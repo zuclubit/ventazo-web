@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  # PostgreSQL - Main OLTP database
+  postgres:
+    image: postgres:15-alpine
+    container_name: zuclubit-postgres
+    environment:
+      POSTGRES_DB: zuclubit_crm
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev123
+      POSTGRES_MULTIPLE_DATABASES: leads,customers,proposals,financial,latam_compliance
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts/postgres:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dev -d zuclubit_crm']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zuclubit-network
+
+  # MongoDB - Document storage for AI and analytics
+  mongodb:
+    image: mongo:7
+    container_name: zuclubit-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: dev
+      MONGO_INITDB_ROOT_PASSWORD: dev123
+      MONGO_INITDB_DATABASE: zuclubit_ai
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zuclubit-network
+
+  # Redis - Cache and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: zuclubit-redis
+    command: redis-server --appendonly yes --requirepass dev123
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zuclubit-network
+
+  # NATS JetStream - Event bus
+  nats:
+    image: nats:latest
+    container_name: zuclubit-nats
+    command: '-js -sd /data'
+    ports:
+      - '4222:4222' # Client connections
+      - '8222:8222' # HTTP monitoring
+      - '6222:6222' # Cluster connections
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:8222/healthz']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zuclubit-network
+
+  # Supabase (for Auth) - simplified setup
+  supabase-db:
+    image: postgres:15-alpine
+    container_name: zuclubit-supabase-db
+    environment:
+      POSTGRES_DB: supabase
+      POSTGRES_USER: supabase
+      POSTGRES_PASSWORD: supabase123
+    ports:
+      - '5433:5432'
+    volumes:
+      - supabase_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U supabase']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zuclubit-network
+
+  # LocalStack - AWS services emulation (optional for local testing)
+  localstack:
+    image: localstack/localstack:latest
+    container_name: zuclubit-localstack
+    environment:
+      SERVICES: lambda,s3,sqs,sns,secretsmanager,dynamodb
+      DEBUG: 1
+      DATA_DIR: /tmp/localstack/data
+      LAMBDA_EXECUTOR: docker
+      DOCKER_HOST: unix:///var/run/docker.sock
+    ports:
+      - '4566:4566' # LocalStack edge port
+      - '4510-4559:4510-4559' # External services port range
+    volumes:
+      - localstack_data:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - zuclubit-network
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+  nats_data:
+  supabase_db_data:
+  localstack_data:
+
+networks:
+  zuclubit-network:
+    driver: bridge
