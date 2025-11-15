@@ -1,0 +1,142 @@
+version: '3.8'
+
+# =============================================================================
+# Zuclubit Smart CRM - Local Development Environment
+# =============================================================================
+# This compose file sets up the complete development environment including:
+# - PostgreSQL databases for each service
+# - NATS for event streaming
+# - PgAdmin for database management
+# - All microservices
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database for Lead Service
+  # ---------------------------------------------------------------------------
+  postgres-leads:
+    image: postgres:16-alpine
+    container_name: zuclubit-postgres-leads
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev123
+      POSTGRES_DB: leads
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-leads-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d leads"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zuclubit-network
+
+  # ---------------------------------------------------------------------------
+  # NATS Server for Event Streaming
+  # ---------------------------------------------------------------------------
+  nats:
+    image: nats:2.10-alpine
+    container_name: zuclubit-nats
+    command:
+      - "-js"  # Enable JetStream
+      - "-sd"  # Enable store directory
+      - "/data"
+    ports:
+      - "4222:4222"  # Client connections
+      - "8222:8222"  # HTTP monitoring
+      - "6222:6222"  # Cluster connections
+    volumes:
+      - nats-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zuclubit-network
+
+  # ---------------------------------------------------------------------------
+  # PgAdmin for Database Management
+  # ---------------------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: zuclubit-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@zuclubit.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      - postgres-leads
+    networks:
+      - zuclubit-network
+
+  # ---------------------------------------------------------------------------
+  # Lead Service
+  # ---------------------------------------------------------------------------
+  lead-service:
+    build:
+      context: ./services/lead-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: zuclubit-lead-service
+    environment:
+      # Server Configuration
+      NODE_ENV: development
+      PORT: 3000
+      HOST: 0.0.0.0
+
+      # Database Configuration
+      POSTGRES_HOST: postgres-leads
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: leads
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev123
+
+      # NATS Configuration
+      NATS_SERVERS: nats://nats:4222
+
+      # API Configuration
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173
+      RATE_LIMIT_MAX: 100
+      RATE_LIMIT_WINDOW: 1 minute
+    ports:
+      - "3001:3000"
+    depends_on:
+      postgres-leads:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+    networks:
+      - zuclubit-network
+    restart: unless-stopped
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  zuclubit-network:
+    driver: bridge
+    name: zuclubit-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres-leads-data:
+    name: zuclubit-postgres-leads-data
+  nats-data:
+    name: zuclubit-nats-data
+  pgadmin-data:
+    name: zuclubit-pgadmin-data
