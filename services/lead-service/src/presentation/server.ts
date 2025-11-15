@@ -5,6 +5,7 @@ import compress from '@fastify/compress';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import { correlationIdMiddleware, requestLoggerOnRequest, requestLoggerOnResponse } from './middlewares';
 
 /**
  * Server configuration options
@@ -45,6 +46,11 @@ export async function createServer(config: ServerConfig): Promise<FastifyInstanc
   };
 
   const server = Fastify(fastifyOptions);
+
+  // Request hooks for correlation ID and logging
+  server.addHook('onRequest', correlationIdMiddleware);
+  server.addHook('onRequest', requestLoggerOnRequest);
+  server.addHook('onResponse', requestLoggerOnResponse);
 
   // Security plugins
   await server.register(helmet, {
@@ -166,16 +172,6 @@ export async function createServer(config: ServerConfig): Promise<FastifyInstanc
     },
   }, async (request, reply) => {
     return { ready: true };
-  });
-
-  // Graceful shutdown
-  const signals = ['SIGINT', 'SIGTERM'];
-  signals.forEach((signal) => {
-    process.on(signal, async () => {
-      server.log.info(`Received ${signal}, shutting down gracefully...`);
-      await server.close();
-      process.exit(0);
-    });
   });
 
   return server;

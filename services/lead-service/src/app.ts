@@ -4,6 +4,7 @@ import { DatabasePool } from '@zuclubit/database';
 import { NatsEventPublisher } from '@zuclubit/events';
 import { createServer, startServer, ServerConfig } from './presentation/server';
 import { errorHandler } from './presentation/middlewares/error-handler.middleware';
+import { leadRoutes } from './presentation/routes/lead.routes';
 import { CommandBus, QueryBus } from './application/common';
 import {
   CreateLeadHandler,
@@ -112,23 +113,69 @@ async function bootstrap() {
   server.setErrorHandler(errorHandler);
 
   // Register routes
-  // TODO: Register route plugins here
-  // await server.register(leadRoutes, { prefix: '/api/v1' });
+  await server.register(leadRoutes, { prefix: '/api/v1/leads' });
 
   // Start server
   await startServer(server, serverConfig);
 
-  // Graceful shutdown
-  const shutdown = async () => {
-    console.log('Shutting down gracefully...');
-    await server.close();
-    await databasePool.close();
-    await eventPublisher.disconnect();
-    process.exit(0);
+  // Graceful shutdown handler
+  let isShuttingDown = false;
+
+  const shutdown = async (signal: string) => {
+    if (isShuttingDown) {
+      server.log.warn('Shutdown already in progress, ignoring signal');
+      return;
+    }
+
+    isShuttingDown = true;
+    server.log.info(`Received ${signal}, starting graceful shutdown...`);
+
+    // Set a timeout for forceful shutdown if graceful shutdown takes too long
+    const forceShutdownTimeout = setTimeout(() => {
+      server.log.error('Graceful shutdown timed out, forcing exit');
+      process.exit(1);
+    }, 30000); // 30 seconds timeout
+
+    try {
+      // Stop accepting new requests
+      server.log.info('Closing HTTP server...');
+      await server.close();
+      server.log.info('HTTP server closed');
+
+      // Close database connections
+      server.log.info('Closing database connections...');
+      await databasePool.close();
+      server.log.info('Database connections closed');
+
+      // Disconnect from event bus
+      server.log.info('Disconnecting from NATS...');
+      await eventPublisher.disconnect();
+      server.log.info('NATS disconnected');
+
+      clearTimeout(forceShutdownTimeout);
+      server.log.info('Graceful shutdown completed successfully');
+      process.exit(0);
+    } catch (error) {
+      clearTimeout(forceShutdownTimeout);
+      server.log.error({ error }, 'Error during graceful shutdown');
+      process.exit(1);
+    }
   };
 
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  // Register shutdown handlers for different signals
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  // Handle uncaught errors
+  process.on('uncaughtException', (error) => {
+    server.log.error({ error }, 'Uncaught exception');
+    shutdown('uncaughtException');
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    server.log.error({ reason, promise }, 'Unhandled rejection');
+    shutdown('unhandledRejection');
+  });
 }
 
 // Start application
