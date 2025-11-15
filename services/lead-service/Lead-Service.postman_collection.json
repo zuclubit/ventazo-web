@@ -1,0 +1,1810 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"name": "Lead Service API",
+		"description": "# Lead Service API - Zuclubit Smart CRM\n\n## Overview\n\nRESTful API para la gestión de leads (prospectos) en el sistema CRM.\n\n## Architecture\n\n- **Clean Architecture**: Domain, Application, Infrastructure, Presentation\n- **CQRS**: Separación de comandos y queries\n- **Event-Driven**: Eventos de dominio con NATS JetStream\n- **Multi-tenant**: Soporte para múltiples tenants\n\n## Authentication\n\n🚧 **TODO**: JWT authentication will be implemented\n- Currently using `system` user for audit fields\n- Future: Extract user from JWT token\n\n## Base URL\n\n- **Local**: `http://localhost:3001`\n- **Development**: `https://dev-api.zuclubit.com`\n- **Production**: `https://api.zuclubit.com`\n\n## Headers\n\n- `Content-Type: application/json`\n- `x-correlation-id`: Request tracing ID (auto-generated if not provided)\n- `x-tenant-id`: Tenant identifier (required for multi-tenant operations)\n\n## Lead Status Flow\n\n```\nNEW → CONTACTED → QUALIFIED → PROPOSAL → NEGOTIATION → WON\n  ↓       ↓           ↓            ↓\nUNQUALIFIED    LOST      LOST       LOST\n```\n\n## Lead Score\n\n- **Range**: 0-100\n- **Categories**:\n  - 🔥 Hot: >= 80\n  - 🌡️ Warm: >= 50\n  - ❄️ Cold: < 50\n- **Qualification Threshold**: >= 60\n\n## Version\n\n**v0.1.0** - Phase 4 Complete",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "12345678"
+	},
+	"item": [
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has status field\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"    pm.expect(jsonData.status).to.eql('healthy');",
+									"});",
+									"",
+									"pm.test(\"Response has timestamp\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('timestamp');",
+									"});",
+									"",
+									"pm.test(\"Response has uptime\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('uptime');",
+									"    pm.expect(jsonData.uptime).to.be.a('number');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Verifica el estado del servicio, base de datos y event publisher."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/health",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"health"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"status\": \"healthy\",\n    \"timestamp\": \"2025-11-15T16:30:00.000Z\",\n    \"uptime\": 3600.5,\n    \"database\": {\n        \"status\": \"connected\",\n        \"maxConnections\": 10,\n        \"idleConnections\": 9\n    },\n    \"eventPublisher\": {\n        \"status\": \"connected\",\n        \"servers\": [\"nats://localhost:4222\"]\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Ready Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Service is ready\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('ready');",
+									"    pm.expect(jsonData.ready).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/ready",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"ready"
+							]
+						},
+						"description": "Verifica que el servicio está listo para recibir tráfico (health check para Kubernetes)."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/ready",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"ready"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"ready\": true\n}"
+						}
+					]
+				}
+			],
+			"description": "Endpoints de salud y disponibilidad del servicio"
+		},
+		{
+			"name": "Leads - CRUD",
+			"item": [
+				{
+					"name": "Create Lead",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate UUIDs for tenant",
+									"if (!pm.collectionVariables.get('tenant_id')) {",
+									"    pm.collectionVariables.set('tenant_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+									"}",
+									"",
+									"// Generate correlation ID for tracing",
+									"pm.collectionVariables.set('correlation_id', pm.variables.replaceIn('{{$randomUUID}}'));"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response has lead ID\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);",
+									"    ",
+									"    // Save lead ID for other requests",
+									"    pm.collectionVariables.set('lead_id', jsonData.id);",
+									"});",
+									"",
+									"pm.test(\"Lead has correct initial status\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql('new');",
+									"});",
+									"",
+									"pm.test(\"Lead has default score\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.score).to.eql(50);",
+									"    pm.expect(jsonData.scoreCategory).to.eql('warm');",
+									"});",
+									"",
+									"pm.test(\"Response has correlation ID\", function () {",
+									"    pm.expect(pm.response.headers.get('x-correlation-id')).to.exist;",
+									"});",
+									"",
+									"pm.test(\"Response has required fields\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('companyName');",
+									"    pm.expect(jsonData).to.have.property('email');",
+									"    pm.expect(jsonData).to.have.property('createdAt');",
+									"    pm.expect(jsonData).to.have.property('updatedAt');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-correlation-id",
+								"value": "{{correlation_id}}",
+								"description": "Request tracing ID"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenantId\": \"{{tenant_id}}\",\n    \"companyName\": \"Acme Corporation\",\n    \"contactName\": \"John Doe\",\n    \"email\": \"john.doe@acme.com\",\n    \"phone\": \"+1-555-123-4567\",\n    \"source\": \"Website Contact Form\",\n    \"industry\": \"Technology\",\n    \"website\": \"https://acme.com\",\n    \"estimatedValue\": 50000,\n    \"notes\": \"Interested in enterprise plan. Follow up next week.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/leads",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads"
+							]
+						},
+						"description": "Crea un nuevo lead en el sistema.\n\n**Command**: `CreateLeadCommand`\n\n**Required Fields**:\n- `tenantId` (UUID)\n- `companyName` (1-255 chars)\n- `email` (valid email)\n- `source` (1-100 chars)\n\n**Optional Fields**:\n- `contactName`\n- `phone`\n- `industry`\n- `website`\n- `estimatedValue`\n- `notes` (max 2000 chars)\n\n**Default Values**:\n- `status`: \"new\"\n- `score`: 50"
+					},
+					"response": [
+						{
+							"name": "Success - Complete",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"tenantId\": \"123e4567-e89b-12d3-a456-426614174000\",\n    \"companyName\": \"Acme Corporation\",\n    \"contactName\": \"John Doe\",\n    \"email\": \"john.doe@acme.com\",\n    \"phone\": \"+1-555-123-4567\",\n    \"source\": \"Website Contact Form\",\n    \"industry\": \"Technology\",\n    \"website\": \"https://acme.com\",\n    \"estimatedValue\": 50000,\n    \"notes\": \"Interested in enterprise plan\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								},
+								{
+									"key": "x-correlation-id",
+									"value": "abc123-def456"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"9f8d7c6b-5a4e-3d2c-1b0a-987654321000\",\n    \"tenantId\": \"123e4567-e89b-12d3-a456-426614174000\",\n    \"companyName\": \"Acme Corporation\",\n    \"email\": \"john.doe@acme.com\",\n    \"phone\": \"+1-555-123-4567\",\n    \"website\": \"https://acme.com\",\n    \"industry\": \"Technology\",\n    \"employeeCount\": null,\n    \"annualRevenue\": null,\n    \"status\": \"new\",\n    \"score\": 50,\n    \"scoreCategory\": \"warm\",\n    \"source\": \"Website Contact Form\",\n    \"ownerId\": null,\n    \"notes\": \"Interested in enterprise plan\",\n    \"customFields\": {},\n    \"createdAt\": \"2025-11-15T16:30:00.000Z\",\n    \"updatedAt\": \"2025-11-15T16:30:00.000Z\",\n    \"lastActivityAt\": null,\n    \"nextFollowUpAt\": null,\n    \"isFollowUpOverdue\": false\n}"
+						},
+						{
+							"name": "Success - Minimal",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"tenantId\": \"123e4567-e89b-12d3-a456-426614174000\",\n    \"companyName\": \"Tech Startup Inc\",\n    \"email\": \"contact@techstartup.io\",\n    \"source\": \"LinkedIn\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"8e7d6c5b-4a3e-2d1c-0b9a-876543210000\",\n    \"tenantId\": \"123e4567-e89b-12d3-a456-426614174000\",\n    \"companyName\": \"Tech Startup Inc\",\n    \"email\": \"contact@techstartup.io\",\n    \"phone\": null,\n    \"website\": null,\n    \"industry\": null,\n    \"employeeCount\": null,\n    \"annualRevenue\": null,\n    \"status\": \"new\",\n    \"score\": 50,\n    \"scoreCategory\": \"warm\",\n    \"source\": \"LinkedIn\",\n    \"ownerId\": null,\n    \"notes\": null,\n    \"customFields\": {},\n    \"createdAt\": \"2025-11-15T16:31:00.000Z\",\n    \"updatedAt\": \"2025-11-15T16:31:00.000Z\",\n    \"lastActivityAt\": null,\n    \"nextFollowUpAt\": null,\n    \"isFollowUpOverdue\": false\n}"
+						},
+						{
+							"name": "Error - Missing Required Field",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"tenantId\": \"123e4567-e89b-12d3-a456-426614174000\",\n    \"companyName\": \"Test Company\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"statusCode\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Validation failed\",\n    \"category\": \"VALIDATION_ERROR\",\n    \"correlationId\": \"abc123-def456\",\n    \"details\": [\n        {\n            \"path\": [\"email\"],\n            \"message\": \"Required\"\n        },\n        {\n            \"path\": [\"source\"],\n            \"message\": \"Required\"\n        }\n    ]\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Lead by ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has lead data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('companyName');",
+									"    pm.expect(jsonData).to.have.property('email');",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"    pm.expect(jsonData).to.have.property('score');",
+									"});",
+									"",
+									"pm.test(\"Lead ID matches requested ID\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    var requestedId = pm.collectionVariables.get('lead_id');",
+									"    if (requestedId) {",
+									"        pm.expect(jsonData.id).to.eql(requestedId);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/leads/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{lead_id}}",
+									"description": "Lead UUID"
+								}
+							]
+						},
+						"description": "Obtiene un lead por su ID.\n\n**Query**: `GetLeadByIdQuery`\n\n**Path Parameters**:\n- `id` (UUID): Lead identifier"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"9f8d7c6b-5a4e-3d2c-1b0a-987654321000\",\n    \"tenantId\": \"123e4567-e89b-12d3-a456-426614174000\",\n    \"companyName\": \"Acme Corporation\",\n    \"email\": \"john.doe@acme.com\",\n    \"phone\": \"+1-555-123-4567\",\n    \"website\": \"https://acme.com\",\n    \"industry\": \"Technology\",\n    \"employeeCount\": null,\n    \"annualRevenue\": null,\n    \"status\": \"contacted\",\n    \"score\": 65,\n    \"scoreCategory\": \"warm\",\n    \"source\": \"Website Contact Form\",\n    \"ownerId\": \"user-123e4567-e89b-12d3-a456-426614174000\",\n    \"notes\": \"Had initial call, very interested\",\n    \"customFields\": {},\n    \"createdAt\": \"2025-11-15T16:30:00.000Z\",\n    \"updatedAt\": \"2025-11-15T17:00:00.000Z\",\n    \"lastActivityAt\": \"2025-11-15T17:00:00.000Z\",\n    \"nextFollowUpAt\": \"2025-11-18T10:00:00.000Z\",\n    \"isFollowUpOverdue\": false\n}"
+						},
+						{
+							"name": "Error - Not Found",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/00000000-0000-0000-0000-000000000000",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"00000000-0000-0000-0000-000000000000"
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"statusCode\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Lead not found\",\n    \"category\": \"NOT_FOUND_ERROR\",\n    \"correlationId\": \"abc123-def456\"\n}"
+						}
+					]
+				},
+				{
+					"name": "List Leads",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has data array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"    pm.expect(jsonData.data).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Response has pagination\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('pagination');",
+									"    pm.expect(jsonData.pagination).to.have.property('page');",
+									"    pm.expect(jsonData.pagination).to.have.property('limit');",
+									"    pm.expect(jsonData.pagination).to.have.property('total');",
+									"    pm.expect(jsonData.pagination).to.have.property('totalPages');",
+									"});",
+									"",
+									"pm.test(\"Data array length <= limit\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.data.length).to.be.at.most(jsonData.pagination.limit);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/leads?page=1&limit=10&sortBy=createdAt&sortOrder=desc",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number (default: 1)"
+								},
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Items per page (default: 10, max: 100)"
+								},
+								{
+									"key": "status",
+									"value": "new",
+									"description": "Filter by status",
+									"disabled": true
+								},
+								{
+									"key": "minScore",
+									"value": "60",
+									"description": "Minimum score filter",
+									"disabled": true
+								},
+								{
+									"key": "maxScore",
+									"value": "100",
+									"description": "Maximum score filter",
+									"disabled": true
+								},
+								{
+									"key": "source",
+									"value": "Website",
+									"description": "Filter by source",
+									"disabled": true
+								},
+								{
+									"key": "industry",
+									"value": "Technology",
+									"description": "Filter by industry",
+									"disabled": true
+								},
+								{
+									"key": "assignedTo",
+									"value": "user-uuid",
+									"description": "Filter by assigned user",
+									"disabled": true
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt",
+									"description": "Sort field: companyName, email, score, createdAt, updatedAt"
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc",
+									"description": "Sort order: asc, desc"
+								}
+							]
+						},
+						"description": "Lista todos los leads con filtros y paginación.\n\n**Query**: `FindLeadsQuery`\n\n**Query Parameters**:\n- `page` (integer, default: 1)\n- `limit` (integer, default: 10, max: 100)\n- `status` (enum: new, contacted, qualified, etc.)\n- `minScore` (integer: 0-100)\n- `maxScore` (integer: 0-100)\n- `source` (string)\n- `industry` (string)\n- `assignedTo` (UUID)\n- `sortBy` (enum: companyName, email, score, createdAt, updatedAt)\n- `sortOrder` (enum: asc, desc)"
+					},
+					"response": [
+						{
+							"name": "Success - With Filters",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads?page=1&limit=10&status=qualified&minScore=60&sortBy=score&sortOrder=desc",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1"
+										},
+										{
+											"key": "limit",
+											"value": "10"
+										},
+										{
+											"key": "status",
+											"value": "qualified"
+										},
+										{
+											"key": "minScore",
+											"value": "60"
+										},
+										{
+											"key": "sortBy",
+											"value": "score"
+										},
+										{
+											"key": "sortOrder",
+											"value": "desc"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"data\": [\n        {\n            \"id\": \"9f8d7c6b-5a4e-3d2c-1b0a-987654321000\",\n            \"tenantId\": \"123e4567-e89b-12d3-a456-426614174000\",\n            \"companyName\": \"Acme Corporation\",\n            \"email\": \"john.doe@acme.com\",\n            \"phone\": \"+1-555-123-4567\",\n            \"website\": \"https://acme.com\",\n            \"industry\": \"Technology\",\n            \"employeeCount\": null,\n            \"annualRevenue\": null,\n            \"status\": \"qualified\",\n            \"score\": 85,\n            \"scoreCategory\": \"hot\",\n            \"source\": \"Website Contact Form\",\n            \"ownerId\": \"user-123e4567-e89b-12d3-a456-426614174000\",\n            \"notes\": \"Ready for proposal\",\n            \"customFields\": {},\n            \"createdAt\": \"2025-11-15T16:30:00.000Z\",\n            \"updatedAt\": \"2025-11-15T18:00:00.000Z\",\n            \"lastActivityAt\": \"2025-11-15T18:00:00.000Z\",\n            \"nextFollowUpAt\": null,\n            \"isFollowUpOverdue\": false\n        }\n    ],\n    \"pagination\": {\n        \"page\": 1,\n        \"limit\": 10,\n        \"total\": 1,\n        \"totalPages\": 1\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Update Lead",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Lead was updated\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('updatedAt');",
+									"    ",
+									"    // Check that updatedAt is recent",
+									"    var updatedAt = new Date(jsonData.updatedAt);",
+									"    var now = new Date();",
+									"    var diff = now - updatedAt;",
+									"    pm.expect(diff).to.be.lessThan(60000); // Less than 1 minute",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phone\": \"+1-555-987-6543\",\n    \"industry\": \"SaaS\",\n    \"website\": \"https://acme-updated.com\",\n    \"estimatedValue\": 75000,\n    \"notes\": \"Updated contact information after meeting.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/leads/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{lead_id}}",
+									"description": "Lead UUID"
+								}
+							]
+						},
+						"description": "Actualiza la información de un lead.\n\n**Command**: `UpdateLeadCommand`\n\n**Path Parameters**:\n- `id` (UUID): Lead identifier\n\n**Optional Body Fields** (all optional, send only what you want to update):\n- `companyName`\n- `contactName`\n- `email`\n- `phone`\n- `industry`\n- `website`\n- `estimatedValue`\n- `notes`\n\n**Business Rules**:\n- Cannot update closed leads (status: won/lost)\n- Email must be valid format\n- Company name cannot be empty"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"phone\": \"+1-555-987-6543\",\n    \"notes\": \"Updated after meeting\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"9f8d7c6b-5a4e-3d2c-1b0a-987654321000\",\n    \"tenantId\": \"123e4567-e89b-12d3-a456-426614174000\",\n    \"companyName\": \"Acme Corporation\",\n    \"email\": \"john.doe@acme.com\",\n    \"phone\": \"+1-555-987-6543\",\n    \"website\": \"https://acme.com\",\n    \"industry\": \"Technology\",\n    \"employeeCount\": null,\n    \"annualRevenue\": null,\n    \"status\": \"contacted\",\n    \"score\": 65,\n    \"scoreCategory\": \"warm\",\n    \"source\": \"Website Contact Form\",\n    \"ownerId\": \"user-123e4567-e89b-12d3-a456-426614174000\",\n    \"notes\": \"Updated after meeting\",\n    \"customFields\": {},\n    \"createdAt\": \"2025-11-15T16:30:00.000Z\",\n    \"updatedAt\": \"2025-11-15T18:30:00.000Z\",\n    \"lastActivityAt\": \"2025-11-15T17:00:00.000Z\",\n    \"nextFollowUpAt\": \"2025-11-18T10:00:00.000Z\",\n    \"isFollowUpOverdue\": false\n}"
+						},
+						{
+							"name": "Error - Cannot Update Closed Lead",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"notes\": \"Trying to update\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"statusCode\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Cannot update closed lead\",\n    \"category\": \"BUSINESS_RULE_ERROR\",\n    \"correlationId\": \"abc123-def456\"\n}"
+						}
+					]
+				}
+			],
+			"description": "Operaciones CRUD básicas para leads"
+		},
+		{
+			"name": "Leads - Actions",
+			"item": [
+				{
+					"name": "Change Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Status was changed\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    var requestBody = JSON.parse(pm.request.body.raw);",
+									"    pm.expect(jsonData.status).to.eql(requestBody.status);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"contacted\",\n    \"reason\": \"Initial call completed. Lead is interested in our services.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/leads/:id/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								":id",
+								"status"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{lead_id}}"
+								}
+							]
+						},
+						"description": "Cambia el estado de un lead.\n\n**Command**: `ChangeLeadStatusCommand`\n\n**Path Parameters**:\n- `id` (UUID): Lead identifier\n\n**Body**:\n- `status` (required, enum): new, contacted, qualified, proposal, negotiation, won, lost, unqualified\n- `reason` (required, 1-500 chars): Reason for status change\n\n**Valid Transitions**:\n- NEW → contacted, unqualified, lost\n- CONTACTED → qualified, unqualified, lost\n- QUALIFIED → proposal, unqualified, lost\n- PROPOSAL → negotiation, won, lost\n- NEGOTIATION → won, lost\n- WON/LOST/UNQUALIFIED → (no transitions allowed)"
+					},
+					"response": [
+						{
+							"name": "Success - New to Contacted",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"status\": \"contacted\",\n    \"reason\": \"Initial call completed\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000/status",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+										"status"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"9f8d7c6b-5a4e-3d2c-1b0a-987654321000\",\n    \"tenantId\": \"123e4567-e89b-12d3-a456-426614174000\",\n    \"companyName\": \"Acme Corporation\",\n    \"email\": \"john.doe@acme.com\",\n    \"status\": \"contacted\",\n    \"score\": 50,\n    \"scoreCategory\": \"warm\",\n    \"updatedAt\": \"2025-11-15T17:00:00.000Z\"\n}"
+						},
+						{
+							"name": "Error - Invalid Transition",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"status\": \"won\",\n    \"reason\": \"Trying to skip steps\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000/status",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+										"status"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"statusCode\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Invalid status transition from new to won\",\n    \"category\": \"BUSINESS_RULE_ERROR\",\n    \"correlationId\": \"abc123-def456\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update Score",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Score was updated\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    var requestBody = JSON.parse(pm.request.body.raw);",
+									"    pm.expect(jsonData.score).to.eql(requestBody.score);",
+									"});",
+									"",
+									"pm.test(\"Score category is correct\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    var score = jsonData.score;",
+									"    var expectedCategory = score >= 80 ? 'hot' : score >= 50 ? 'warm' : 'cold';",
+									"    pm.expect(jsonData.scoreCategory).to.eql(expectedCategory);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"score\": 85,\n    \"reason\": \"High engagement during demo. Budget confirmed. Decision maker identified.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/leads/:id/score",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								":id",
+								"score"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{lead_id}}"
+								}
+							]
+						},
+						"description": "Actualiza el score de calificación de un lead.\n\n**Command**: `UpdateLeadScoreCommand`\n\n**Path Parameters**:\n- `id` (UUID): Lead identifier\n\n**Body**:\n- `score` (required, integer 0-100): New score value\n- `reason` (required, 1-500 chars): Reason for score change\n\n**Score Categories**:\n- 🔥 Hot: >= 80\n- 🌡️ Warm: >= 50\n- ❄️ Cold: < 50\n\n**Qualification Threshold**: 60"
+					},
+					"response": [
+						{
+							"name": "Success - Hot Lead",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"score\": 85,\n    \"reason\": \"High engagement during demo\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000/score",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+										"score"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"9f8d7c6b-5a4e-3d2c-1b0a-987654321000\",\n    \"score\": 85,\n    \"scoreCategory\": \"hot\",\n    \"updatedAt\": \"2025-11-15T17:30:00.000Z\"\n}"
+						},
+						{
+							"name": "Error - Invalid Score",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"score\": 150,\n    \"reason\": \"Invalid score\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000/score",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+										"score"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"statusCode\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Score must be at most 100\",\n    \"category\": \"VALIDATION_ERROR\",\n    \"correlationId\": \"abc123-def456\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Assign Lead",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate a user UUID for assignment",
+									"if (!pm.collectionVariables.get('user_id')) {",
+									"    pm.collectionVariables.set('user_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Lead was assigned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('ownerId');",
+									"    pm.expect(jsonData.ownerId).to.not.be.null;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"assignedTo\": \"{{user_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/leads/:id/assign",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								":id",
+								"assign"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{lead_id}}"
+								}
+							]
+						},
+						"description": "Asigna un lead a un usuario (sales rep).\n\n**Command**: `AssignLeadCommand`\n\n**Path Parameters**:\n- `id` (UUID): Lead identifier\n\n**Body**:\n- `assignedTo` (required, UUID): User ID to assign lead to\n\n**Business Rules**:\n- Cannot assign closed leads"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"assignedTo\": \"user-123e4567-e89b-12d3-a456-426614174000\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000/assign",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+										"assign"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"9f8d7c6b-5a4e-3d2c-1b0a-987654321000\",\n    \"ownerId\": \"user-123e4567-e89b-12d3-a456-426614174000\",\n    \"updatedAt\": \"2025-11-15T17:45:00.000Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Qualify Lead",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate a user UUID",
+									"if (!pm.collectionVariables.get('user_id')) {",
+									"    pm.collectionVariables.set('user_id', pm.variables.replaceIn('{{$randomUUID}}'));",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Lead status is qualified\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql('qualified');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"qualifiedBy\": \"{{user_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/leads/:id/qualify",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								":id",
+								"qualify"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{lead_id}}"
+								}
+							]
+						},
+						"description": "Califica un lead (marca como qualified).\n\n**Command**: `QualifyLeadCommand`\n\n**Path Parameters**:\n- `id` (UUID): Lead identifier\n\n**Body**:\n- `qualifiedBy` (required, UUID): User ID who qualified the lead\n\n**Business Rules**:\n- Lead score must be >= 60 (qualification threshold)\n- Automatically changes status to 'qualified'\n- Must follow valid status transitions"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"qualifiedBy\": \"user-123e4567-e89b-12d3-a456-426614174000\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000/qualify",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+										"qualify"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"9f8d7c6b-5a4e-3d2c-1b0a-987654321000\",\n    \"status\": \"qualified\",\n    \"score\": 85,\n    \"scoreCategory\": \"hot\",\n    \"updatedAt\": \"2025-11-15T18:00:00.000Z\"\n}"
+						},
+						{
+							"name": "Error - Score Too Low",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"qualifiedBy\": \"user-123e4567-e89b-12d3-a456-426614174000\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000/qualify",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+										"qualify"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"statusCode\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Lead score (45) is below qualification threshold\",\n    \"category\": \"BUSINESS_RULE_ERROR\",\n    \"correlationId\": \"abc123-def456\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Schedule Follow-up",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate future datetime (3 days from now)",
+									"var futureDate = new Date();",
+									"futureDate.setDate(futureDate.getDate() + 3);",
+									"pm.collectionVariables.set('follow_up_date', futureDate.toISOString());"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Follow-up was scheduled\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('nextFollowUpAt');",
+									"    pm.expect(jsonData.nextFollowUpAt).to.not.be.null;",
+									"});",
+									"",
+									"pm.test(\"Follow-up is not overdue\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.isFollowUpOverdue).to.be.false;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"scheduledAt\": \"{{follow_up_date}}\",\n    \"notes\": \"Follow up to discuss pricing and implementation timeline. Bring technical team for Q&A.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/leads/:id/follow-up",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								":id",
+								"follow-up"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{lead_id}}"
+								}
+							]
+						},
+						"description": "Programa un seguimiento futuro para un lead.\n\n**Command**: `ScheduleFollowUpCommand`\n\n**Path Parameters**:\n- `id` (UUID): Lead identifier\n\n**Body**:\n- `scheduledAt` (required, ISO 8601 datetime): Follow-up date/time\n- `notes` (required, 1-1000 chars): Follow-up notes\n\n**Business Rules**:\n- Cannot schedule for closed leads\n- Date must be in the future\n- Overwrites previous follow-up if exists"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"scheduledAt\": \"2025-11-18T10:00:00.000Z\",\n    \"notes\": \"Follow up to discuss pricing\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000/follow-up",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+										"follow-up"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"9f8d7c6b-5a4e-3d2c-1b0a-987654321000\",\n    \"nextFollowUpAt\": \"2025-11-18T10:00:00.000Z\",\n    \"isFollowUpOverdue\": false,\n    \"updatedAt\": \"2025-11-15T18:15:00.000Z\"\n}"
+						},
+						{
+							"name": "Error - Past Date",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"scheduledAt\": \"2020-01-01T10:00:00.000Z\",\n    \"notes\": \"Past date\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/9f8d7c6b-5a4e-3d2c-1b0a-987654321000/follow-up",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"9f8d7c6b-5a4e-3d2c-1b0a-987654321000",
+										"follow-up"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"statusCode\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Follow-up date must be in the future\",\n    \"category\": \"BUSINESS_RULE_ERROR\",\n    \"correlationId\": \"abc123-def456\"\n}"
+						}
+					]
+				}
+			],
+			"description": "Acciones específicas sobre leads (cambiar estado, asignar, calificar, etc.)"
+		},
+		{
+			"name": "Stats & Queries",
+			"item": [
+				{
+					"name": "Get Lead Stats",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has statistics\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('totalLeads');",
+									"    pm.expect(jsonData).to.have.property('leadsByStatus');",
+									"    pm.expect(jsonData).to.have.property('averageScoreByStatus');",
+									"});",
+									"",
+									"pm.test(\"Total leads is a number\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.totalLeads).to.be.a('number');",
+									"    pm.expect(jsonData.totalLeads).to.be.at.least(0);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/leads/stats/overview?tenantId={{tenant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"stats",
+								"overview"
+							],
+							"query": [
+								{
+									"key": "tenantId",
+									"value": "{{tenant_id}}",
+									"description": "Filter by tenant (optional)"
+								}
+							]
+						},
+						"description": "Obtiene estadísticas generales de leads.\n\n**Query**: `GetLeadStatsQuery`\n\n**Query Parameters**:\n- `tenantId` (optional, UUID): Filter by tenant\n\n**Returns**:\n- Total leads count\n- Breakdown by status\n- Average score per status"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/stats/overview?tenantId=123e4567-e89b-12d3-a456-426614174000",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"stats",
+										"overview"
+									],
+									"query": [
+										{
+											"key": "tenantId",
+											"value": "123e4567-e89b-12d3-a456-426614174000"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"totalLeads\": 150,\n    \"leadsByStatus\": {\n        \"new\": 45,\n        \"contacted\": 38,\n        \"qualified\": 25,\n        \"proposal\": 18,\n        \"negotiation\": 10,\n        \"won\": 8,\n        \"lost\": 4,\n        \"unqualified\": 2\n    },\n    \"averageScoreByStatus\": {\n        \"new\": 50,\n        \"contacted\": 58,\n        \"qualified\": 72,\n        \"proposal\": 78,\n        \"negotiation\": 85,\n        \"won\": 90,\n        \"lost\": 35,\n        \"unqualified\": 28\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Overdue Follow-ups",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is an array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"All leads have overdue follow-ups\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    jsonData.forEach(function(lead) {",
+									"        pm.expect(lead.isFollowUpOverdue).to.be.true;",
+									"        pm.expect(lead.nextFollowUpAt).to.exist;",
+									"    });",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/leads/follow-ups/overdue?tenantId={{tenant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"leads",
+								"follow-ups",
+								"overdue"
+							],
+							"query": [
+								{
+									"key": "tenantId",
+									"value": "{{tenant_id}}",
+									"description": "Filter by tenant (optional)"
+								},
+								{
+									"key": "assignedTo",
+									"value": "{{user_id}}",
+									"description": "Filter by assigned user (optional)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Obtiene todos los leads con seguimientos vencidos.\n\n**Query**: `GetOverdueFollowUpsQuery`\n\n**Query Parameters**:\n- `tenantId` (optional, UUID): Filter by tenant\n- `assignedTo` (optional, UUID): Filter by assigned user\n\n**Returns**:\n- Array of leads with `nextFollowUpAt` < current date\n- All leads have `isFollowUpOverdue: true`"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/follow-ups/overdue?assignedTo=user-123e4567-e89b-12d3-a456-426614174000",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"follow-ups",
+										"overdue"
+									],
+									"query": [
+										{
+											"key": "assignedTo",
+											"value": "user-123e4567-e89b-12d3-a456-426614174000"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": \"9f8d7c6b-5a4e-3d2c-1b0a-987654321000\",\n        \"tenantId\": \"123e4567-e89b-12d3-a456-426614174000\",\n        \"companyName\": \"Acme Corporation\",\n        \"email\": \"john.doe@acme.com\",\n        \"status\": \"contacted\",\n        \"score\": 65,\n        \"scoreCategory\": \"warm\",\n        \"ownerId\": \"user-123e4567-e89b-12d3-a456-426614174000\",\n        \"nextFollowUpAt\": \"2025-11-10T10:00:00.000Z\",\n        \"isFollowUpOverdue\": true,\n        \"createdAt\": \"2025-11-01T16:30:00.000Z\",\n        \"updatedAt\": \"2025-11-05T17:00:00.000Z\"\n    },\n    {\n        \"id\": \"8e7d6c5b-4a3e-2d1c-0b9a-876543210000\",\n        \"tenantId\": \"123e4567-e89b-12d3-a456-426614174000\",\n        \"companyName\": \"Tech Startup Inc\",\n        \"email\": \"contact@techstartup.io\",\n        \"status\": \"qualified\",\n        \"score\": 75,\n        \"scoreCategory\": \"warm\",\n        \"ownerId\": \"user-123e4567-e89b-12d3-a456-426614174000\",\n        \"nextFollowUpAt\": \"2025-11-12T14:00:00.000Z\",\n        \"isFollowUpOverdue\": true,\n        \"createdAt\": \"2025-11-02T10:15:00.000Z\",\n        \"updatedAt\": \"2025-11-08T11:30:00.000Z\"\n    }\n]"
+						},
+						{
+							"name": "Success - No Overdue",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/v1/leads/follow-ups/overdue",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"leads",
+										"follow-ups",
+										"overdue"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "[]"
+						}
+					]
+				}
+			],
+			"description": "Consultas de estadísticas y reportes"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global pre-request script",
+					"",
+					"// Log request for debugging",
+					"console.log('Request:', pm.request.method, pm.request.url.toString());",
+					"",
+					"// Ensure correlation ID exists",
+					"if (!pm.request.headers.get('x-correlation-id')) {",
+					"    pm.request.headers.add({",
+					"        key: 'x-correlation-id',",
+					"        value: pm.variables.replaceIn('{{$randomUUID}}')",
+					"    });",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test script",
+					"",
+					"// Check response time",
+					"pm.test(\"Response time is acceptable\", function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(3000); // 3 seconds",
+					"});",
+					"",
+					"// Check that correlation ID is returned",
+					"pm.test(\"Response has correlation ID header\", function () {",
+					"    pm.expect(pm.response.headers.get('x-correlation-id')).to.exist;",
+					"});",
+					"",
+					"// Check content type for successful responses",
+					"if (pm.response.code < 400) {",
+					"    pm.test(\"Content-Type is application/json\", function () {",
+					"        pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+					"    });",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3001",
+			"type": "string"
+		},
+		{
+			"key": "tenant_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "lead_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "correlation_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "follow_up_date",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
