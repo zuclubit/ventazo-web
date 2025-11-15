@@ -1,25 +1,35 @@
-import { Request, Response, NextFunction } from 'express';
+import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 
 /**
- * Global error handler middleware
+ * Global error handler for Fastify
  * Catches all errors and returns consistent error responses
  */
-export const errorHandler = (
-  err: Error,
-  req: Request,
-  res: Response,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  next: NextFunction
-): void => {
-  console.error('Error:', err);
+export function errorHandler(
+  error: FastifyError,
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  request.log.error(error);
 
-  // Default to 500 server error
-  const statusCode = (err as Error & { statusCode?: number }).statusCode || 500;
+  // Determine status code
+  const statusCode = error.statusCode || 500;
 
-  res.status(statusCode).json({
-    error: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && {
-      stack: err.stack,
-    }),
-  });
-};
+  // Build error response
+  const response: {
+    statusCode: number;
+    error: string;
+    message: string;
+    stack?: string;
+  } = {
+    statusCode,
+    error: error.name || 'Internal Server Error',
+    message: error.message || 'An unexpected error occurred',
+  };
+
+  // Include stack trace in development
+  if (process.env.NODE_ENV === 'development') {
+    response.stack = error.stack;
+  }
+
+  reply.status(statusCode).send(response);
+}

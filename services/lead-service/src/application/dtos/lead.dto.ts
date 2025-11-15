@@ -65,3 +65,44 @@ export interface LeadStatsDTO {
   leadsByStatus: Record<string, number>;
   averageScoreByStatus: Record<string, number>;
 }
+
+/**
+ * Mapper to convert Lead aggregate to DTOs
+ */
+import { Lead } from '../../domain/aggregates';
+
+export class LeadMapper {
+  static toResponseDTO(lead: Lead): LeadResponseDTO {
+    const now = new Date();
+    const nextFollowUp = lead.getNextFollowUpAt();
+    const isFollowUpOverdue = nextFollowUp ? nextFollowUp < now : false;
+
+    return {
+      id: lead.id,
+      tenantId: lead.tenantId,
+      companyName: lead.getCompanyName(),
+      email: lead.getEmail().value,
+      phone: lead.getPhone() || null,
+      website: lead.getWebsite() || null,
+      industry: lead.getIndustry() || null,
+      employeeCount: lead.getEmployeeCount() || null,
+      annualRevenue: lead.getAnnualRevenue() || null,
+      status: lead.getStatus().value,
+      score: lead.getScore().value,
+      scoreCategory: lead.getScore().getCategory(),
+      source: lead.getSource(),
+      ownerId: lead.getOwnerId() || null,
+      notes: lead.getNotes() || null,
+      customFields: lead.getCustomFields(),
+      createdAt: lead.createdAt.toISOString(),
+      updatedAt: lead.getUpdatedAt().toISOString(),
+      lastActivityAt: lead.getLastActivityAt()?.toISOString() || null,
+      nextFollowUpAt: nextFollowUp?.toISOString() || null,
+      isFollowUpOverdue,
+    };
+  }
+
+  static toResponseDTOArray(leads: Lead[]): LeadResponseDTO[] {
+    return leads.map(lead => this.toResponseDTO(lead));
+  }
+}
