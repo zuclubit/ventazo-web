@@ -5,6 +5,7 @@ import { DatabasePool } from '@zuclubit/database';
 import { IEventPublisher } from '@zuclubit/events';
 import { createServer, ServerConfig } from '../../presentation/server';
 import { errorHandler } from '../../presentation/middlewares/error-handler.middleware';
+import { leadRoutes } from '../../presentation/routes/lead.routes';
 import { CommandBus, QueryBus } from '../../application/common';
 import {
   CreateLeadHandler,
@@ -127,7 +128,7 @@ export async function buildTestServer(databasePool: DatabasePool): Promise<Fasti
   server.setErrorHandler(errorHandler);
 
   // Register routes
-  // TODO: Add route registration when routes are implemented
+  await server.register(leadRoutes, { prefix: '/api/v1/leads' });
 
   // Wait for server to be ready
   await server.ready();
