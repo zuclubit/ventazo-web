@@ -1,4 +1,11 @@
-import { connect, NatsConnection, JetStreamClient, StringCodec } from 'nats';
+import {
+  connect,
+  NatsConnection,
+  JetStreamClient,
+  StringCodec,
+  RetentionPolicy,
+  StorageType,
+} from 'nats';
 import { DomainEvent, Result } from '@zuclubit/domain';
 import { IEventPublisher } from '../types';
 
@@ -34,9 +41,9 @@ export class NatsEventPublisher implements IEventPublisher {
         await jsm.streams.add({
           name: this.streamName,
           subjects: ['events.>'],
-          retention: 'limits',
+          retention: RetentionPolicy.Limits,
           max_age: 7 * 24 * 60 * 60 * 1_000_000_000, // 7 days in nanoseconds
-          storage: 'file',
+          storage: StorageType.File,
         });
       }
 

@@ -1,4 +1,4 @@
-import { PoolClient } from 'pg';
+import { PoolClient, QueryResultRow } from 'pg';
 import { Result } from '@zuclubit/domain';
 import { DatabasePool } from '../connection';
 
@@ -23,7 +23,7 @@ export abstract class BaseRepository {
   /**
    * Execute a query with the pool
    */
-  protected async query<T = unknown>(
+  protected async query<T extends QueryResultRow = QueryResultRow>(
     text: string,
     params?: unknown[]
   ): Promise<Result<T[]>> {
@@ -37,7 +37,7 @@ export abstract class BaseRepository {
   /**
    * Execute a query and return a single row
    */
-  protected async queryOne<T = unknown>(
+  protected async queryOne<T extends QueryResultRow = QueryResultRow>(
     text: string,
     params?: unknown[]
   ): Promise<Result<T | null>> {

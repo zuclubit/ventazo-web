@@ -1,6 +1,6 @@
-import { Pool, PoolClient, PoolConfig, QueryResult } from 'pg';
+import { Pool, PoolClient, PoolConfig, QueryResult, QueryResultRow } from 'pg';
 import { Result } from '@zuclubit/domain';
-import { DatabaseConfig, TransactionOptions, IsolationLevel } from '../types';
+import { DatabaseConfig, TransactionOptions } from '../types';
 
 /**
  * Database connection pool manager
@@ -67,7 +67,7 @@ export class DatabasePool {
   /**
    * Execute a query with automatic connection management
    */
-  async query<T = unknown>(
+  async query<T extends QueryResultRow = QueryResultRow>(
     text: string,
     params?: unknown[]
   ): Promise<Result<QueryResult<T>>> {

@@ -10,6 +10,6 @@ export type {
 export { NatsEventPublisher } from './publisher';
 export type { NatsEventPublisherConfig } from './publisher';
 
-// Subscriber
-export { NatsEventSubscriber } from './subscriber';
-export type { NatsEventSubscriberConfig } from './subscriber';
+// Subscriber - temporarily commented out due to NATS typing issues
+// export { NatsEventSubscriber } from './subscriber';
+// export type { NatsEventSubscriberConfig } from './subscriber';
