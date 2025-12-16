@@ -1,0 +1,29 @@
+# ===========================================
+# Cloudflare Pages Configuration
+# Zuclubit CRM - Frontend (using OpenNext)
+# ===========================================
+
+name = "zuclubit-crm"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# OpenNext output directory
+main = ".open-next/worker.js"
+assets = { directory = ".open-next/assets", binding = "ASSETS" }
+
+# Environment variables (set in Cloudflare Dashboard for secrets)
+[vars]
+NEXT_PUBLIC_APP_NAME = "Zuclubit CRM"
+NEXT_PUBLIC_API_URL = "https://zuclubit-lead-service.fly.dev"
+NEXT_PUBLIC_API_VERSION = "v1"
+NEXT_PUBLIC_TENANT_MODE = "path"
+NEXT_PUBLIC_ENABLE_DARK_MODE = "true"
+NEXT_PUBLIC_ENABLE_ANALYTICS = "true"
+NEXT_PUBLIC_ENABLE_DEV_TOOLS = "false"
+# Server-side API URL for Server Actions
+API_URL = "https://zuclubit-lead-service.fly.dev"
+
+# Preview environment
+[env.preview.vars]
+NEXT_PUBLIC_ENABLE_DEV_TOOLS = "true"
+NEXT_PUBLIC_ENABLE_ANALYTICS = "false"
