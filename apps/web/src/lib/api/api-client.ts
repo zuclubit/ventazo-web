@@ -227,6 +227,51 @@ addErrorInterceptor(async (error) => {
 });
 
 // ============================================
+// Tenant ID Getter (for interceptor)
+// ============================================
+
+let getTenantIdFromStore: (() => string | null) | null = null;
+
+/**
+ * Register the tenant store getter for the request interceptor.
+ * Called from providers.tsx on app initialization.
+ */
+export function registerTenantGetter(getter: () => string | null): void {
+  getTenantIdFromStore = getter;
+}
+
+// ============================================
+// Default Request Interceptor (Tenant Header)
+// ============================================
+
+addRequestInterceptor(async (url, config) => {
+  // If tenant header already set, don't override
+  const headers = config.headers as Record<string, string> | undefined;
+  if (headers?.['x-tenant-id']) {
+    return { url, config };
+  }
+
+  // Get tenant from store if available
+  if (getTenantIdFromStore) {
+    const tenantId = getTenantIdFromStore();
+    if (tenantId) {
+      return {
+        url,
+        config: {
+          ...config,
+          headers: {
+            ...headers,
+            'x-tenant-id': tenantId,
+          },
+        },
+      };
+    }
+  }
+
+  return { url, config };
+});
+
+// ============================================
 // Core Fetch Function
 // ============================================
 

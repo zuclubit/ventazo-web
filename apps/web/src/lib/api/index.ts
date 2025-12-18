@@ -13,6 +13,7 @@ export {
   addRequestInterceptor,
   addResponseInterceptor,
   addErrorInterceptor,
+  registerTenantGetter,
   API_BASE_URL,
   type RequestConfig,
   type ApiResponse,

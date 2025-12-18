@@ -8,9 +8,11 @@ import { ThemeProvider as NextThemesProvider } from 'next-themes';
 
 import { AuthProvider } from '@/components/auth';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { registerTenantGetter } from '@/lib/api';
 import { I18nProvider } from '@/lib/i18n/context';
 import { TenantProvider } from '@/lib/tenant/tenant-context';
 import { TenantThemeProvider } from '@/lib/theme';
+import { useTenantStore } from '@/store';
 
 // ============================================
 // Query Client Configuration
@@ -53,6 +55,26 @@ function getQueryClient() {
 }
 
 // ============================================
+// Tenant API Initializer
+// ============================================
+
+/**
+ * Component that registers the tenant getter for API requests.
+ * This ensures all API calls include the x-tenant-id header.
+ */
+function TenantApiInitializer({ children }: { children: React.ReactNode }) {
+  React.useEffect(() => {
+    // Register the tenant getter with the API client
+    registerTenantGetter(() => {
+      const state = useTenantStore.getState();
+      return state.currentTenant?.id ?? null;
+    });
+  }, []);
+
+  return <>{children}</>;
+}
+
+// ============================================
 // Providers Component
 // ============================================
 
@@ -68,18 +90,20 @@ export function Providers({ children }: ProvidersProps) {
       <I18nProvider>
         <AuthProvider>
           <TenantProvider>
-            <TenantThemeProvider>
-              <NextThemesProvider
-                disableTransitionOnChange
-                enableSystem
-                attribute="class"
-                defaultTheme="system"
-              >
-                <TooltipProvider delayDuration={0}>
-                  {children}
-                </TooltipProvider>
-              </NextThemesProvider>
-            </TenantThemeProvider>
+            <TenantApiInitializer>
+              <TenantThemeProvider>
+                <NextThemesProvider
+                  disableTransitionOnChange
+                  enableSystem
+                  attribute="class"
+                  defaultTheme="system"
+                >
+                  <TooltipProvider delayDuration={0}>
+                    {children}
+                  </TooltipProvider>
+                </NextThemesProvider>
+              </TenantThemeProvider>
+            </TenantApiInitializer>
           </TenantProvider>
         </AuthProvider>
       </I18nProvider>

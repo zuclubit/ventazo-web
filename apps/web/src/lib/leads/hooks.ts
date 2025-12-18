@@ -58,7 +58,7 @@ export const leadKeys = {
  * Hook to fetch leads with filters and pagination
  */
 export function useLeads(params: LeadsQueryParams = {}) {
-  const { tenant } = useTenantSafe();
+  const { tenant, tenantId } = useTenantSafe();
 
   return useQuery({
     queryKey: leadKeys.list(params),
@@ -78,7 +78,8 @@ export function useLeads(params: LeadsQueryParams = {}) {
       if (params.sortOrder) searchParams.set('sortOrder', params.sortOrder);
 
       const response = await apiClient.get<LeadsListResponse>(
-        `/api/v1/leads?${searchParams.toString()}`
+        `/api/v1/leads?${searchParams.toString()}`,
+        { tenantId }
       );
       return response;
     },
@@ -90,12 +91,12 @@ export function useLeads(params: LeadsQueryParams = {}) {
  * Hook to fetch a single lead by ID
  */
 export function useLead(leadId: string) {
-  const { tenant } = useTenantSafe();
+  const { tenant, tenantId } = useTenantSafe();
 
   return useQuery({
     queryKey: leadKeys.detail(leadId),
     queryFn: async () => {
-      const response = await apiClient.get<Lead>(`/api/v1/leads/${leadId}`);
+      const response = await apiClient.get<Lead>(`/api/v1/leads/${leadId}`, { tenantId });
       return response;
     },
     enabled: !!tenant && !!leadId,
@@ -106,12 +107,12 @@ export function useLead(leadId: string) {
  * Hook to fetch lead statistics
  */
 export function useLeadStats() {
-  const { tenant } = useTenantSafe();
+  const { tenant, tenantId } = useTenantSafe();
 
   return useQuery({
     queryKey: leadKeys.stats(),
     queryFn: async () => {
-      const response = await apiClient.get<LeadStatsResponse>('/api/v1/leads/stats/overview');
+      const response = await apiClient.get<LeadStatsResponse>('/api/v1/leads/stats/overview', { tenantId });
       return response;
     },
     enabled: !!tenant,
