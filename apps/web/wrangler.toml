@@ -1,0 +1,37 @@
+# ===========================================
+# Cloudflare Pages Configuration
+# Zuclubit CRM - Frontend (using OpenNext)
+# ===========================================
+
+name = "ventazo"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Pages build output directory (required for Pages wrangler.toml support)
+pages_build_output_dir = ".open-next"
+
+# Environment variables (set in Cloudflare Dashboard for secrets)
+[vars]
+# Production environment
+NODE_ENV = "production"
+NEXT_PUBLIC_APP_NAME = "Zuclubit CRM"
+NEXT_PUBLIC_API_URL = "https://zuclubit-lead-service.fly.dev"
+NEXT_PUBLIC_API_VERSION = "v1"
+NEXT_PUBLIC_TENANT_MODE = "path"
+NEXT_PUBLIC_ENABLE_DARK_MODE = "true"
+NEXT_PUBLIC_ENABLE_ANALYTICS = "true"
+NEXT_PUBLIC_ENABLE_DEV_TOOLS = "false"
+# Server-side API URL for Server Actions
+API_URL = "https://zuclubit-lead-service.fly.dev"
+# Supabase Configuration (public keys)
+NEXT_PUBLIC_SUPABASE_URL = "https://fngdlxipgrkpbutiqjhw.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZuZ2RseGlwZ3JrcGJ1dGlxamh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MjExMzUsImV4cCI6MjA4MTI5NzEzNX0.V26aOFufrza_G2nv1N6_PanCNoovLiaw5uObKcXtnQc"
+# Server-side Supabase config (also available for API routes)
+SUPABASE_URL = "https://fngdlxipgrkpbutiqjhw.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZuZ2RseGlwZ3JrcGJ1dGlxamh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MjExMzUsImV4cCI6MjA4MTI5NzEzNX0.V26aOFufrza_G2nv1N6_PanCNoovLiaw5uObKcXtnQc"
+# Note: SUPABASE_SERVICE_ROLE_KEY should be set as a secret via: wrangler pages secret put SUPABASE_SERVICE_ROLE_KEY
+
+# Preview environment
+[env.preview.vars]
+NEXT_PUBLIC_ENABLE_DEV_TOOLS = "true"
+NEXT_PUBLIC_ENABLE_ANALYTICS = "false"

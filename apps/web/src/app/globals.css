@@ -1,0 +1,740 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ============================================
+       VENTAZO DESIGN SYSTEM - Official Brand 2025
+
+       Primary Green: #0EB58C
+       Secondary Dark Green: #003C3B
+       White: #FFFFFF
+       Light Gray: #E6E6E6
+       Text Carbon: #1C1C1E
+       ============================================ */
+
+    /* Base Colors - Clean White Background */
+    --background: 0 0% 100%; /* #FFFFFF */
+    --foreground: 240 6% 12%; /* #1C1C1E - Carbon Gray */
+
+    /* Card */
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 12%;
+
+    /* Popover */
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 12%;
+
+    /* Primary - Ventazo Green */
+    --primary: 160 85% 39%; /* #0EB58C */
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Light Gray */
+    --secondary: 0 0% 90%; /* #E6E6E6 */
+    --secondary-foreground: 240 6% 12%;
+
+    /* Muted */
+    --muted: 0 0% 96%;
+    --muted-foreground: 240 4% 46%;
+
+    /* Accent - Ventazo Dark Green */
+    --accent: 179 100% 12%; /* #003C3B */
+    --accent-foreground: 0 0% 100%;
+
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success */
+    --success: 160 85% 39%; /* Same as primary */
+    --success-foreground: 0 0% 100%;
+
+    /* Warning */
+    --warning: 38 92% 50%;
+    --warning-foreground: 240 6% 12%;
+
+    /* Info */
+    --info: 160 85% 39%;
+    --info-foreground: 0 0% 100%;
+
+    /* Border, Input, Ring */
+    --border: 0 0% 90%; /* #E6E6E6 */
+    --input: 0 0% 90%;
+    --ring: 160 85% 39%; /* Primary green */
+
+    /* Border Radius - Modern Rounded */
+    --radius: 0.75rem; /* 12px */
+
+    /* Sidebar - Deep Green */
+    --sidebar-background: 179 100% 12%; /* #003C3B */
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 160 85% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 179 80% 16%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 179 60% 18%;
+    --sidebar-ring: 160 85% 39%;
+
+    /* ============================================
+       VENTAZO BRAND SPECIFIC VARIABLES
+       ============================================ */
+    --ventazo-green: #0EB58C;
+    --ventazo-dark: #003C3B;
+    --ventazo-white: #FFFFFF;
+    --ventazo-gray: #E6E6E6;
+    --ventazo-carbon: #1C1C1E;
+  }
+
+  .dark {
+    /* ============================================
+       PREMIUM DARK MODE - Ventazo 2025
+       Official Brand with Glassmorphism
+
+       Primary Green: #0EB58C
+       Secondary Dark Green: #003C3B
+       ============================================ */
+
+    /* Base Colors - Premium Dark Green */
+    --background: 179 100% 6%; /* Deep dark green base */
+    --foreground: 0 0% 95%; /* Nearly white */
+
+    /* Card - Glass Effect Base */
+    --card: 179 80% 8%;
+    --card-foreground: 0 0% 95%;
+
+    /* Popover - Slightly Elevated */
+    --popover: 179 70% 9%;
+    --popover-foreground: 0 0% 95%;
+
+    /* Primary - Ventazo Green */
+    --primary: 160 85% 39%; /* #0EB58C */
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Muted Dark */
+    --secondary: 179 60% 12%;
+    --secondary-foreground: 0 0% 95%;
+
+    /* Muted - Subtle Backgrounds */
+    --muted: 179 50% 14%;
+    --muted-foreground: 0 0% 60%;
+
+    /* Accent - Ventazo Light Green */
+    --accent: 160 75% 45%; /* Lighter green for dark mode */
+    --accent-foreground: 0 0% 100%;
+
+    /* Semantic Colors */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 160 85% 39%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 240 6% 12%;
+
+    --info: 160 85% 39%;
+    --info-foreground: 0 0% 100%;
+
+    /* Borders & Inputs - Subtle Glass */
+    --border: 179 30% 18%;
+    --input: 179 30% 14%;
+    --ring: 160 85% 39%;
+
+    /* Sidebar - Deep Green Premium */
+    --sidebar-background: 179 100% 7%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 160 85% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 179 60% 14%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 179 40% 16%;
+    --sidebar-ring: 160 85% 39%;
+
+    /* ============================================
+       VENTAZO PREMIUM GLASS SYSTEM
+       ============================================ */
+
+    /* Glass Backgrounds - Based on Ventazo Dark */
+    --glass-bg: rgba(0, 60, 59, 0.5);
+    --glass-bg-light: rgba(0, 80, 78, 0.35);
+    --glass-bg-dark: rgba(0, 40, 39, 0.7);
+
+    /* Glass Borders */
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-border-light: rgba(255, 255, 255, 0.15);
+    --glass-border-hover: rgba(14, 181, 140, 0.3);
+
+    /* Glow Effects - Ventazo Green */
+    --glow-primary: rgba(14, 181, 140, 0.2);
+    --glow-primary-intense: rgba(14, 181, 140, 0.35);
+    --glow-accent: rgba(14, 181, 140, 0.15);
+    --glow-accent-intense: rgba(14, 181, 140, 0.25);
+
+    /* Premium Gradients - Ventazo Brand */
+    --gradient-dark-start: #001A1A;
+    --gradient-dark-mid: #002828;
+    --gradient-dark-end: #003C3B;
+
+    /* Premium Text Colors */
+    --text-bright: #FFFFFF;
+    --text-secondary: #B8C4C4;
+    --text-muted: #7A8F8F;
+    --text-accent: #0EB58C;
+
+    /* Ventazo Brand Variables (Dark) */
+    --ventazo-green: #0EB58C;
+    --ventazo-dark: #003C3B;
+    --ventazo-white: #FFFFFF;
+    --ventazo-gray: #E6E6E6;
+    --ventazo-carbon: #1C1C1E;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+
+  /* Focus visible styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  /* CRM-specific component styles */
+  .lead-card {
+    @apply rounded-lg border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md;
+  }
+
+  .stat-card {
+    @apply rounded-lg border bg-card p-6 shadow-sm;
+  }
+
+  .page-container {
+    @apply container mx-auto px-4 py-6 sm:px-6 lg:px-8;
+  }
+
+  .section-header {
+    @apply flex items-center justify-between pb-4 border-b;
+  }
+
+  /* Status badges */
+  .status-badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .status-new {
+    @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300;
+  }
+
+  .status-contacted {
+    @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300;
+  }
+
+  .status-qualified {
+    @apply bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300;
+  }
+
+  .status-proposal {
+    @apply bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300;
+  }
+
+  .status-negotiation {
+    @apply bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300;
+  }
+
+  .status-won {
+    @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300;
+  }
+
+  .status-lost {
+    @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300;
+  }
+
+  /* Score indicators */
+  .score-hot {
+    @apply text-green-600 dark:text-green-400;
+  }
+
+  .score-warm {
+    @apply text-yellow-600 dark:text-yellow-400;
+  }
+
+  .score-cold {
+    @apply text-blue-600 dark:text-blue-400;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-in {
+    animation: animateIn 0.3s ease-out;
+  }
+
+  @keyframes animateIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes animateInFromLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes animateInFromRight {
+    from {
+      opacity: 0;
+      transform: translateX(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-slide-in-left {
+    animation: animateInFromLeft 0.2s ease-out;
+  }
+
+  .animate-slide-in-right {
+    animation: animateInFromRight 0.2s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply relative overflow-hidden bg-muted;
+  }
+
+  .skeleton::after {
+    @apply absolute inset-0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.1),
+      transparent
+    );
+    animation: shimmer 2s infinite;
+    content: '';
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Truncate with ellipsis */
+  .truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Interactive states - consistent transitions */
+  .interactive {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .interactive:hover {
+    @apply scale-[1.02];
+  }
+
+  .interactive:active {
+    @apply scale-[0.98];
+  }
+
+  /* Card hover effect */
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+
+  .card-hover:hover {
+    @apply shadow-md -translate-y-0.5;
+  }
+
+  /* Focus ring utility */
+  .focus-ring {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60;
+  }
+
+  /* ============================================
+     PREMIUM GLASS SYSTEM - Utility Classes
+     ============================================ */
+
+  /* Basic Glass Effect */
+  .glass {
+    @apply backdrop-blur-md bg-background/80;
+  }
+
+  /* Premium Glass Card */
+  .glass-card {
+    @apply relative overflow-hidden;
+    @apply rounded-2xl border;
+    @apply backdrop-blur-xl;
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 var(--glass-border-light);
+    transition: all 0.3s ease-out;
+  }
+
+  .glass-card:hover {
+    border-color: var(--glass-border-hover);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 var(--glass-border-light);
+    transform: translateY(-2px);
+  }
+
+  /* Premium Glass Input */
+  .glass-input {
+    @apply rounded-xl border px-4 py-3;
+    @apply backdrop-blur-sm;
+    @apply transition-all duration-300;
+    background: var(--glass-bg-light);
+    border-color: var(--glass-border);
+  }
+
+  .glass-input:focus {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px var(--glow-primary);
+    outline: none;
+  }
+
+  .glass-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  /* Premium Glass Button */
+  .glass-button {
+    @apply relative overflow-hidden;
+    @apply rounded-xl px-6 py-3;
+    @apply font-medium;
+    @apply backdrop-blur-md;
+    @apply transition-all duration-300;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--text-bright);
+  }
+
+  .glass-button:hover {
+    background: var(--glass-bg-light);
+    border-color: var(--glass-border-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Gradient Button - Ventazo Brand */
+  .gradient-button {
+    @apply relative overflow-hidden;
+    @apply rounded-xl px-6 py-3;
+    @apply font-semibold text-white;
+    @apply transition-all duration-300;
+    background: linear-gradient(135deg, #003C3B 0%, #0EB58C 100%);
+    box-shadow:
+      0 8px 30px -6px rgba(14, 181, 140, 0.4),
+      0 2px 8px -2px rgba(0, 0, 0, 0.2);
+  }
+
+  .gradient-button:hover {
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, #004A49 0%, #10C99A 100%);
+    box-shadow:
+      0 12px 40px -6px rgba(14, 181, 140, 0.5),
+      0 4px 12px -2px rgba(0, 0, 0, 0.25);
+  }
+
+  .gradient-button:active {
+    transform: translateY(0);
+  }
+
+  /* Ventazo Primary Button */
+  .ventazo-button {
+    @apply relative overflow-hidden;
+    @apply rounded-xl px-6 py-3;
+    @apply font-semibold text-white;
+    @apply transition-all duration-300;
+    background-color: #0EB58C;
+    box-shadow: 0 4px 14px -3px rgba(14, 181, 140, 0.4);
+  }
+
+  .ventazo-button:hover {
+    transform: translateY(-1px);
+    background-color: #0CA57D;
+    box-shadow: 0 6px 20px -3px rgba(14, 181, 140, 0.5);
+  }
+
+  .ventazo-button:active {
+    transform: translateY(0);
+  }
+
+  /* Ventazo Outline Button */
+  .ventazo-button-outline {
+    @apply relative overflow-hidden;
+    @apply rounded-xl px-6 py-3;
+    @apply font-medium;
+    @apply transition-all duration-300;
+    background-color: transparent;
+    border: 1.5px solid #0EB58C;
+    color: #0EB58C;
+  }
+
+  .ventazo-button-outline:hover {
+    background-color: rgba(14, 181, 140, 0.1);
+    border-color: #0CA57D;
+    color: #0CA57D;
+  }
+
+  /* Premium Background Gradient */
+  .bg-premium-gradient {
+    background: linear-gradient(165deg,
+      var(--gradient-dark-start) 0%,
+      var(--gradient-dark-mid) 25%,
+      var(--gradient-dark-end) 50%,
+      var(--gradient-dark-mid) 75%,
+      var(--gradient-dark-start) 100%
+    );
+  }
+
+  /* Atmospheric Glow Layers */
+  .atmospheric-glow {
+    @apply pointer-events-none absolute inset-0;
+  }
+
+  .atmospheric-glow::before {
+    content: '';
+    @apply absolute -right-40 -top-40;
+    @apply h-[700px] w-[700px] rounded-full;
+    background: var(--glow-primary);
+    filter: blur(150px);
+  }
+
+  .atmospheric-glow::after {
+    content: '';
+    @apply absolute -left-20 top-1/3;
+    @apply h-[500px] w-[500px] rounded-full;
+    background: var(--glow-accent);
+    filter: blur(120px);
+  }
+
+  /* Noise Texture Overlay */
+  .noise-overlay {
+    @apply pointer-events-none absolute inset-0;
+    opacity: 0.015;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+
+  /* Vignette Effect */
+  .vignette {
+    @apply pointer-events-none absolute inset-0;
+    background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, rgba(4, 26, 26, 0.6) 100%);
+  }
+
+  /* Premium Text Styles */
+  .text-premium {
+    color: var(--text-bright);
+  }
+
+  .text-premium-secondary {
+    color: var(--text-secondary);
+  }
+
+  .text-premium-muted {
+    color: var(--text-muted);
+  }
+
+  .text-premium-accent {
+    color: var(--text-accent);
+  }
+
+  /* Gradient Text - Premium */
+  .text-gradient-premium {
+    @apply bg-clip-text text-transparent;
+    background: linear-gradient(135deg, #0D9488 0%, #14B8A6 50%, #2DD4BF 100%);
+  }
+
+  .text-gradient-accent {
+    @apply bg-clip-text text-transparent;
+    background: linear-gradient(135deg, #FB923C 0%, #F97316 50%, #EA580C 100%);
+  }
+
+  /* Glow Ring on Focus */
+  .glow-ring-primary:focus-within {
+    box-shadow: 0 0 0 3px var(--glow-primary-intense);
+  }
+
+  .glow-ring-accent:focus-within {
+    box-shadow: 0 0 0 3px var(--glow-accent-intense);
+  }
+
+  /* Premium Divider */
+  .divider-premium {
+    @apply relative flex items-center gap-4;
+  }
+
+  .divider-premium::before,
+  .divider-premium::after {
+    content: '';
+    @apply flex-1 h-px;
+    background: linear-gradient(90deg, transparent, var(--glass-border), transparent);
+  }
+
+  /* Dot indicator */
+  .dot-indicator {
+    @apply relative;
+  }
+
+  .dot-indicator::after {
+    content: '';
+    @apply absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary;
+  }
+
+  /* Pulse animation for notifications */
+  .pulse-dot {
+    @apply relative;
+  }
+
+  .pulse-dot::after {
+    content: '';
+    @apply absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-destructive animate-pulse;
+  }
+
+  /* Text selection */
+  ::selection {
+    @apply bg-primary/20 text-foreground;
+  }
+
+  /* Smooth scroll behavior */
+  .scroll-smooth {
+    scroll-behavior: smooth;
+  }
+
+  /* List item hover */
+  .list-item-hover {
+    @apply transition-colors duration-150;
+  }
+
+  .list-item-hover:hover {
+    @apply bg-muted/50;
+  }
+
+  /* Table row hover */
+  .table-row-hover {
+    @apply transition-colors duration-150;
+  }
+
+  .table-row-hover:hover {
+    @apply bg-muted/30;
+  }
+
+  /* Disabled state overlay */
+  .disabled-overlay {
+    @apply relative pointer-events-none opacity-50;
+  }
+
+  /* Loading state */
+  .loading-state {
+    @apply relative pointer-events-none;
+  }
+
+  .loading-state::after {
+    content: '';
+    @apply absolute inset-0 bg-background/50 backdrop-blur-[1px];
+  }
+
+  /* OTP Shake animation (P0.1) */
+  .animate-shake {
+    animation: shake 0.4s ease-in-out;
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+
+  /* OTP Input success animation */
+  .animate-success-bounce {
+    animation: successBounce 0.5s ease-out;
+  }
+
+  @keyframes successBounce {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.05); }
+    50% { transform: scale(0.95); }
+    70% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+  }
+}

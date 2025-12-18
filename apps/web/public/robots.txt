@@ -1,0 +1,14 @@
+# Ventazo by Zuclubit - Smart CRM para LATAM
+# https://zuclubit-crm.osvaloismtz.workers.dev
+
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /api/
+Disallow: /onboarding/
+
+# Sitemap
+Sitemap: https://zuclubit-crm.osvaloismtz.workers.dev/sitemap.xml
+
+# Crawl-delay for polite bots
+Crawl-delay: 1
