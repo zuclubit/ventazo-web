@@ -318,15 +318,15 @@ export function LeadFormDialog({ lead, open, onClose }: LeadFormDialogProps) {
             <div className="space-y-2">
               <Label>Etapa del Pipeline</Label>
               <Select
-                defaultValue={watch('stageId') || ''}
+                defaultValue={watch('stageId') || '_none'}
                 disabled={isLoading}
-                onValueChange={(value) => setValue('stageId', value)}
+                onValueChange={(value) => setValue('stageId', value === '_none' ? '' : value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar etapa" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin etapa</SelectItem>
+                  <SelectItem value="_none">Sin etapa</SelectItem>
                   {stages?.map((stage) => (
                     <SelectItem key={stage.id} value={stage.id}>
                       <div className="flex items-center gap-2">
