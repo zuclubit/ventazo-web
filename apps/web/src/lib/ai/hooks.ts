@@ -127,7 +127,7 @@ export const aiQueryKeys = {
 // Now using centralized apiClient for proper auth and tenant headers
 // ============================================
 
-const AI_BASE_URL = '/api/v1/ai';
+const AI_BASE_URL = '/ai';
 
 const fetchAPI = async <T>(endpoint: string, body: unknown, method: 'POST' | 'GET' = 'POST'): Promise<T> => {
   const url = `${AI_BASE_URL}/${endpoint}`;

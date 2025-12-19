@@ -66,6 +66,13 @@
     /* Border Radius - Modern Rounded */
     --radius: 0.75rem; /* 12px */
 
+    /* ============================================
+       SIDEBAR LAYOUT SYSTEM
+       ============================================ */
+    --sidebar-width: 256px;
+    --sidebar-collapsed-width: 64px;
+    --sidebar-expanded-width: 256px;
+
     /* Sidebar - Deep Green */
     --sidebar-background: 179 100% 12%; /* #003C3B */
     --sidebar-foreground: 0 0% 98%;
@@ -84,6 +91,52 @@
     --ventazo-white: #FFFFFF;
     --ventazo-gray: #E6E6E6;
     --ventazo-carbon: #1C1C1E;
+
+    /* ============================================
+       UNIFIED TYPOGRAPHY SYSTEM - Light Mode
+       ============================================ */
+
+    /* Premium Text Hierarchy */
+    --text-bright: #1C1C1E;
+    --text-secondary: #4A4A4C;
+    --text-muted: #8E8E93;
+    --text-accent: #0EB58C;
+
+    /* Score Colors - Lead Temperature */
+    --score-hot: #059669;           /* emerald-600 */
+    --score-hot-bg: #D1FAE5;        /* emerald-100 */
+    --score-warm: #D97706;          /* amber-600 */
+    --score-warm-bg: #FEF3C7;       /* amber-100 */
+    --score-cold: #DC2626;          /* red-600 */
+    --score-cold-bg: #FEE2E2;       /* red-100 */
+
+    /* Status Colors - Semantic */
+    --status-success: #059669;      /* emerald-600 */
+    --status-success-bg: #D1FAE5;   /* emerald-100 */
+    --status-warning: #EA580C;      /* orange-600 */
+    --status-warning-bg: #FFEDD5;   /* orange-100 */
+    --status-error: #DC2626;        /* red-600 */
+    --status-error-bg: #FEE2E2;     /* red-100 */
+    --status-info: #0284C7;         /* sky-600 */
+    --status-info-bg: #E0F2FE;      /* sky-100 */
+
+    /* WhatsApp Brand */
+    --whatsapp: #25D366;
+    --whatsapp-hover: #20BD5A;
+    --whatsapp-bg: #DCF8E6;
+
+    /* Trend Indicators */
+    --trend-up: #059669;            /* emerald-600 */
+    --trend-up-bg: #D1FAE5;
+    --trend-down: #DC2626;          /* red-600 */
+    --trend-down-bg: #FEE2E2;
+    --trend-neutral: #6B7280;       /* gray-500 */
+    --trend-neutral-bg: #F3F4F6;
+
+    /* Highlight/Active States */
+    --highlight-primary: rgba(14, 181, 140, 0.1);
+    --highlight-warning: rgba(234, 88, 12, 0.1);
+    --highlight-success: rgba(5, 150, 105, 0.1);
   }
 
   .dark {
@@ -141,6 +194,13 @@
     --input: 179 30% 14%;
     --ring: 160 85% 39%;
 
+    /* ============================================
+       SIDEBAR LAYOUT SYSTEM (Dark)
+       ============================================ */
+    --sidebar-width: 256px;
+    --sidebar-collapsed-width: 64px;
+    --sidebar-expanded-width: 256px;
+
     /* Sidebar - Deep Green Premium */
     --sidebar-background: 179 100% 7%;
     --sidebar-foreground: 0 0% 95%;
@@ -188,6 +248,46 @@
     --ventazo-white: #FFFFFF;
     --ventazo-gray: #E6E6E6;
     --ventazo-carbon: #1C1C1E;
+
+    /* ============================================
+       UNIFIED TYPOGRAPHY SYSTEM - Dark Mode
+       ============================================ */
+
+    /* Score Colors - Lead Temperature (Dark) */
+    --score-hot: #34D399;           /* emerald-400 */
+    --score-hot-bg: rgba(16, 185, 129, 0.15);
+    --score-warm: #FBBF24;          /* amber-400 */
+    --score-warm-bg: rgba(251, 191, 36, 0.15);
+    --score-cold: #F87171;          /* red-400 */
+    --score-cold-bg: rgba(248, 113, 113, 0.15);
+
+    /* Status Colors - Semantic (Dark) */
+    --status-success: #34D399;      /* emerald-400 */
+    --status-success-bg: rgba(16, 185, 129, 0.15);
+    --status-warning: #FB923C;      /* orange-400 */
+    --status-warning-bg: rgba(251, 146, 60, 0.15);
+    --status-error: #F87171;        /* red-400 */
+    --status-error-bg: rgba(248, 113, 113, 0.15);
+    --status-info: #38BDF8;         /* sky-400 */
+    --status-info-bg: rgba(56, 189, 248, 0.15);
+
+    /* WhatsApp Brand (Dark) */
+    --whatsapp: #25D366;
+    --whatsapp-hover: #2EE371;
+    --whatsapp-bg: rgba(37, 211, 102, 0.15);
+
+    /* Trend Indicators (Dark) */
+    --trend-up: #34D399;            /* emerald-400 */
+    --trend-up-bg: rgba(16, 185, 129, 0.15);
+    --trend-down: #F87171;          /* red-400 */
+    --trend-down-bg: rgba(248, 113, 113, 0.15);
+    --trend-neutral: #9CA3AF;       /* gray-400 */
+    --trend-neutral-bg: rgba(156, 163, 175, 0.1);
+
+    /* Highlight/Active States (Dark) */
+    --highlight-primary: rgba(14, 181, 140, 0.2);
+    --highlight-warning: rgba(251, 146, 60, 0.15);
+    --highlight-success: rgba(52, 211, 153, 0.15);
   }
 }
 
@@ -221,6 +321,71 @@
   /* Focus visible styles */
   *:focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Prevent horizontal overflow on mobile */
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar utility - works across all browsers */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* iOS momentum scrolling */
+  .-webkit-overflow-scrolling-touch {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Safe area padding utilities for notched devices */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .safe-area-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .safe-area-y {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Mobile touch-friendly sizes */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent text overflow in containers */
+  .text-truncate-safe {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
   }
 }
 
@@ -275,17 +440,95 @@
     @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300;
   }
 
-  /* Score indicators */
+  /* Score indicators - Using CSS Variables */
   .score-hot {
-    @apply text-green-600 dark:text-green-400;
+    color: var(--score-hot);
+  }
+
+  .score-hot-bg {
+    background-color: var(--score-hot-bg);
+    color: var(--score-hot);
   }
 
   .score-warm {
-    @apply text-yellow-600 dark:text-yellow-400;
+    color: var(--score-warm);
+  }
+
+  .score-warm-bg {
+    background-color: var(--score-warm-bg);
+    color: var(--score-warm);
   }
 
   .score-cold {
-    @apply text-blue-600 dark:text-blue-400;
+    color: var(--score-cold);
+  }
+
+  .score-cold-bg {
+    background-color: var(--score-cold-bg);
+    color: var(--score-cold);
+  }
+
+  /* Status indicators - Using CSS Variables */
+  .status-success-text {
+    color: var(--status-success);
+  }
+
+  .status-warning-text {
+    color: var(--status-warning);
+  }
+
+  .status-error-text {
+    color: var(--status-error);
+  }
+
+  .status-info-text {
+    color: var(--status-info);
+  }
+
+  /* WhatsApp styling */
+  .whatsapp-button {
+    background-color: var(--whatsapp);
+    color: white;
+  }
+
+  .whatsapp-button:hover {
+    background-color: var(--whatsapp-hover);
+  }
+
+  .whatsapp-text {
+    color: var(--whatsapp);
+  }
+
+  .whatsapp-bg {
+    background-color: var(--whatsapp-bg);
+  }
+
+  /* Trend indicators */
+  .trend-up {
+    color: var(--trend-up);
+  }
+
+  .trend-up-bg {
+    background-color: var(--trend-up-bg);
+    color: var(--trend-up);
+  }
+
+  .trend-down {
+    color: var(--trend-down);
+  }
+
+  .trend-down-bg {
+    background-color: var(--trend-down-bg);
+    color: var(--trend-down);
+  }
+
+  .trend-neutral {
+    color: var(--trend-neutral);
+  }
+
+  .trend-neutral-bg {
+    background-color: var(--trend-neutral-bg);
+    color: var(--trend-neutral);
   }
 }
 

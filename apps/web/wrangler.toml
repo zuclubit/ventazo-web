@@ -15,14 +15,14 @@ pages_build_output_dir = ".open-next"
 # Production environment
 NODE_ENV = "production"
 NEXT_PUBLIC_APP_NAME = "Zuclubit CRM"
-NEXT_PUBLIC_API_URL = "https://zuclubit-lead-service.fly.dev"
+NEXT_PUBLIC_API_URL = "https://zuclubit-lead-service.fly.dev/api/v1"
 NEXT_PUBLIC_API_VERSION = "v1"
 NEXT_PUBLIC_TENANT_MODE = "path"
 NEXT_PUBLIC_ENABLE_DARK_MODE = "true"
 NEXT_PUBLIC_ENABLE_ANALYTICS = "true"
 NEXT_PUBLIC_ENABLE_DEV_TOOLS = "false"
 # Server-side API URL for Server Actions
-API_URL = "https://zuclubit-lead-service.fly.dev"
+API_URL = "https://zuclubit-lead-service.fly.dev/api/v1"
 # Supabase Configuration (public keys)
 NEXT_PUBLIC_SUPABASE_URL = "https://fngdlxipgrkpbutiqjhw.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZuZ2RseGlwZ3JrcGJ1dGlxamh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MjExMzUsImV4cCI6MjA4MTI5NzEzNX0.V26aOFufrza_G2nv1N6_PanCNoovLiaw5uObKcXtnQc"

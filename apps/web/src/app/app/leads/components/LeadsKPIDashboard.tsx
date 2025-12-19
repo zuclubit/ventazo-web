@@ -128,7 +128,9 @@ export function LeadsKPIDashboard({
         title="Leads Calientes"
         value={hotLeadsCount}
         icon={Flame}
-        subtitle={hotLeadsCount > 0 ? '¡Prioritarios!' : 'Score > 80'}
+        subtitle="Score > 80"
+        badge={hotLeadsCount > 0 ? '¡Atención!' : undefined}
+        showPulse={hotLeadsCount > 0}
         variant="highlight"
         isLoading={isLoading}
         onClick={onFilterChange ? () => handleKPIClick('hot') : undefined}
@@ -141,6 +143,8 @@ export function LeadsKPIDashboard({
         value={noContactCount}
         icon={noContactCount > 0 ? AlertCircle : Clock}
         subtitle="> 48 horas"
+        badge={noContactCount > 0 ? 'Urgente' : undefined}
+        showPulse={noContactCount > 5}
         variant={noContactCount > 0 ? 'warning' : 'default'}
         isLoading={isLoading}
         onClick={onFilterChange ? () => handleKPIClick('no-contact') : undefined}

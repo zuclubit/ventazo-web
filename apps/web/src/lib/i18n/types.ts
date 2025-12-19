@@ -570,4 +570,193 @@ export interface Translations {
       verifyingToken: string;
     };
   };
+  // Leads Module (CRM App)
+  leads: {
+    // Page titles
+    title: string;
+    subtitle: string;
+    newLead: string;
+    editLead: string;
+    // Status labels
+    status: {
+      label: string;
+      new: string;
+      contacted: string;
+      inProgress: string;
+      qualified: string;
+      proposal: string;
+      negotiation: string;
+      won: string;
+      lost: string;
+    };
+    // Form sections
+    form: {
+      // Progress
+      progress: string;
+      // Personal info section
+      personalInfo: {
+        title: string;
+        description: string;
+      };
+      // Company info section
+      companyInfo: {
+        title: string;
+        description: string;
+      };
+      // Classification section
+      classification: {
+        title: string;
+        description: string;
+      };
+      // Notes section
+      notes: {
+        title: string;
+        description: string;
+      };
+      // Field labels
+      fields: {
+        fullName: {
+          label: string;
+          placeholder: string;
+        };
+        email: {
+          label: string;
+          placeholder: string;
+        };
+        phone: {
+          label: string;
+          placeholder: string;
+          hint: string;
+        };
+        company: {
+          label: string;
+          placeholder: string;
+          hint: string;
+        };
+        jobTitle: {
+          label: string;
+          placeholder: string;
+          hint: string;
+        };
+        website: {
+          label: string;
+          placeholder: string;
+          hint: string;
+        };
+        industry: {
+          label: string;
+          placeholder: string;
+          hint: string;
+        };
+        source: {
+          label: string;
+          placeholder: string;
+        };
+        stage: {
+          label: string;
+          placeholder: string;
+          noStage: string;
+        };
+        tags: {
+          label: string;
+          placeholder: string;
+          addHint: string;
+          limitReached: string;
+        };
+        notes: {
+          label: string;
+          placeholder: string;
+        };
+      };
+      // Actions
+      actions: {
+        create: string;
+        creating: string;
+        save: string;
+        saving: string;
+        cancel: string;
+        close: string;
+      };
+      // Validation
+      validation: {
+        required: string;
+        nameMin: string;
+        nameMax: string;
+        nameInvalid: string;
+        emailRequired: string;
+        emailInvalid: string;
+        emailMax: string;
+        phoneMax: string;
+        phoneInvalid: string;
+        companyMax: string;
+        jobTitleMax: string;
+        websiteInvalid: string;
+        websiteMax: string;
+        industryMax: string;
+        notesMax: string;
+        fixErrors: string;
+      };
+      // Success messages
+      success: {
+        created: string;
+        createdDescription: string;
+        updated: string;
+        updatedDescription: string;
+      };
+      // Error messages
+      errors: {
+        saveFailed: string;
+        loadFailed: string;
+      };
+    };
+    // Source labels (matches LeadSource enum)
+    sources: {
+      manual: string;
+      website: string;
+      referral: string;
+      social: string;
+      advertising: string;  // Maps to LeadSource.AD
+      organic: string;      // Maps to LeadSource.ORGANIC
+      other: string;
+    };
+    // Quick actions
+    quickActions: {
+      call: string;
+      email: string;
+      whatsapp: string;
+      edit: string;
+    };
+    // KPI Dashboard
+    kpi: {
+      total: string;
+      new: string;
+      qualified: string;
+      converted: string;
+      thisMonth: string;
+      trend: string;
+    };
+    // Empty state
+    empty: {
+      title: string;
+      description: string;
+      cta: string;
+    };
+    // Filters
+    filters: {
+      all: string;
+      status: string;
+      source: string;
+      dateRange: string;
+      search: string;
+      searchPlaceholder: string;
+      clear: string;
+    };
+    // List
+    list: {
+      score: string;
+      lastActivity: string;
+      noResults: string;
+      loadMore: string;
+    };
+  };
 }

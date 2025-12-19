@@ -5,7 +5,7 @@ import * as React from 'react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 
 import { apiClient } from '@/lib/api';
-import { useTenantSafe } from '@/lib/tenant';
+import { useTenantValidation } from '@/lib/tenant';
 
 import type {
   Lead,
@@ -58,7 +58,7 @@ export const leadKeys = {
  * Hook to fetch leads with filters and pagination
  */
 export function useLeads(params: LeadsQueryParams = {}) {
-  const { tenant, tenantId } = useTenantSafe();
+  const { isValid, tenantId } = useTenantValidation();
 
   return useQuery({
     queryKey: leadKeys.list(params),
@@ -78,12 +78,12 @@ export function useLeads(params: LeadsQueryParams = {}) {
       if (params.sortOrder) searchParams.set('sortOrder', params.sortOrder);
 
       const response = await apiClient.get<LeadsListResponse>(
-        `/api/v1/leads?${searchParams.toString()}`,
-        { tenantId }
+        `/leads?${searchParams.toString()}`,
+        { tenantId: tenantId! }
       );
       return response;
     },
-    enabled: !!tenant,
+    enabled: isValid && !!tenantId,
   });
 }
 
@@ -91,15 +91,15 @@ export function useLeads(params: LeadsQueryParams = {}) {
  * Hook to fetch a single lead by ID
  */
 export function useLead(leadId: string) {
-  const { tenant, tenantId } = useTenantSafe();
+  const { isValid, tenantId } = useTenantValidation();
 
   return useQuery({
     queryKey: leadKeys.detail(leadId),
     queryFn: async () => {
-      const response = await apiClient.get<Lead>(`/api/v1/leads/${leadId}`, { tenantId });
+      const response = await apiClient.get<Lead>(`/leads/${leadId}`, { tenantId: tenantId! });
       return response;
     },
-    enabled: !!tenant && !!leadId,
+    enabled: isValid && !!tenantId && !!leadId,
   });
 }
 
@@ -107,15 +107,15 @@ export function useLead(leadId: string) {
  * Hook to fetch lead statistics
  */
 export function useLeadStats() {
-  const { tenant, tenantId } = useTenantSafe();
+  const { isValid, tenantId } = useTenantValidation();
 
   return useQuery({
     queryKey: leadKeys.stats(),
     queryFn: async () => {
-      const response = await apiClient.get<LeadStatsResponse>('/api/v1/leads/stats/overview', { tenantId });
+      const response = await apiClient.get<LeadStatsResponse>('/leads/stats/overview', { tenantId: tenantId! });
       return response;
     },
-    enabled: !!tenant,
+    enabled: isValid && !!tenantId,
   });
 }
 
@@ -131,7 +131,7 @@ export function useCreateLead() {
 
   return useMutation({
     mutationFn: async (data: CreateLeadRequest) => {
-      const response = await apiClient.post<Lead>('/api/v1/leads', data);
+      const response = await apiClient.post<Lead>('/leads', data);
       return response;
     },
     onSuccess: () => {
@@ -150,7 +150,7 @@ export function useUpdateLead() {
 
   return useMutation({
     mutationFn: async ({ leadId, data }: { leadId: string; data: UpdateLeadRequest }) => {
-      const response = await apiClient.patch<Lead>(`/api/v1/leads/${leadId}`, data);
+      const response = await apiClient.patch<Lead>(`/leads/${leadId}`, data);
       return response;
     },
     onSuccess: (_, variables) => {
@@ -169,7 +169,7 @@ export function useDeleteLead() {
 
   return useMutation({
     mutationFn: async (leadId: string) => {
-      await apiClient.delete(`/api/v1/leads/${leadId}`);
+      await apiClient.delete(`/leads/${leadId}`);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: leadKeys.lists() });
@@ -187,7 +187,7 @@ export function useChangeLeadStatus() {
 
   return useMutation({
     mutationFn: async ({ leadId, status, reason }: { leadId: string; status: string; reason: string }) => {
-      const response = await apiClient.patch<Lead>(`/api/v1/leads/${leadId}/status`, { status, reason });
+      const response = await apiClient.patch<Lead>(`/leads/${leadId}/status`, { status, reason });
       return response;
     },
     onSuccess: (_, variables) => {
@@ -207,7 +207,7 @@ export function useUpdateLeadScore() {
 
   return useMutation({
     mutationFn: async ({ leadId, score, reason }: { leadId: string; score: number; reason: string }) => {
-      const response = await apiClient.patch<Lead>(`/api/v1/leads/${leadId}/score`, { score, reason });
+      const response = await apiClient.patch<Lead>(`/leads/${leadId}/score`, { score, reason });
       return response;
     },
     onSuccess: (_, variables) => {
@@ -225,7 +225,7 @@ export function useAssignLead() {
 
   return useMutation({
     mutationFn: async ({ leadId, assignedTo }: { leadId: string; assignedTo: string }) => {
-      const response = await apiClient.post<Lead>(`/api/v1/leads/${leadId}/assign`, { assignedTo });
+      const response = await apiClient.post<Lead>(`/leads/${leadId}/assign`, { assignedTo });
       return response;
     },
     onSuccess: (_, variables) => {
@@ -244,7 +244,7 @@ export function useUpdateLeadStage() {
 
   return useMutation({
     mutationFn: async ({ leadId, stageId }: { leadId: string; stageId: string }) => {
-      const response = await apiClient.patch<Lead>(`/api/v1/leads/${leadId}/stage`, { stageId });
+      const response = await apiClient.patch<Lead>(`/leads/${leadId}/stage`, { stageId });
       return response;
     },
     onSuccess: (_, variables) => {
@@ -264,7 +264,7 @@ export function useQualifyLead() {
 
   return useMutation({
     mutationFn: async ({ leadId, qualifiedBy }: { leadId: string; qualifiedBy: string }) => {
-      const response = await apiClient.post<Lead>(`/api/v1/leads/${leadId}/qualify`, { qualifiedBy });
+      const response = await apiClient.post<Lead>(`/leads/${leadId}/qualify`, { qualifiedBy });
       return response;
     },
     onSuccess: (_, variables) => {
@@ -284,7 +284,7 @@ export function useConvertLead() {
   return useMutation({
     mutationFn: async ({ leadId, data }: { leadId: string; data?: ConvertLeadRequest }) => {
       const response = await apiClient.post<ConvertLeadResponse>(
-        `/api/v1/leads/${leadId}/convert`,
+        `/leads/${leadId}/convert`,
         data || {}
       );
       return response;
@@ -316,7 +316,7 @@ export function useScheduleFollowUp() {
       scheduledAt: string;
       notes: string;
     }) => {
-      const response = await apiClient.post<Lead>(`/api/v1/leads/${leadId}/follow-up`, {
+      const response = await apiClient.post<Lead>(`/leads/${leadId}/follow-up`, {
         scheduledAt,
         notes,
       });
@@ -338,17 +338,17 @@ export function useScheduleFollowUp() {
  * Hook to fetch notes for a lead
  */
 export function useLeadNotes(leadId: string, page = 1, limit = 20) {
-  const { tenant } = useTenantSafe();
+  const { isValid, tenantId } = useTenantValidation();
 
   return useQuery({
     queryKey: [...leadKeys.notes(leadId), { page, limit }],
     queryFn: async () => {
       const response = await apiClient.get<LeadNotesResponse>(
-        `/api/v1/leads/${leadId}/notes?page=${page}&limit=${limit}`
+        `/leads/${leadId}/notes?page=${page}&limit=${limit}`
       );
       return response;
     },
-    enabled: !!tenant && !!leadId,
+    enabled: isValid && !!tenantId && !!leadId,
   });
 }
 
@@ -368,7 +368,7 @@ export function useAddLeadNote() {
       content: string;
       isPinned?: boolean;
     }) => {
-      const response = await apiClient.post<LeadNote>(`/api/v1/leads/${leadId}/notes`, {
+      const response = await apiClient.post<LeadNote>(`/leads/${leadId}/notes`, {
         content,
         isPinned,
       });
@@ -400,7 +400,7 @@ export function useUpdateLeadNote() {
       content?: string;
       isPinned?: boolean;
     }) => {
-      const response = await apiClient.patch<LeadNote>(`/api/v1/leads/${leadId}/notes/${noteId}`, {
+      const response = await apiClient.patch<LeadNote>(`/leads/${leadId}/notes/${noteId}`, {
         content,
         isPinned,
       });
@@ -420,7 +420,7 @@ export function useDeleteLeadNote() {
 
   return useMutation({
     mutationFn: async ({ leadId, noteId }: { leadId: string; noteId: string }) => {
-      await apiClient.delete(`/api/v1/leads/${leadId}/notes/${noteId}`);
+      await apiClient.delete(`/leads/${leadId}/notes/${noteId}`);
     },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: leadKeys.notes(variables.leadId) });
@@ -437,7 +437,7 @@ export function useDeleteLeadNote() {
  * Hook to fetch activity for a lead with infinite scroll
  */
 export function useLeadActivity(leadId: string, limit = 20) {
-  const { tenant } = useTenantSafe();
+  const { isValid, tenantId } = useTenantValidation();
 
   return useInfiniteQuery({
     queryKey: leadKeys.activity(leadId),
@@ -445,7 +445,7 @@ export function useLeadActivity(leadId: string, limit = 20) {
       const response = await apiClient.get<{
         data: LeadActivity[];
         meta: { page: number; limit: number; total: number; totalPages: number };
-      }>(`/api/v1/leads/${leadId}/activity?page=${pageParam}&limit=${limit}`);
+      }>(`/leads/${leadId}/activity?page=${pageParam}&limit=${limit}`);
       return response;
     },
     initialPageParam: 1,
@@ -455,7 +455,7 @@ export function useLeadActivity(leadId: string, limit = 20) {
       }
       return undefined;
     },
-    enabled: !!tenant && !!leadId,
+    enabled: isValid && !!tenantId && !!leadId,
   });
 }
 
@@ -467,15 +467,15 @@ export function useLeadActivity(leadId: string, limit = 20) {
  * Hook to fetch pipeline stages
  */
 export function usePipelineStages() {
-  const { tenant } = useTenantSafe();
+  const { isValid, tenantId } = useTenantValidation();
 
   return useQuery({
     queryKey: leadKeys.pipelineStages(),
     queryFn: async () => {
-      const response = await apiClient.get<PipelineStage[]>('/api/v1/leads/pipeline/stages');
+      const response = await apiClient.get<PipelineStage[]>('/leads/pipeline/stages');
       return response;
     },
-    enabled: !!tenant,
+    enabled: isValid && !!tenantId,
   });
 }
 
@@ -483,15 +483,15 @@ export function usePipelineStages() {
  * Hook to fetch pipeline view (leads grouped by stage)
  */
 export function usePipelineView() {
-  const { tenant } = useTenantSafe();
+  const { isValid, tenantId } = useTenantValidation();
 
   return useQuery({
     queryKey: leadKeys.pipelineView(),
     queryFn: async () => {
-      const response = await apiClient.get<PipelineView>('/api/v1/leads/pipeline/view');
+      const response = await apiClient.get<PipelineView>('/leads/pipeline/view');
       return response;
     },
-    enabled: !!tenant,
+    enabled: isValid && !!tenantId,
   });
 }
 
@@ -509,7 +509,7 @@ export function useCreatePipelineStage() {
       color?: string;
       isDefault?: boolean;
     }) => {
-      const response = await apiClient.post<PipelineStage>('/api/v1/leads/pipeline/stages', data);
+      const response = await apiClient.post<PipelineStage>('/leads/pipeline/stages', data);
       return response;
     },
     onSuccess: () => {
@@ -600,7 +600,7 @@ export function useBulkAssignLeads() {
 
   return useMutation({
     mutationFn: async (data: Omit<BulkAssignRequest, 'operation'>) => {
-      const response = await apiClient.post<BulkOperationResult>('/api/v1/leads/bulk/assign', {
+      const response = await apiClient.post<BulkOperationResult>('/leads/bulk/assign', {
         ...data,
         operation: 'assign',
       });
@@ -621,7 +621,7 @@ export function useBulkDeleteLeads() {
 
   return useMutation({
     mutationFn: async (data: Omit<BulkDeleteRequest, 'operation'>) => {
-      const response = await apiClient.post<BulkOperationResult>('/api/v1/leads/bulk/delete', {
+      const response = await apiClient.post<BulkOperationResult>('/leads/bulk/delete', {
         ...data,
         operation: 'delete',
       });
@@ -643,7 +643,7 @@ export function useBulkUpdateStatus() {
 
   return useMutation({
     mutationFn: async (data: Omit<BulkStatusRequest, 'operation'>) => {
-      const response = await apiClient.post<BulkOperationResult>('/api/v1/leads/bulk/status', {
+      const response = await apiClient.post<BulkOperationResult>('/leads/bulk/status', {
         ...data,
         operation: 'status',
       });
@@ -665,7 +665,7 @@ export function useBulkUpdateStage() {
 
   return useMutation({
     mutationFn: async (data: Omit<BulkStageRequest, 'operation'>) => {
-      const response = await apiClient.post<BulkOperationResult>('/api/v1/leads/bulk/stage', {
+      const response = await apiClient.post<BulkOperationResult>('/leads/bulk/stage', {
         ...data,
         operation: 'stage',
       });
@@ -684,7 +684,7 @@ export function useBulkUpdateStage() {
 export function useBulkExportLeads() {
   return useMutation({
     mutationFn: async (data: Omit<BulkExportRequest, 'operation'>) => {
-      const response = await apiClient.post<BulkExportResult>('/api/v1/leads/bulk/export', {
+      const response = await apiClient.post<BulkExportResult>('/leads/bulk/export', {
         ...data,
         operation: 'export',
       });
@@ -701,7 +701,7 @@ export function useBulkTagLeads() {
 
   return useMutation({
     mutationFn: async (data: Omit<BulkTagRequest, 'operation'>) => {
-      const response = await apiClient.post<BulkOperationResult>('/api/v1/leads/bulk/tags', {
+      const response = await apiClient.post<BulkOperationResult>('/leads/bulk/tags', {
         ...data,
         operation: 'tag',
       });
@@ -757,7 +757,7 @@ export function useBulkLeadOperations() {
  * Hook to fetch leads with advanced filters
  */
 export function useLeadsAdvanced(filters: AdvancedLeadFilters = {}) {
-  const { tenant } = useTenantSafe();
+  const { isValid, tenantId } = useTenantValidation();
 
   return useQuery({
     queryKey: [...leadKeys.lists(), 'advanced', filters],
@@ -788,11 +788,11 @@ export function useLeadsAdvanced(filters: AdvancedLeadFilters = {}) {
       if (filters.tags?.length) searchParams.set('tags', filters.tags.join(','));
 
       const response = await apiClient.get<LeadsListResponse>(
-        `/api/v1/leads?${searchParams.toString()}`
+        `/leads?${searchParams.toString()}`
       );
       return response;
     },
-    enabled: !!tenant,
+    enabled: isValid && !!tenantId,
   });
 }
 

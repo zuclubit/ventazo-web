@@ -111,7 +111,7 @@ export function useTasks(options: UseTasksOptions = {}) {
     filters.tags.forEach((t) => queryParams.append('tags', t));
   }
 
-  const endpoint = `/api/v1/tasks${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/tasks${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<TasksResponse>(
     taskQueryKeys.list(filters as Record<string, unknown>),
@@ -129,7 +129,7 @@ export function useTasks(options: UseTasksOptions = {}) {
 export function useTask(taskId: string) {
   return useApiQuery<Task>(
     taskQueryKeys.detail(taskId),
-    `/api/v1/tasks/${taskId}`,
+    `/tasks/${taskId}`,
     {
       enabled: !!taskId,
       staleTime: 60 * 1000, // 1 minute
@@ -144,7 +144,7 @@ export function useTaskStatistics(userId?: string) {
   const queryParams = new URLSearchParams();
   if (userId) queryParams.set('userId', userId);
 
-  const endpoint = `/api/v1/tasks/statistics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/tasks/statistics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<TaskStatistics>(
     taskQueryKeys.statistics(userId),
@@ -161,7 +161,7 @@ export function useTaskStatistics(userId?: string) {
 export function useUpcomingTasks(userId?: string) {
   return useApiQuery<UpcomingTasks>(
     taskQueryKeys.upcoming(userId),
-    '/api/v1/tasks/upcoming',
+    '/tasks/upcoming',
     {
       staleTime: 2 * 60 * 1000, // 2 minutes
     }
@@ -185,7 +185,7 @@ export function useTasksByEntity(
 
   return useApiQuery<{ tasks: Task[] }>(
     taskQueryKeys.byEntity(entityType, entityId),
-    `/api/v1/tasks/by-entity?${queryParams.toString()}`,
+    `/tasks/by-entity?${queryParams.toString()}`,
     {
       enabled: !!entityId,
       staleTime: 60 * 1000, // 1 minute
@@ -201,7 +201,7 @@ export function useCreateTask() {
 
   return useApiMutation<Task, CreateTaskData>(
     async (data, client) => {
-      return client.post<Task>('/api/v1/tasks', data);
+      return client.post<Task>('/tasks', data);
     },
     {
       onSuccess: (newTask) => {
@@ -231,7 +231,7 @@ export function useUpdateTask() {
 
   return useApiMutation<Task, { taskId: string; data: UpdateTaskData }>(
     async ({ taskId, data }, client) => {
-      return client.patch<Task>(`/api/v1/tasks/${taskId}`, data);
+      return client.patch<Task>(`/tasks/${taskId}`, data);
     },
     {
       onSuccess: (updatedTask) => {
@@ -252,7 +252,7 @@ export function useDeleteTask() {
 
   return useApiMutation<void, string>(
     async (taskId, client) => {
-      return client.delete(`/api/v1/tasks/${taskId}`);
+      return client.delete(`/tasks/${taskId}`);
     },
     {
       onSuccess: (_, taskId) => {
@@ -277,7 +277,7 @@ export function useCompleteTask() {
 
   return useApiMutation<Task, { taskId: string; data?: CompleteTaskData }>(
     async ({ taskId, data }, client) => {
-      return client.post<Task>(`/api/v1/tasks/${taskId}/complete`, data ?? {});
+      return client.post<Task>(`/tasks/${taskId}/complete`, data ?? {});
     },
     {
       onSuccess: (updatedTask) => {
@@ -299,7 +299,7 @@ export function useCancelTask() {
 
   return useApiMutation<Task, { taskId: string; data?: CancelTaskData }>(
     async ({ taskId, data }, client) => {
-      return client.post<Task>(`/api/v1/tasks/${taskId}/cancel`, data ?? {});
+      return client.post<Task>(`/tasks/${taskId}/cancel`, data ?? {});
     },
     {
       onSuccess: (updatedTask) => {
@@ -321,7 +321,7 @@ export function useAssignTask() {
 
   return useApiMutation<Task, { taskId: string; data: AssignTaskData }>(
     async ({ taskId, data }, client) => {
-      return client.patch<Task>(`/api/v1/tasks/${taskId}`, { assignedTo: data.assignedTo });
+      return client.patch<Task>(`/tasks/${taskId}`, { assignedTo: data.assignedTo });
     },
     {
       onSuccess: (updatedTask) => {
@@ -341,7 +341,7 @@ export function useDeferTask() {
 
   return useApiMutation<Task, { taskId: string; data: DeferTaskData }>(
     async ({ taskId, data }, client) => {
-      return client.patch<Task>(`/api/v1/tasks/${taskId}`, {
+      return client.patch<Task>(`/tasks/${taskId}`, {
         status: 'deferred',
         dueDate: data.deferTo,
         metadata: data.reason ? { deferReason: data.reason } : undefined,
@@ -367,7 +367,7 @@ export function useReopenTask() {
 
   return useApiMutation<Task, string>(
     async (taskId, client) => {
-      return client.patch<Task>(`/api/v1/tasks/${taskId}`, { status: 'pending' });
+      return client.patch<Task>(`/tasks/${taskId}`, { status: 'pending' });
     },
     {
       onSuccess: (updatedTask) => {
@@ -389,7 +389,7 @@ export function useBulkTaskOperation() {
 
   return useApiMutation<BulkTaskResult, BulkTaskOperation>(
     async (data, client) => {
-      return client.post<BulkTaskResult>('/api/v1/tasks/bulk', data);
+      return client.post<BulkTaskResult>('/tasks/bulk', data);
     },
     {
       onSuccess: () => {
@@ -418,7 +418,7 @@ export function useTaskComments(taskId: string, options: UseTaskCommentsOptions 
   if (options.page) queryParams.set('page', String(options.page));
   if (options.limit) queryParams.set('limit', String(options.limit));
 
-  const endpoint = `/api/v1/tasks/${taskId}/comments${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/tasks/${taskId}/comments${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<TaskCommentsResponse>(
     taskQueryKeys.commentsList(taskId, options),
@@ -438,7 +438,7 @@ export function useAddTaskComment() {
 
   return useApiMutation<TaskComment, { taskId: string; data: CreateTaskCommentData }>(
     async ({ taskId, data }, client) => {
-      return client.post<TaskComment>(`/api/v1/tasks/${taskId}/comments`, data);
+      return client.post<TaskComment>(`/tasks/${taskId}/comments`, data);
     },
     {
       onSuccess: (_, { taskId }) => {
@@ -457,7 +457,7 @@ export function useUpdateTaskComment() {
 
   return useApiMutation<TaskComment, { taskId: string; commentId: string; data: UpdateTaskCommentData }>(
     async ({ taskId, commentId, data }, client) => {
-      return client.patch<TaskComment>(`/api/v1/tasks/${taskId}/comments/${commentId}`, data);
+      return client.patch<TaskComment>(`/tasks/${taskId}/comments/${commentId}`, data);
     },
     {
       onSuccess: (_, { taskId }) => {
@@ -475,7 +475,7 @@ export function useDeleteTaskComment() {
 
   return useApiMutation<void, { taskId: string; commentId: string }>(
     async ({ taskId, commentId }, client) => {
-      return client.delete(`/api/v1/tasks/${taskId}/comments/${commentId}`);
+      return client.delete(`/tasks/${taskId}/comments/${commentId}`);
     },
     {
       onSuccess: (_, { taskId }) => {
@@ -506,7 +506,7 @@ export function useTaskActivity(taskId: string, options: UseTaskActivityOptions 
   if (options.startDate) queryParams.set('startDate', options.startDate);
   if (options.endDate) queryParams.set('endDate', options.endDate);
 
-  const endpoint = `/api/v1/tasks/${taskId}/activity${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/tasks/${taskId}/activity${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<TaskActivityResponse>(
     taskQueryKeys.activityList(taskId, options as Record<string, unknown>),

@@ -1,12 +1,13 @@
 'use client';
 
 /**
- * LeadsEmptyState Component
+ * LeadsEmptyState Component - Redesigned
  *
- * Educational empty state with 3 CTAs:
- * 1. Add lead manually
- * 2. Connect WhatsApp Business
- * 3. Import from Excel
+ * Educational empty state with hierarchy:
+ * - WhatsApp as PRIMARY action (large centered card)
+ * - Add manually and Import as SECONDARY actions (smaller, below)
+ *
+ * Based on UX research: WhatsApp is #1 channel in LATAM/Mexico
  */
 
 import * as React from 'react';
@@ -14,8 +15,10 @@ import {
   UserPlus,
   MessageCircle,
   Upload,
-  Sparkles,
+  Rocket,
   ArrowRight,
+  Zap,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -42,79 +45,125 @@ export interface LeadsEmptyStateProps {
 }
 
 // ============================================
-// CTA Card Component
+// Primary CTA Card (WhatsApp - Large)
 // ============================================
 
-interface CTACardProps {
+interface PrimaryCTACardProps {
+  onClick?: () => void;
+}
+
+function PrimaryCTACard({ onClick }: PrimaryCTACardProps) {
+  return (
+    <div
+      className={cn(
+        'relative w-full max-w-md rounded-2xl border-2 p-8',
+        'border-[var(--whatsapp)]/30',
+        'bg-gradient-to-br from-[var(--whatsapp-bg)] via-[var(--whatsapp)]/5 to-transparent',
+        'transition-all duration-300 hover:border-[var(--whatsapp)]/50 hover:shadow-lg hover:shadow-[var(--whatsapp)]/10',
+        'cursor-pointer group'
+      )}
+      onClick={onClick}
+    >
+      {/* Decorative gradient orb */}
+      <div className="absolute top-4 right-4 h-20 w-20 rounded-full bg-[var(--whatsapp)]/10 blur-2xl" />
+
+      {/* Badge */}
+      <div className="inline-flex items-center gap-1.5 mb-4 px-3 py-1 rounded-full border border-[var(--whatsapp)]/30 bg-[var(--whatsapp-bg)]">
+        <Zap className="h-3.5 w-3.5 whatsapp-text" />
+        <span className="text-xs font-medium whatsapp-text">Recomendado</span>
+      </div>
+
+      {/* Icon */}
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl whatsapp-button mb-5 shadow-lg shadow-[var(--whatsapp)]/30 group-hover:scale-105 transition-transform">
+        <MessageCircle className="h-8 w-8 text-white" />
+      </div>
+
+      {/* Content */}
+      <h3 className="text-xl font-semibold mb-2">Conectar WhatsApp</h3>
+      <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+        Recibe leads automáticamente desde WhatsApp Business.
+        La forma más rápida de capturar prospectos en México.
+      </p>
+
+      {/* Features */}
+      <div className="flex flex-col gap-2 mb-6">
+        {[
+          'Captura automática de contactos',
+          'Respuestas instantáneas con IA',
+          'Integración sin código',
+        ].map((feature) => (
+          <div key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CheckCircle2 className="h-4 w-4 whatsapp-text shrink-0" />
+            <span>{feature}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Button */}
+      <Button
+        size="lg"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
+        className="w-full whatsapp-button shadow-lg shadow-[var(--whatsapp)]/30"
+      >
+        Conectar ahora
+        <ArrowRight className="ml-2 h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+// ============================================
+// Secondary CTA Card (Smaller)
+// ============================================
+
+interface SecondaryCTACardProps {
   icon: React.ReactNode;
   title: string;
   description: string;
   buttonLabel: string;
   onClick?: () => void;
-  variant?: 'primary' | 'whatsapp' | 'secondary';
-  disabled?: boolean;
 }
 
-function CTACard({
+function SecondaryCTACard({
   icon,
   title,
   description,
   buttonLabel,
   onClick,
-  variant = 'secondary',
-  disabled = false,
-}: CTACardProps) {
-  const variantStyles = {
-    primary: {
-      container: 'border-primary/20 bg-primary/5 hover:border-primary/30',
-      icon: 'bg-primary/10 text-primary',
-      button: 'ventazo-button',
-    },
-    whatsapp: {
-      container: 'border-green-500/20 bg-green-500/5 hover:border-green-500/30',
-      icon: 'bg-green-500/10 text-green-500',
-      button: 'bg-green-500 hover:bg-green-600 text-white',
-    },
-    secondary: {
-      container: 'border-muted hover:border-muted-foreground/20',
-      icon: 'bg-muted text-muted-foreground',
-      button: '',
-    },
-  };
-
-  const styles = variantStyles[variant];
-
+}: SecondaryCTACardProps) {
   return (
     <div
       className={cn(
-        'rounded-2xl border p-5 transition-all duration-300',
-        'flex flex-col items-center text-center',
-        styles.container,
-        !disabled && onClick && 'cursor-pointer'
+        'flex-1 min-w-[180px] rounded-xl border border-border/50 p-5',
+        'bg-card/50 backdrop-blur-sm',
+        'transition-all duration-300 hover:border-primary/20 hover:bg-card/80',
+        'cursor-pointer group'
       )}
-      onClick={!disabled ? onClick : undefined}
+      onClick={onClick}
     >
       {/* Icon */}
-      <div className={cn('rounded-xl p-3 mb-3', styles.icon)}>
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted mb-3 group-hover:bg-primary/10 transition-colors">
         {icon}
       </div>
 
       {/* Content */}
       <h3 className="font-semibold text-sm mb-1">{title}</h3>
-      <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+      <p className="text-xs text-muted-foreground mb-4 leading-relaxed line-clamp-2">
         {description}
       </p>
 
       {/* Button */}
       <Button
         size="sm"
-        variant={variant === 'secondary' ? 'outline' : 'default'}
+        variant="outline"
         onClick={(e) => {
           e.stopPropagation();
           onClick?.();
         }}
-        disabled={disabled}
-        className={cn('w-full', styles.button)}
+        className="w-full group-hover:border-primary/30"
       >
         {buttonLabel}
         <ArrowRight className="ml-2 h-3.5 w-3.5" />
@@ -217,75 +266,55 @@ export function LeadsEmptyState({
     return <CompactEmpty onAddLead={onAddLead} className={className} />;
   }
 
-  // Default full variant
+  // Default full variant - Redesigned with hierarchy
   return (
-    <div className={cn('flex flex-col items-center justify-center py-16 px-4', className)}>
-      {/* Illustrated Icon */}
-      <div className="relative mb-6">
-        {/* Background Glow */}
-        <div className="absolute inset-0 blur-3xl rounded-full bg-primary/10 opacity-60" />
-
-        {/* Icon Container */}
-        <div className="relative flex h-24 w-24 items-center justify-center rounded-full border-2 border-dashed border-primary/20 bg-primary/5">
-          {/* Inner Ring */}
-          <div className="absolute inset-3 rounded-full border border-primary/10" />
-
-          {/* Icon */}
-          <UserPlus className="h-10 w-10 text-primary" strokeWidth={1.5} />
-
-          {/* Decorative Dots */}
-          <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary/20" />
-          <div className="absolute -bottom-2 -left-2 h-2 w-2 rounded-full bg-primary/15" />
-        </div>
-      </div>
-
+    <div className={cn('flex flex-col items-center justify-center py-12 px-4', className)}>
       {/* Header */}
       <div className="text-center max-w-lg mb-8">
-        <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full border border-primary/20 bg-primary/5">
-          <Sparkles className="h-3.5 w-3.5 text-primary" />
-          <span className="text-xs font-medium text-primary">Empieza a vender</span>
+        {/* Motivational Badge */}
+        <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5">
+          <Rocket className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium text-primary">¡Es hora de conseguir clientes!</span>
         </div>
 
-        <h2 className="text-xl font-semibold mb-2">
-          Comienza a capturar oportunidades
+        {/* Title */}
+        <h2 className="text-2xl font-bold mb-3">
+          Tu pipeline está listo
         </h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Los leads son el primer paso hacia nuevos clientes. Agrega tu primer prospecto
-          manualmente, conecta WhatsApp para recibirlos automáticamente, o importa
-          tu base de datos existente.
+          Agrega tu primer lead y empieza a cerrar ventas hoy mismo.
+          Te recomendamos conectar WhatsApp para recibir prospectos automáticamente.
         </p>
       </div>
 
-      {/* CTA Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl w-full">
+      {/* PRIMARY Action - WhatsApp (Large Card) */}
+      <PrimaryCTACard onClick={onConnectWhatsApp} />
+
+      {/* Divider with "o" */}
+      <div className="flex items-center gap-4 my-6 w-full max-w-md">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-xs text-muted-foreground uppercase tracking-wider">o también</span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
+
+      {/* SECONDARY Actions (Smaller, in row) */}
+      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
         {/* Add Manually */}
-        <CTACard
-          icon={<UserPlus className="h-5 w-5" />}
+        <SecondaryCTACard
+          icon={<UserPlus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />}
           title="Agregar Manualmente"
-          description="Captura un nuevo prospecto con sus datos de contacto"
+          description="Captura un prospecto con sus datos de contacto"
           buttonLabel="Agregar Lead"
           onClick={onAddLead}
-          variant="primary"
-        />
-
-        {/* Connect WhatsApp */}
-        <CTACard
-          icon={<MessageCircle className="h-5 w-5" />}
-          title="Conectar WhatsApp"
-          description="Recibe leads automáticamente desde WhatsApp Business"
-          buttonLabel="Conectar"
-          onClick={onConnectWhatsApp}
-          variant="whatsapp"
         />
 
         {/* Import Excel */}
-        <CTACard
-          icon={<Upload className="h-5 w-5" />}
-          title="Importar Excel"
-          description="Sube tu base de datos desde un archivo CSV o Excel"
+        <SecondaryCTACard
+          icon={<Upload className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />}
+          title="Importar desde Excel"
+          description="Sube tu base de datos en formato CSV o Excel"
           buttonLabel="Importar"
           onClick={onImport}
-          variant="secondary"
         />
       </div>
     </div>

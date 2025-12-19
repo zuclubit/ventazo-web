@@ -1,281 +1,177 @@
 'use client';
 
 /**
- * Leads Page - Redesigned
+ * Leads Page - Kanban View
  *
- * Features:
- * - Hybrid list + preview layout (Gmail-style)
- * - Smart KPI dashboard with clickable filters
- * - Quick actions (WhatsApp, Call, Email)
- * - Glassmorphism styling matching landing page
- * - Mobile responsive with Sheet for preview
+ * Redesigned as a Kanban board for visual pipeline management.
+ * Fully responsive:
+ * - Mobile: Horizontal snap scrolling, bottom Sheet for preview
+ * - Tablet: Scrollable columns, side panel for preview
+ * - Desktop: All columns visible, right panel for preview
  */
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useMediaQuery } from '@/hooks/use-media-query';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Kanban,
-  Loader2,
-  Plus,
-  LayoutList,
-  LayoutGrid,
-} from 'lucide-react';
+import { Plus, LayoutList, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from '@/components/ui/toggle-group';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { RBACGuard } from '@/lib/auth';
-import {
-  useLeadsManagement,
-  LeadStatus,
-  LeadSource,
-  type Lead,
-} from '@/lib/leads';
+import { usePipelineView, type Lead } from '@/lib/leads';
 
-// New redesigned components
+// Components
 import {
-  LeadCard,
-  LeadsKPIDashboard,
-  LeadPreviewPanel,
-  LeadFiltersBar,
+  KanbanBoard,
+  KanbanSkeleton,
   LeadsEmptyState,
-  LeadFormDialog,
+  LeadFormSheet,
   DeleteLeadDialog,
   ConvertLeadDialog,
-  defaultFilters,
-  type LeadFilters,
-  type LeadsFilter,
+  LeadPreviewPanel,
 } from './components';
 
 // ============================================
-// Types
-// ============================================
-
-type ViewMode = 'list' | 'compact';
-
-// ============================================
-// Leads Page Component
+// Leads Page Component - Kanban View
 // ============================================
 
 export default function LeadsPage() {
   const router = useRouter();
-  const isMobile = useMediaQuery('(max-width: 1024px)');
+  const isMobile = useMediaQuery('(max-width: 1023px)');
 
-  // View mode
-  const [viewMode, setViewMode] = React.useState<ViewMode>('list');
+  // Fetch pipeline data
+  const {
+    data: pipelineData,
+    isLoading,
+    error,
+    refetch,
+    isRefetching,
+  } = usePipelineView();
 
-  // Filters state
-  const [filters, setFilters] = React.useState<LeadFilters>(defaultFilters);
-  const [kpiFilter, setKpiFilter] = React.useState<LeadsFilter>('all');
-
-  // Pagination
-  const [page, setPage] = React.useState(1);
-  const pageSize = 20;
-
-  // Debounced search
-  const [debouncedSearch, setDebouncedSearch] = React.useState('');
-  React.useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(filters.searchTerm), 300);
-    return () => clearTimeout(timer);
-  }, [filters.searchTerm]);
-
-  // Selected lead for preview
-  const [selectedLeadId, setSelectedLeadId] = React.useState<string | null>(null);
-
-  // Dialogs
+  // Dialog states
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [editLead, setEditLead] = React.useState<Lead | null>(null);
   const [deleteLead, setDeleteLead] = React.useState<Lead | null>(null);
   const [convertLead, setConvertLead] = React.useState<Lead | null>(null);
+  const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
 
-  // Data fetching
-  const {
-    leads,
-    meta,
-    statistics,
-    isLoading,
-    isStatsLoading,
-    refetchLeads,
-  } = useLeadsManagement({
-    page,
-    limit: pageSize,
-    searchTerm: debouncedSearch || undefined,
-    status: filters.status !== 'all' ? filters.status : undefined,
-    source: filters.source !== 'all' ? filters.source : undefined,
-    minScore: filters.minScore > 0 ? filters.minScore : undefined,
-    maxScore: filters.maxScore < 100 ? filters.maxScore : undefined,
-    sortBy: 'createdAt',
-    sortOrder: 'desc',
-  });
-
-  // Apply KPI filter client-side
-  const filteredLeads = React.useMemo(() => {
-    if (kpiFilter === 'all') return leads;
-
-    return leads.filter((lead) => {
-      switch (kpiFilter) {
-        case 'hot':
-          return lead.score >= 80;
-        case 'no-contact': {
-          const lastActivity = lead.lastActivityAt || lead.updatedAt;
-          const hoursSince = (Date.now() - new Date(lastActivity).getTime()) / (1000 * 60 * 60);
-          return hoursSince > 48;
-        }
-        case 'converted':
-          return lead.status === LeadStatus.CONVERTED;
-        default:
-          return true;
-      }
-    });
-  }, [leads, kpiFilter]);
-
-  // Selected lead object
-  const selectedLead = React.useMemo(
-    () => leads.find((l) => l.id === selectedLeadId) || null,
-    [leads, selectedLeadId]
-  );
-
-  // Reset page on filter change
-  React.useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, filters.status, filters.source, filters.minScore, filters.maxScore]);
+  // Derived values
+  const columns = pipelineData?.stages ?? [];
+  const totalLeads = pipelineData?.totalLeads ?? 0;
+  const isEmpty = columns.length === 0 || columns.every((c) => c.leads.length === 0);
 
   // Handlers
-  const handleKPIFilterChange = (filter: LeadsFilter) => {
-    setKpiFilter(filter);
-    setPage(1);
+  const handleLeadClick = (lead: Lead) => {
+    setSelectedLead(lead);
   };
 
-  const handleLeadClick = (lead: Lead) => {
-    setSelectedLeadId(lead.id);
+  const handleLeadEdit = (lead: Lead) => {
+    setEditLead(lead);
+  };
+
+  const handleLeadDelete = (lead: Lead) => {
+    setDeleteLead(lead);
+  };
+
+  const handleLeadConvert = (lead: Lead) => {
+    setConvertLead(lead);
   };
 
   const handleClosePreview = () => {
-    setSelectedLeadId(null);
+    setSelectedLead(null);
   };
 
-  const handleEditFromPreview = () => {
-    if (selectedLead) {
-      setEditLead(selectedLead);
-    }
+  const handleRefresh = () => {
+    refetch();
   };
-
-  const handleDeleteFromPreview = () => {
-    if (selectedLead) {
-      setDeleteLead(selectedLead);
-    }
-  };
-
-  const handleConvertFromPreview = () => {
-    if (selectedLead) {
-      setConvertLead(selectedLead);
-    }
-  };
-
-  const handleClearFilters = () => {
-    setFilters(defaultFilters);
-    setKpiFilter('all');
-  };
-
-  // Check if any filters are active
-  const hasActiveFilters = React.useMemo(() => {
-    return (
-      filters.searchTerm !== '' ||
-      filters.status !== 'all' ||
-      filters.source !== 'all' ||
-      filters.minScore > 0 ||
-      filters.maxScore < 100 ||
-      filters.tags.length > 0 ||
-      kpiFilter !== 'all'
-    );
-  }, [filters, kpiFilter]);
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-      {/* Main Content Area */}
+      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Page Header */}
-        <div className="shrink-0 px-6 pt-6 pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Leads</h1>
-              <p className="text-sm text-muted-foreground">
-                Gestiona tus prospectos y convierte oportunidades
+        {/* Header - Responsive */}
+        <div className="shrink-0 px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-2 sm:pb-3 md:pb-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex items-center justify-between gap-2">
+            {/* Title Section */}
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight truncate">
+                Leads
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                {isLoading ? (
+                  'Cargando...'
+                ) : error ? (
+                  'Error al cargar'
+                ) : (
+                  <>
+                    <span className="font-medium">{totalLeads}</span> leads en pipeline
+                  </>
+                )}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {/* View Toggle */}
-              <ToggleGroup
-                type="single"
-                value={viewMode}
-                onValueChange={(value) => value && setViewMode(value as ViewMode)}
-                className="hidden sm:flex"
+
+            {/* Actions Section */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Refresh Button - Icon only on mobile */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefresh}
+                disabled={isRefetching}
+                className="h-8 w-8 sm:h-9 sm:w-9"
               >
-                <ToggleGroupItem value="list" aria-label="Vista lista">
-                  <LayoutList className="h-4 w-4" />
-                </ToggleGroupItem>
-                <ToggleGroupItem value="compact" aria-label="Vista compacta">
-                  <LayoutGrid className="h-4 w-4" />
-                </ToggleGroupItem>
-              </ToggleGroup>
+                <RefreshCw
+                  className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`}
+                />
+              </Button>
 
-              <Separator orientation="vertical" className="h-6 hidden sm:block" />
-
-              {/* Pipeline Button */}
-              <Button variant="outline" onClick={() => router.push('/app/leads/pipeline')}>
-                <Kanban className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Pipeline</span>
+              {/* List View Button - Hidden on mobile */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/app/leads/list')}
+                className="hidden sm:flex h-8 sm:h-9"
+              >
+                <LayoutList className="h-4 w-4 sm:mr-2" />
+                <span className="hidden md:inline">Vista Lista</span>
               </Button>
 
               {/* New Lead Button */}
               <RBACGuard fallback={null} minRole="sales_rep">
-                <Button onClick={() => setIsCreateOpen(true)} className="ventazo-button">
-                  <Plus className="mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Nuevo Lead</span>
+                <Button
+                  onClick={() => setIsCreateOpen(true)}
+                  className="ventazo-button h-8 sm:h-9 px-2.5 sm:px-3"
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Nuevo</span>
                 </Button>
               </RBACGuard>
             </div>
           </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-auto px-6 pb-6 space-y-5">
-          {/* KPI Dashboard */}
-          <LeadsKPIDashboard
-            statistics={statistics}
-            leads={leads}
-            isLoading={isStatsLoading}
-            onFilterChange={handleKPIFilterChange}
-            activeFilter={kpiFilter}
-          />
-
-          {/* Filters Bar */}
-          <LeadFiltersBar
-            filters={filters}
-            onFiltersChange={setFilters}
-            onRefresh={() => refetchLeads()}
-            isRefreshing={isLoading}
-          />
-
-          {/* Content */}
+        {/* Kanban Board - Responsive Container */}
+        <div className="flex-1 overflow-hidden py-3 sm:py-4 md:py-6 px-0 sm:px-4 md:px-6">
           {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <KanbanSkeleton columns={5} />
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center h-full px-4">
+              <p className="text-destructive text-center mb-4">
+                Error al cargar el pipeline
+              </p>
+              <Button variant="outline" onClick={handleRefresh}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Reintentar
+              </Button>
             </div>
-          ) : filteredLeads.length === 0 ? (
-            hasActiveFilters ? (
-              <LeadsEmptyState
-                variant="search"
-                searchTerm={filters.searchTerm}
-                onClearFilters={handleClearFilters}
-              />
-            ) : (
+          ) : isEmpty && !isLoading ? (
+            <div className="px-4 sm:px-0">
               <LeadsEmptyState
                 onAddLead={() => setIsCreateOpen(true)}
                 onConnectWhatsApp={() => router.push('/app/settings/integrations')}
@@ -284,86 +180,68 @@ export default function LeadsPage() {
                   console.log('Import leads');
                 }}
               />
-            )
+            </div>
           ) : (
-            <>
-              {/* Lead Cards */}
-              <div className="space-y-2">
-                {filteredLeads.map((lead) => (
-                  <LeadCard
-                    key={lead.id}
-                    lead={lead}
-                    variant={viewMode === 'compact' ? 'compact' : 'default'}
-                    selected={selectedLeadId === lead.id}
-                    onClick={() => handleLeadClick(lead)}
-                    showQuickActions={viewMode === 'list'}
-                    onEdit={() => setEditLead(lead)}
-                    onDelete={() => setDeleteLead(lead)}
-                    onConvert={() => setConvertLead(lead)}
-                  />
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {meta && meta.totalPages > 1 && (
-                <div className="flex items-center justify-between pt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Mostrando {filteredLeads.length} de {meta.total} leads
-                    {' '}• Página {meta.page} de {meta.totalPages}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Anterior
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page >= meta.totalPages}
-                      onClick={() => setPage((p) => p + 1)}
-                    >
-                      Siguiente
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
+            <KanbanBoard
+              columns={columns}
+              onLeadClick={handleLeadClick}
+              onLeadEdit={handleLeadEdit}
+              onLeadDelete={handleLeadDelete}
+              onLeadConvert={handleLeadConvert}
+            />
           )}
         </div>
       </div>
 
-      {/* Preview Panel (Desktop) */}
+      {/* Preview Panel - Desktop (lg+) */}
       {!isMobile && selectedLead && (
         <LeadPreviewPanel
           lead={selectedLead}
           onClose={handleClosePreview}
-          onEdit={handleEditFromPreview}
-          onDelete={handleDeleteFromPreview}
-          onConvert={handleConvertFromPreview}
+          onEdit={() => handleLeadEdit(selectedLead)}
+          onDelete={() => handleLeadDelete(selectedLead)}
+          onConvert={() => handleLeadConvert(selectedLead)}
           isMobile={false}
         />
       )}
 
-      {/* Preview Panel (Mobile - Sheet) */}
+      {/* Preview Sheet - Mobile/Tablet */}
       {isMobile && (
-        <LeadPreviewPanel
-          lead={selectedLead}
-          onClose={handleClosePreview}
-          onEdit={handleEditFromPreview}
-          onDelete={handleDeleteFromPreview}
-          onConvert={handleConvertFromPreview}
-          isMobile={true}
-        />
+        <Sheet open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
+          <SheetContent
+            side="bottom"
+            className="h-[85vh] rounded-t-2xl px-0"
+          >
+            <SheetHeader className="px-4 pb-2 border-b">
+              <SheetTitle className="text-left">Detalle del Lead</SheetTitle>
+            </SheetHeader>
+            <div className="overflow-y-auto h-full pb-safe">
+              {selectedLead && (
+                <LeadPreviewPanel
+                  lead={selectedLead}
+                  onClose={handleClosePreview}
+                  onEdit={() => {
+                    handleLeadEdit(selectedLead);
+                    setSelectedLead(null);
+                  }}
+                  onDelete={() => {
+                    handleLeadDelete(selectedLead);
+                    setSelectedLead(null);
+                  }}
+                  onConvert={() => {
+                    handleLeadConvert(selectedLead);
+                    setSelectedLead(null);
+                  }}
+                  isMobile={true}
+                />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
       )}
 
-      {/* Create/Edit Dialog */}
-      <LeadFormDialog
+      {/* Create/Edit Sheet */}
+      <LeadFormSheet
         lead={editLead}
         open={isCreateOpen || !!editLead}
         onClose={() => {

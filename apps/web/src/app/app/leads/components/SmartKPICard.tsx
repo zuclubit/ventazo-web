@@ -40,6 +40,10 @@ export interface SmartKPICardProps {
   onClick?: () => void;
   /** Is currently active/selected */
   isActive?: boolean;
+  /** Show pulsing indicator for urgent items */
+  showPulse?: boolean;
+  /** Badge text (e.g., "¡Atención!") */
+  badge?: string;
   /** Additional CSS classes */
   className?: string;
 }
@@ -54,24 +58,34 @@ const variantConfig = {
     iconBg: 'bg-muted',
     iconColor: 'text-muted-foreground',
     activeBorder: 'border-primary/50',
+    badgeStyle: 'bg-muted text-muted-foreground',
+    pulseColor: 'bg-muted-foreground',
   },
   highlight: {
     border: 'border-l-4 border-l-primary border-t-0 border-r-0 border-b-0',
-    iconBg: 'bg-primary/10',
+    iconBg: 'bg-[var(--highlight-primary)]',
     iconColor: 'text-primary',
     activeBorder: 'ring-2 ring-primary/20',
+    badgeStyle: 'bg-[var(--highlight-primary)] text-primary',
+    pulseColor: 'bg-primary',
   },
   warning: {
-    border: 'border-l-4 border-l-orange-500 border-t-0 border-r-0 border-b-0',
-    iconBg: 'bg-orange-500/10',
-    iconColor: 'text-orange-500',
-    activeBorder: 'ring-2 ring-orange-500/20',
+    border: 'border-l-4 border-t-0 border-r-0 border-b-0',
+    borderColor: 'border-l-[var(--status-warning)]',
+    iconBg: 'bg-[var(--status-warning-bg)]',
+    iconColor: 'status-warning-text',
+    activeBorder: 'ring-2 ring-[var(--status-warning)]/20',
+    badgeStyle: 'bg-[var(--status-warning-bg)] status-warning-text',
+    pulseColor: 'bg-[var(--status-warning)]',
   },
   success: {
-    border: 'border-l-4 border-l-emerald-500 border-t-0 border-r-0 border-b-0',
-    iconBg: 'bg-emerald-500/10',
-    iconColor: 'text-emerald-500',
-    activeBorder: 'ring-2 ring-emerald-500/20',
+    border: 'border-l-4 border-t-0 border-r-0 border-b-0',
+    borderColor: 'border-l-[var(--status-success)]',
+    iconBg: 'bg-[var(--status-success-bg)]',
+    iconColor: 'status-success-text',
+    activeBorder: 'ring-2 ring-[var(--status-success)]/20',
+    badgeStyle: 'bg-[var(--status-success-bg)] status-success-text',
+    pulseColor: 'bg-[var(--status-success)]',
   },
 };
 
@@ -89,31 +103,31 @@ function TrendIndicator({ value, direction, label }: TrendIndicatorProps) {
   const config = {
     up: {
       icon: TrendingUp,
-      color: 'text-emerald-500',
-      bgColor: 'bg-emerald-500/10',
+      className: 'trend-up',
+      bgClassName: 'trend-up-bg',
       prefix: '+',
     },
     down: {
       icon: TrendingDown,
-      color: 'text-red-500',
-      bgColor: 'bg-red-500/10',
+      className: 'trend-down',
+      bgClassName: 'trend-down-bg',
       prefix: '',
     },
     neutral: {
       icon: Minus,
-      color: 'text-muted-foreground',
-      bgColor: 'bg-muted',
+      className: 'trend-neutral',
+      bgClassName: 'trend-neutral-bg',
       prefix: '',
     },
   };
 
-  const { icon: Icon, color, bgColor, prefix } = config[direction];
+  const { icon: Icon, className, bgClassName, prefix } = config[direction];
 
   return (
     <div className="flex items-center gap-1.5">
-      <div className={cn('flex items-center gap-1 px-1.5 py-0.5 rounded-full', bgColor)}>
-        <Icon className={cn('h-3 w-3', color)} />
-        <span className={cn('text-xs font-medium', color)}>
+      <div className={cn('flex items-center gap-1 px-1.5 py-0.5 rounded-full', bgClassName)}>
+        <Icon className={cn('h-3 w-3', className)} />
+        <span className={cn('text-xs font-medium', className)}>
           {prefix}
           {Math.abs(value)}%
         </span>
@@ -139,6 +153,8 @@ export function SmartKPICard({
   isLoading = false,
   onClick,
   isActive = false,
+  showPulse = false,
+  badge,
   className,
 }: SmartKPICardProps) {
   const config = variantConfig[variant];
@@ -150,6 +166,7 @@ export function SmartKPICard({
         'relative overflow-hidden transition-all duration-300',
         'backdrop-blur-xl bg-card/80',
         config.border,
+        'borderColor' in config && config.borderColor,
         isClickable && 'cursor-pointer hover:shadow-lg hover:-translate-y-0.5',
         isActive && config.activeBorder,
         className
@@ -172,10 +189,20 @@ export function SmartKPICard({
         <div className="flex items-start justify-between gap-3">
           {/* Content */}
           <div className="flex-1 min-w-0">
-            {/* Title */}
-            <p className="text-sm font-medium text-muted-foreground truncate">
-              {title}
-            </p>
+            {/* Title with optional badge */}
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-muted-foreground truncate">
+                {title}
+              </p>
+              {badge && (
+                <span className={cn(
+                  'inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium',
+                  config.badgeStyle
+                )}>
+                  {badge}
+                </span>
+              )}
+            </div>
 
             {/* Value */}
             <div className="mt-1 flex items-baseline gap-2">
@@ -203,14 +230,28 @@ export function SmartKPICard({
             </div>
           </div>
 
-          {/* Icon */}
-          <div
-            className={cn(
-              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
-              config.iconBg
+          {/* Icon with optional pulse */}
+          <div className="relative">
+            {showPulse && (
+              <>
+                <div className={cn(
+                  'absolute -inset-1 rounded-xl animate-ping opacity-20',
+                  config.pulseColor
+                )} />
+                <div className={cn(
+                  'absolute -top-1 -right-1 h-3 w-3 rounded-full animate-pulse',
+                  config.pulseColor
+                )} />
+              </>
             )}
-          >
-            <Icon className={cn('h-5 w-5', config.iconColor)} />
+            <div
+              className={cn(
+                'relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                config.iconBg
+              )}
+            >
+              <Icon className={cn('h-5 w-5', config.iconColor)} />
+            </div>
           </div>
         </div>
       </CardContent>

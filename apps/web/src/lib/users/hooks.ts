@@ -58,7 +58,7 @@ export const userQueryKeys = {
 export function useCurrentUserProfile() {
   return useApiQuery<UserProfile>(
     userQueryKeys.me(),
-    '/api/v1/users/me',
+    '/users/me',
     {
       staleTime: 5 * 60 * 1000, // 5 minutes
     }
@@ -84,7 +84,7 @@ export interface UserTenantMembership {
 export function useUserTenants() {
   return useApiQuery<UserTenantMembership[]>(
     userQueryKeys.tenants(),
-    '/api/v1/auth/tenants',
+    '/auth/tenants',
     {
       staleTime: 5 * 60 * 1000, // 5 minutes
       // This query doesn't require a tenant ID since it returns all tenants for the user
@@ -105,7 +105,7 @@ export function useUpdateProfile() {
 
   return useApiMutation<UserProfile, UpdateProfileData>(
     async (data, client) => {
-      return client.patch<UserProfile>('/api/v1/users/me', data);
+      return client.patch<UserProfile>('/users/me', data);
     },
     {
       onSuccess: (updatedProfile) => {
@@ -141,7 +141,7 @@ export function useUploadAvatar() {
   return useApiMutation<{ avatarUrl: string }, FormData>(
     async (formData, _client) => {
       // For file upload, we need custom handling
-      const response = await fetch('/api/v1/users/me/avatar', {
+      const response = await fetch('/users/me/avatar', {
         method: 'POST',
         body: formData,
       });
@@ -164,7 +164,7 @@ export function useUploadAvatar() {
  */
 export function useAvatarUpload() {
   return useImageUpload<{ avatarUrl: string }>({
-    endpoint: '/api/v1/users/me/avatar',
+    endpoint: '/users/me/avatar',
     fieldName: 'avatar',
     invalidateKeys: [userQueryKeys.me()],
     successMessage: 'Avatar actualizado exitosamente',
@@ -196,7 +196,7 @@ export function useTeamMembers(filters?: TeamMembersFilters) {
   if (filters?.role) queryParams.set('role', filters.role);
   if (filters?.search) queryParams.set('search', filters.search);
 
-  const endpoint = `/api/v1/tenant/members${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/tenant/members${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<TeamMembersResponse>(
     userQueryKeys.teamMembersList(filters as Record<string, unknown>),
@@ -213,7 +213,7 @@ export function useTeamMembers(filters?: TeamMembersFilters) {
 export function useTeamMember(memberId: string) {
   return useApiQuery<TeamMember>(
     userQueryKeys.teamMember(memberId),
-    `/api/v1/tenant/members/${memberId}`,
+    `/tenant/members/${memberId}`,
     {
       enabled: !!memberId,
     }
@@ -228,7 +228,7 @@ export function useUpdateMemberRole() {
 
   return useApiMutation<TeamMember, UpdateMemberRoleData>(
     async ({ memberId, role }, client) => {
-      return client.patch<TeamMember>(`/api/v1/tenant/members/${memberId}/role`, { role });
+      return client.patch<TeamMember>(`/tenant/members/${memberId}/role`, { role });
     },
     {
       onSuccess: (updatedMember, variables) => {
@@ -253,7 +253,7 @@ export function useDeleteMember() {
 
   return useApiMutation<void, string>(
     async (memberId, client) => {
-      return client.delete(`/api/v1/tenant/members/${memberId}`);
+      return client.delete(`/tenant/members/${memberId}`);
     },
     {
       onSuccess: (_, memberId) => {
@@ -275,7 +275,7 @@ export function useSuspendMember() {
 
   return useApiMutation<TeamMember, string>(
     async (memberId, client) => {
-      return client.patch<TeamMember>(`/api/v1/tenant/members/${memberId}/suspend`);
+      return client.patch<TeamMember>(`/tenant/members/${memberId}/suspend`);
     },
     {
       onSuccess: () => {
@@ -293,7 +293,7 @@ export function useReactivateMember() {
 
   return useApiMutation<TeamMember, string>(
     async (memberId, client) => {
-      return client.patch<TeamMember>(`/api/v1/tenant/members/${memberId}/reactivate`);
+      return client.patch<TeamMember>(`/tenant/members/${memberId}/reactivate`);
     },
     {
       onSuccess: () => {
@@ -313,7 +313,7 @@ export function useReactivateMember() {
 export function useInvitations() {
   return useApiQuery<InvitationsResponse>(
     userQueryKeys.invitations(),
-    '/api/v1/tenant/invitations',
+    '/tenant/invitations',
     {
       staleTime: 60 * 1000, // 1 minute
     }
@@ -328,7 +328,7 @@ export function useInviteMember() {
 
   return useApiMutation<Invitation, InviteMemberData>(
     async (data, client) => {
-      return client.post<Invitation>('/api/v1/tenant/members/invite', data);
+      return client.post<Invitation>('/tenant/members/invite', data);
     },
     {
       onSuccess: () => {
@@ -347,7 +347,7 @@ export function useResendInvitation() {
 
   return useApiMutation<Invitation, string>(
     async (invitationId, client) => {
-      return client.post<Invitation>(`/api/v1/tenant/invitations/${invitationId}/resend`);
+      return client.post<Invitation>(`/tenant/invitations/${invitationId}/resend`);
     },
     {
       onSuccess: () => {
@@ -365,7 +365,7 @@ export function useCancelInvitation() {
 
   return useApiMutation<void, string>(
     async (invitationId, client) => {
-      return client.delete(`/api/v1/tenant/invitations/${invitationId}`);
+      return client.delete(`/tenant/invitations/${invitationId}`);
     },
     {
       onSuccess: () => {
@@ -393,7 +393,7 @@ export function useAuditLogs(filters?: AuditLogFilters) {
   if (filters?.page) queryParams.set('page', String(filters.page));
   if (filters?.pageSize) queryParams.set('pageSize', String(filters.pageSize));
 
-  const endpoint = `/api/v1/audit-logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/audit-logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<AuditLogsResponse>(
     userQueryKeys.auditLogsList(filters),

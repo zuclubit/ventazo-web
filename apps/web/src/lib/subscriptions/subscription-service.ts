@@ -28,14 +28,14 @@ import type {
  * Get all available subscription plans
  */
 export async function getPlans(): Promise<SubscriptionPlan[]> {
-  return apiClient.get<SubscriptionPlan[]>('/api/v1/payments/plans');
+  return apiClient.get<SubscriptionPlan[]>('/payments/plans');
 }
 
 /**
  * Get a specific plan by ID
  */
 export async function getPlan(planId: string): Promise<SubscriptionPlan> {
-  return apiClient.get<SubscriptionPlan>(`/api/v1/payments/plans/${planId}`);
+  return apiClient.get<SubscriptionPlan>(`/payments/plans/${planId}`);
 }
 
 // ============================================
@@ -47,7 +47,7 @@ export async function getPlan(planId: string): Promise<SubscriptionPlan> {
  */
 export async function getCurrentSubscription(): Promise<Subscription | null> {
   try {
-    const subscriptions = await apiClient.get<Subscription[]>('/api/v1/payments/subscriptions', {
+    const subscriptions = await apiClient.get<Subscription[]>('/payments/subscriptions', {
       params: { status: 'active,trialing,past_due' },
     });
     return subscriptions[0] || null;
@@ -61,7 +61,7 @@ export async function getCurrentSubscription(): Promise<Subscription | null> {
  * Get subscription by ID
  */
 export async function getSubscription(subscriptionId: string): Promise<Subscription> {
-  return apiClient.get<Subscription>(`/api/v1/payments/subscriptions/${subscriptionId}`);
+  return apiClient.get<Subscription>(`/payments/subscriptions/${subscriptionId}`);
 }
 
 /**
@@ -113,7 +113,7 @@ export async function getTrialInfo(): Promise<TrialInfo> {
 export async function createCheckoutSession(
   request: CreateCheckoutSessionRequest
 ): Promise<CreateCheckoutSessionResponse> {
-  return apiClient.post<CreateCheckoutSessionResponse>('/api/v1/payments/checkout/sessions', request);
+  return apiClient.post<CreateCheckoutSessionResponse>('/payments/checkout/sessions', request);
 }
 
 /**
@@ -123,7 +123,7 @@ export async function updateSubscription(
   subscriptionId: string,
   request: UpdateSubscriptionRequest
 ): Promise<Subscription> {
-  return apiClient.patch<Subscription>(`/api/v1/payments/subscriptions/${subscriptionId}`, request);
+  return apiClient.patch<Subscription>(`/payments/subscriptions/${subscriptionId}`, request);
 }
 
 /**
@@ -133,14 +133,14 @@ export async function cancelSubscription(
   subscriptionId: string,
   request: CancelSubscriptionRequest = {}
 ): Promise<Subscription> {
-  return apiClient.post<Subscription>(`/api/v1/payments/subscriptions/${subscriptionId}/cancel`, request);
+  return apiClient.post<Subscription>(`/payments/subscriptions/${subscriptionId}/cancel`, request);
 }
 
 /**
  * Reactivate a canceled subscription (before period end)
  */
 export async function reactivateSubscription(subscriptionId: string): Promise<Subscription> {
-  return apiClient.post<Subscription>(`/api/v1/payments/subscriptions/${subscriptionId}/reactivate`);
+  return apiClient.post<Subscription>(`/payments/subscriptions/${subscriptionId}/reactivate`);
 }
 
 // ============================================
@@ -151,14 +151,14 @@ export async function reactivateSubscription(subscriptionId: string): Promise<Su
  * Get payment methods for current customer
  */
 export async function getPaymentMethods(customerId: string): Promise<PaymentMethod[]> {
-  return apiClient.get<PaymentMethod[]>(`/api/v1/payments/customers/${customerId}/payment-methods`);
+  return apiClient.get<PaymentMethod[]>(`/payments/customers/${customerId}/payment-methods`);
 }
 
 /**
  * Create setup intent for adding payment method
  */
 export async function createSetupIntent(customerId: string): Promise<SetupIntentResponse> {
-  return apiClient.post<SetupIntentResponse>(`/api/v1/payments/customers/${customerId}/setup-intent`);
+  return apiClient.post<SetupIntentResponse>(`/payments/customers/${customerId}/setup-intent`);
 }
 
 /**
@@ -168,7 +168,7 @@ export async function setDefaultPaymentMethod(
   customerId: string,
   paymentMethodId: string
 ): Promise<void> {
-  return apiClient.post(`/api/v1/payments/customers/${customerId}/default-payment-method`, {
+  return apiClient.post(`/payments/customers/${customerId}/default-payment-method`, {
     paymentMethodId,
   });
 }
@@ -177,7 +177,7 @@ export async function setDefaultPaymentMethod(
  * Remove payment method
  */
 export async function removePaymentMethod(paymentMethodId: string): Promise<void> {
-  return apiClient.delete(`/api/v1/payments/payment-methods/${paymentMethodId}`);
+  return apiClient.delete(`/payments/payment-methods/${paymentMethodId}`);
 }
 
 // ============================================
@@ -191,7 +191,7 @@ export async function getInvoices(
   customerId: string,
   options?: { limit?: number; status?: string }
 ): Promise<Invoice[]> {
-  return apiClient.get<Invoice[]>(`/api/v1/payments/customers/${customerId}/invoices`, {
+  return apiClient.get<Invoice[]>(`/payments/customers/${customerId}/invoices`, {
     params: options,
   });
 }
@@ -200,7 +200,7 @@ export async function getInvoices(
  * Get a specific invoice
  */
 export async function getInvoice(invoiceId: string): Promise<Invoice> {
-  return apiClient.get<Invoice>(`/api/v1/payments/invoices/${invoiceId}`);
+  return apiClient.get<Invoice>(`/payments/invoices/${invoiceId}`);
 }
 
 // ============================================
@@ -275,7 +275,7 @@ export async function getBillingOverview(customerId?: string): Promise<BillingOv
  * Create a customer portal session (Stripe Billing Portal)
  */
 export async function createPortalSession(returnUrl: string): Promise<{ url: string }> {
-  return apiClient.post<{ url: string }>('/api/v1/payments/portal/sessions', { returnUrl });
+  return apiClient.post<{ url: string }>('/payments/portal/sessions', { returnUrl });
 }
 
 // ============================================

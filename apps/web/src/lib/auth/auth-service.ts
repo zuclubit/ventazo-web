@@ -29,7 +29,9 @@ import {
 } from './types';
 
 // API base URL
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3000';
+// Remove /api/v1 suffix if present since we add the full path in fetch calls
+const rawApiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3000';
+const API_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
 
 /**
  * Backend API response types

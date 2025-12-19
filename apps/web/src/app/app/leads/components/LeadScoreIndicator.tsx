@@ -52,34 +52,34 @@ function getScoreLabel(category: ScoreCategory): string {
   }
 }
 
-// Color configurations
+// Color configurations using CSS variables for theme compatibility
 const scoreColors: Record<ScoreCategory, {
-  text: string;
-  bg: string;
-  border: string;
-  ring: string;
-  gradient: string;
+  textClass: string;
+  bgClass: string;
+  borderClass: string;
+  ringClass: string;
+  gradientClass: string;
 }> = {
   cold: {
-    text: 'text-red-500',
-    bg: 'bg-red-500/10',
-    border: 'border-red-500/30',
-    ring: 'ring-red-500/20',
-    gradient: 'from-red-500 to-red-600',
+    textClass: 'score-cold',
+    bgClass: 'score-cold-bg',
+    borderClass: 'border-[var(--score-cold)]/30',
+    ringClass: 'ring-[var(--score-cold)]/20',
+    gradientClass: 'from-[var(--score-cold)] to-[var(--score-cold)]',
   },
   warm: {
-    text: 'text-amber-500',
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/30',
-    ring: 'ring-amber-500/20',
-    gradient: 'from-amber-500 to-orange-500',
+    textClass: 'score-warm',
+    bgClass: 'score-warm-bg',
+    borderClass: 'border-[var(--score-warm)]/30',
+    ringClass: 'ring-[var(--score-warm)]/20',
+    gradientClass: 'from-[var(--score-warm)] to-[var(--status-warning)]',
   },
   hot: {
-    text: 'text-emerald-500',
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/30',
-    ring: 'ring-emerald-500/20',
-    gradient: 'from-emerald-500 to-teal-500',
+    textClass: 'score-hot',
+    bgClass: 'score-hot-bg',
+    borderClass: 'border-[var(--score-hot)]/30',
+    ringClass: 'ring-[var(--score-hot)]/20',
+    gradientClass: 'from-[var(--score-hot)] to-primary',
   },
 };
 
@@ -131,17 +131,16 @@ export function LeadScoreIndicator({
     return (
       <div
         className={cn(
-          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full',
-          colors.bg,
-          colors.border,
-          'border',
+          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border',
+          colors.bgClass,
+          colors.borderClass,
           className
         )}
       >
         {isHotLead && (
-          <Flame className={cn('h-3 w-3', colors.text)} />
+          <Flame className={cn('h-3 w-3', colors.textClass)} />
         )}
-        <span className={cn('text-xs font-semibold', colors.text)}>
+        <span className={cn('text-xs font-semibold', colors.textClass)}>
           {normalizedScore}
         </span>
       </div>
@@ -154,19 +153,18 @@ export function LeadScoreIndicator({
       <div className={cn('inline-flex items-center', sizes.wrapper, className)}>
         <div
           className={cn(
-            'flex items-center justify-center rounded-full',
-            colors.bg,
-            colors.border,
-            'border',
+            'flex items-center justify-center rounded-full border',
+            colors.bgClass,
+            colors.borderClass,
             size === 'sm' ? 'h-6 w-6' : 'h-7 w-7'
           )}
         >
-          <span className={cn(sizes.text, colors.text)}>
+          <span className={cn(sizes.text, colors.textClass)}>
             {normalizedScore}
           </span>
         </div>
         {isHotLead && (
-          <Flame className={cn(sizes.flame, 'text-orange-500 animate-pulse')} />
+          <Flame className={cn(sizes.flame, 'status-warning-text animate-pulse')} />
         )}
       </div>
     );
@@ -182,13 +180,13 @@ export function LeadScoreIndicator({
           className={cn(
             'flex items-center justify-center rounded-full',
             'border-2 transition-all duration-300',
-            colors.bg,
-            colors.border,
+            colors.bgClass,
+            colors.borderClass,
             sizes.container
           )}
         >
           {/* Score Number */}
-          <span className={cn(sizes.text, colors.text)}>
+          <span className={cn(sizes.text, colors.textClass)}>
             {normalizedScore}
           </span>
         </div>
@@ -200,8 +198,8 @@ export function LeadScoreIndicator({
               'absolute -top-1 -right-1',
               'flex items-center justify-center',
               'h-5 w-5 rounded-full',
-              'bg-gradient-to-br from-orange-400 to-red-500',
-              'shadow-lg shadow-orange-500/30',
+              'bg-gradient-to-br from-[var(--status-warning)] to-[var(--status-error)]',
+              'shadow-lg shadow-[var(--status-warning)]/30',
               'animate-pulse'
             )}
           >
@@ -247,7 +245,7 @@ export function LeadScoreBar({
           className={cn(
             'h-full rounded-full transition-all duration-500 ease-out',
             'bg-gradient-to-r',
-            colors.gradient
+            colors.gradientClass
           )}
           style={{ width: `${normalizedScore}%` }}
           role="progressbar"
@@ -260,7 +258,7 @@ export function LeadScoreBar({
 
       {/* Value */}
       {showValue && (
-        <span className={cn('text-xs font-semibold min-w-[2rem] text-right', colors.text)}>
+        <span className={cn('text-xs font-semibold min-w-[2rem] text-right', colors.textClass)}>
           {normalizedScore}
         </span>
       )}

@@ -96,7 +96,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
     tiers.forEach((t) => queryParams.append('tier', t));
   }
 
-  const endpoint = `/api/v1/customers${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/customers${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<CustomersResponse>(
     customerQueryKeys.list(filters as Record<string, unknown>),
@@ -114,7 +114,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
 export function useCustomer(customerId: string) {
   return useApiQuery<Customer>(
     customerQueryKeys.detail(customerId),
-    `/api/v1/customers/${customerId}`,
+    `/customers/${customerId}`,
     {
       enabled: !!customerId,
       staleTime: 60 * 1000, // 1 minute
@@ -135,7 +135,7 @@ export function useCustomerStatistics(options?: {
   if (options?.dateFrom) queryParams.set('dateFrom', options.dateFrom);
   if (options?.dateTo) queryParams.set('dateTo', options.dateTo);
 
-  const endpoint = `/api/v1/customers/statistics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/customers/statistics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<CustomerStatistics>(
     customerQueryKeys.statistics(),
@@ -154,7 +154,7 @@ export function useCreateCustomer() {
 
   return useApiMutation<Customer, CreateCustomerData>(
     async (data, client) => {
-      return client.post<Customer>('/api/v1/customers', data);
+      return client.post<Customer>('/customers', data);
     },
     {
       onSuccess: () => {
@@ -173,7 +173,7 @@ export function useUpdateCustomer() {
 
   return useApiMutation<Customer, { customerId: string; data: UpdateCustomerData }>(
     async ({ customerId, data }, client) => {
-      return client.patch<Customer>(`/api/v1/customers/${customerId}`, data);
+      return client.patch<Customer>(`/customers/${customerId}`, data);
     },
     {
       onSuccess: (updatedCustomer) => {
@@ -193,7 +193,7 @@ export function useDeleteCustomer() {
 
   return useApiMutation<void, string>(
     async (customerId, client) => {
-      return client.delete(`/api/v1/customers/${customerId}`);
+      return client.delete(`/customers/${customerId}`);
     },
     {
       onSuccess: (_, customerId) => {
@@ -223,7 +223,7 @@ export function useCustomerNotes(customerId: string, options: UseCustomerNotesOp
   if (options.limit) queryParams.set('limit', String(options.limit));
   if (options.isPinned !== undefined) queryParams.set('isPinned', String(options.isPinned));
 
-  const endpoint = `/api/v1/customers/${customerId}/notes${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/customers/${customerId}/notes${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<CustomerNotesResponse>(
     customerQueryKeys.notesList(customerId, options as Record<string, unknown>),
@@ -243,7 +243,7 @@ export function useAddCustomerNote() {
 
   return useApiMutation<CustomerNote, { customerId: string; data: CreateNoteData }>(
     async ({ customerId, data }, client) => {
-      return client.post<CustomerNote>(`/api/v1/customers/${customerId}/notes`, data);
+      return client.post<CustomerNote>(`/customers/${customerId}/notes`, data);
     },
     {
       onSuccess: (_, { customerId }) => {
@@ -262,7 +262,7 @@ export function useUpdateCustomerNote() {
 
   return useApiMutation<CustomerNote, { customerId: string; noteId: string; data: UpdateNoteData }>(
     async ({ customerId, noteId, data }, client) => {
-      return client.patch<CustomerNote>(`/api/v1/customers/${customerId}/notes/${noteId}`, data);
+      return client.patch<CustomerNote>(`/customers/${customerId}/notes/${noteId}`, data);
     },
     {
       onSuccess: (_, { customerId }) => {
@@ -280,7 +280,7 @@ export function useDeleteCustomerNote() {
 
   return useApiMutation<void, { customerId: string; noteId: string }>(
     async ({ customerId, noteId }, client) => {
-      return client.delete(`/api/v1/customers/${customerId}/notes/${noteId}`);
+      return client.delete(`/customers/${customerId}/notes/${noteId}`);
     },
     {
       onSuccess: (_, { customerId }) => {
@@ -311,7 +311,7 @@ export function useCustomerActivity(customerId: string, options: UseCustomerActi
   if (options.startDate) queryParams.set('startDate', options.startDate);
   if (options.endDate) queryParams.set('endDate', options.endDate);
 
-  const endpoint = `/api/v1/customers/${customerId}/activity${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/customers/${customerId}/activity${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<CustomerActivityResponse>(
     customerQueryKeys.activityList(customerId, options as Record<string, unknown>),

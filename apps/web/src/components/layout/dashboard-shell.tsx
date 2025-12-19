@@ -6,6 +6,11 @@
  * Premium 2025 layout wrapper for all internal CRM pages.
  * Features atmospheric background, glass sidebar, and glass navbar.
  *
+ * Architecture:
+ * - SidebarProvider wraps everything for synchronized state
+ * - Main content area dynamically adjusts padding based on sidebar state
+ * - Supports both desktop (collapsible sidebar) and mobile (sheet drawer)
+ *
  * @module components/layout/dashboard-shell
  */
 
@@ -15,6 +20,7 @@ import { cn } from '@/lib/utils';
 
 import { Navbar } from './navbar';
 import { Sidebar } from './sidebar';
+import { SidebarProvider, useSidebar } from './sidebar-context';
 
 // ============================================
 // Premium Background Component
@@ -27,7 +33,8 @@ function PremiumDashboardBackground() {
       <div
         className="absolute inset-0"
         style={{
-          background: 'linear-gradient(165deg, #041A1A 0%, #052828 25%, #063030 50%, #052828 75%, #041A1A 100%)',
+          background:
+            'linear-gradient(165deg, #041A1A 0%, #052828 25%, #063030 50%, #052828 75%, #041A1A 100%)',
         }}
       />
 
@@ -51,6 +58,46 @@ function PremiumDashboardBackground() {
 }
 
 // ============================================
+// Main Content Area Component
+// ============================================
+
+interface MainContentProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+function MainContent({ children, className }: MainContentProps) {
+  const { currentWidth, isMobile, isCollapsed, config } = useSidebar();
+
+  return (
+    <div
+      className={cn(
+        'flex flex-1 flex-col min-h-screen',
+        // Transition for smooth width changes
+        'transition-[padding-left] duration-300 ease-in-out',
+        'motion-reduce:transition-none'
+      )}
+      style={{
+        // Dynamic padding based on sidebar state
+        // On mobile: no padding (sidebar is a sheet overlay)
+        // On desktop: padding matches sidebar width
+        paddingLeft: isMobile ? 0 : currentWidth,
+      }}
+    >
+      <Navbar />
+      <main
+        className={cn(
+          'relative flex-1 space-y-4 p-4 md:p-6 lg:p-8',
+          className
+        )}
+      >
+        {children}
+      </main>
+    </div>
+  );
+}
+
+// ============================================
 // Dashboard Shell Component
 // ============================================
 
@@ -61,27 +108,48 @@ interface DashboardShellProps {
 
 export function DashboardShell({ children, className }: DashboardShellProps) {
   return (
+    <SidebarProvider>
+      <DashboardShellContent className={className}>
+        {children}
+      </DashboardShellContent>
+    </SidebarProvider>
+  );
+}
+
+// ============================================
+// Inner Content (inside SidebarProvider)
+// ============================================
+
+interface DashboardShellContentProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+function DashboardShellContent({
+  children,
+  className,
+}: DashboardShellContentProps) {
+  const { isMobile } = useSidebar();
+
+  return (
     <div className="relative flex min-h-screen">
       {/* Premium Background */}
       <PremiumDashboardBackground />
 
-      {/* Sidebar - hidden on mobile, visible on md+ */}
-      <div className="hidden md:block">
-        <Sidebar />
-      </div>
+      {/* Sidebar - hidden on mobile (uses sheet instead) */}
+      {!isMobile && <Sidebar />}
 
-      {/* Main content area */}
-      <div className="flex flex-1 flex-col md:pl-64">
-        <Navbar />
-        <main
-          className={cn(
-            'relative flex-1 space-y-4 p-4 md:p-6 lg:p-8',
-            className
-          )}
-        >
-          {children}
-        </main>
-      </div>
+      {/* Main content area with dynamic padding */}
+      <MainContent className={className}>{children}</MainContent>
     </div>
   );
 }
+
+// ============================================
+// Display Names
+// ============================================
+
+DashboardShell.displayName = 'DashboardShell';
+MainContent.displayName = 'MainContent';
+DashboardShellContent.displayName = 'DashboardShellContent';
+PremiumDashboardBackground.displayName = 'PremiumDashboardBackground';

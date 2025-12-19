@@ -28,7 +28,8 @@ const SESSION_DURATION_DAYS = 7;
 
 const SUPABASE_URL = process.env['NEXT_PUBLIC_SUPABASE_URL'] || '';
 const SUPABASE_ANON_KEY = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'] || '';
-const API_URL = process.env['API_URL'] || process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
+const rawApiUrl = process.env['API_URL'] || process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
+const API_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
 
 // Allowed redirect paths (security: prevent open redirect)
 const ALLOWED_REDIRECTS = [

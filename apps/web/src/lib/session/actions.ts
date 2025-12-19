@@ -31,7 +31,9 @@ import {
 
 // For Server Actions (edge runtime), use API_URL secret
 // For client-side, NEXT_PUBLIC_API_URL is embedded at build time
-const API_URL = process.env['API_URL'] || process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
+// Remove /api/v1 suffix if present since we add the full path in fetch calls
+const rawApiUrl = process.env['API_URL'] || process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
+const API_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
 
 // ============================================
 // Validation Schemas

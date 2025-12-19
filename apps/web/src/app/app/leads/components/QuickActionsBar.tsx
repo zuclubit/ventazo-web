@@ -145,15 +145,15 @@ function ActionButton({
       icon: MessageCircle,
       label: 'WhatsApp',
       tooltip: 'Enviar WhatsApp',
-      className: 'bg-green-500 text-white border-green-500 hover:bg-green-600',
-      hoverClassName: 'hover:bg-green-600 hover:border-green-600',
+      className: 'whatsapp-button border-[var(--whatsapp)]',
+      hoverClassName: 'hover:bg-[var(--whatsapp-hover)] hover:border-[var(--whatsapp-hover)]',
     },
     call: {
       icon: Phone,
       label: 'Llamar',
       tooltip: 'Hacer llamada',
-      className: 'bg-blue-500/10 text-blue-500 border-blue-500/30',
-      hoverClassName: 'hover:bg-blue-500/20 hover:border-blue-500/50',
+      className: 'bg-[var(--status-info-bg)] status-info-text border-[var(--status-info)]/30',
+      hoverClassName: 'hover:bg-[var(--status-info)]/20 hover:border-[var(--status-info)]/50',
     },
     email: {
       icon: Mail,
@@ -178,7 +178,7 @@ function ActionButton({
         !disabled && className,
         !disabled && hoverClassName,
         disabled && 'opacity-40 cursor-not-allowed',
-        action === 'whatsapp' && !disabled && 'shadow-sm shadow-green-500/20'
+        action === 'whatsapp' && !disabled && 'shadow-sm shadow-[var(--whatsapp)]/20'
       )}
       aria-label={tooltip}
     >
@@ -292,8 +292,8 @@ export function QuickActionsBar({
           disabled={!hasPhone}
           onClick={(e) => handleAction('whatsapp', e)}
           className={cn(
-            'w-full bg-green-500 hover:bg-green-600 text-white',
-            'shadow-sm shadow-green-500/20',
+            'w-full whatsapp-button',
+            'shadow-sm shadow-[var(--whatsapp)]/20',
             !hasPhone && 'opacity-40 cursor-not-allowed'
           )}
         >
@@ -414,7 +414,7 @@ export function QuickActionsDropdown({
         <DropdownMenuItem
           disabled={!hasPhone}
           onClick={() => handleAction('whatsapp')}
-          className="text-green-600"
+          className="whatsapp-text"
         >
           <MessageCircle className="mr-2 h-4 w-4" />
           WhatsApp

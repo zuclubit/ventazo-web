@@ -201,7 +201,8 @@ export function LoginForm() {
     setResendSuccess(false);
 
     try {
-      const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
+      const rawApiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
+      const API_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
       await fetch(`${API_URL}/api/v1/auth/resend-confirmation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -15,7 +15,8 @@ import { z } from 'zod';
 
 const SESSION_COOKIE_NAME = 'zcrm_session';
 const SESSION_DURATION_DAYS = 7;
-const API_URL = process.env['API_URL'] || process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
+const rawApiUrl = process.env['API_URL'] || process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
+const API_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
 
 function getSecretKey(): Uint8Array {
   const secret = process.env['SESSION_SECRET'];

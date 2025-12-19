@@ -37,7 +37,31 @@ export type { LeadFiltersBarProps, LeadFilters } from './LeadFiltersBar';
 export { LeadsEmptyState } from './LeadsEmptyState';
 export type { LeadsEmptyStateProps } from './LeadsEmptyState';
 
+// Skeleton Loading States
+export {
+  KPICardsSkeleton,
+  LeadCardSkeleton,
+  LeadListSkeleton,
+  FiltersBarSkeleton,
+  LeadsPageSkeleton,
+  LeadsHeaderSkeleton,
+} from './LeadsSkeleton';
+
+// Lead Form Sheet (Responsive Side Panel)
+export { LeadFormSheet } from './LeadFormSheet';
+export type { LeadFormSheetProps } from './LeadFormSheet';
+
 // Re-export existing dialog components for convenience
 export { LeadFormDialog } from './lead-form-dialog';
 export { DeleteLeadDialog } from './delete-lead-dialog';
 export { ConvertLeadDialog } from './convert-lead-dialog';
+
+// Kanban Components
+export {
+  KanbanBoard,
+  KanbanColumn,
+  KanbanCard,
+  KanbanColumnHeader,
+  KanbanEmptyColumn,
+  KanbanSkeleton,
+} from './kanban';

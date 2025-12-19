@@ -130,7 +130,7 @@ export function useOpportunities(options: UseOpportunitiesOptions = {}) {
     filters.tags.forEach((t) => queryParams.append('tags', t));
   }
 
-  const endpoint = `/api/v1/opportunities${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/opportunities${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<OpportunitiesResponse>(
     opportunityQueryKeys.list(filters as Record<string, unknown>),
@@ -148,7 +148,7 @@ export function useOpportunities(options: UseOpportunitiesOptions = {}) {
 export function useOpportunity(opportunityId: string) {
   return useApiQuery<Opportunity>(
     opportunityQueryKeys.detail(opportunityId),
-    `/api/v1/opportunities/${opportunityId}`,
+    `/opportunities/${opportunityId}`,
     {
       enabled: !!opportunityId,
       staleTime: 60 * 1000, // 1 minute
@@ -169,7 +169,7 @@ export function useOpportunityStatistics(options?: {
   if (options?.dateFrom) queryParams.set('dateFrom', options.dateFrom);
   if (options?.dateTo) queryParams.set('dateTo', options.dateTo);
 
-  const endpoint = `/api/v1/opportunities/statistics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/opportunities/statistics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<OpportunityStatistics>(
     opportunityQueryKeys.statistics(),
@@ -188,7 +188,7 @@ export function useCreateOpportunity() {
 
   return useApiMutation<Opportunity, CreateOpportunityData>(
     async (data, client) => {
-      return client.post<Opportunity>('/api/v1/opportunities', data);
+      return client.post<Opportunity>('/opportunities', data);
     },
     {
       onSuccess: () => {
@@ -208,7 +208,7 @@ export function useUpdateOpportunity() {
 
   return useApiMutation<Opportunity, { opportunityId: string; data: UpdateOpportunityData }>(
     async ({ opportunityId, data }, client) => {
-      return client.patch<Opportunity>(`/api/v1/opportunities/${opportunityId}`, data);
+      return client.patch<Opportunity>(`/opportunities/${opportunityId}`, data);
     },
     {
       onSuccess: (updatedOpportunity) => {
@@ -229,7 +229,7 @@ export function useDeleteOpportunity() {
 
   return useApiMutation<void, string>(
     async (opportunityId, client) => {
-      return client.delete(`/api/v1/opportunities/${opportunityId}`);
+      return client.delete(`/opportunities/${opportunityId}`);
     },
     {
       onSuccess: (_, opportunityId) => {
@@ -254,7 +254,7 @@ export function useUpdateOpportunityStage() {
 
   return useApiMutation<Opportunity, { opportunityId: string; data: UpdateOpportunityStageData }>(
     async ({ opportunityId, data }, client) => {
-      return client.patch<Opportunity>(`/api/v1/opportunities/${opportunityId}/stage`, data);
+      return client.patch<Opportunity>(`/opportunities/${opportunityId}/stage`, data);
     },
     {
       onSuccess: (updatedOpportunity) => {
@@ -275,7 +275,7 @@ export function useUpdateOpportunityStatus() {
 
   return useApiMutation<Opportunity, { opportunityId: string; data: UpdateOpportunityStatusData }>(
     async ({ opportunityId, data }, client) => {
-      return client.patch<Opportunity>(`/api/v1/opportunities/${opportunityId}/status`, data);
+      return client.patch<Opportunity>(`/opportunities/${opportunityId}/status`, data);
     },
     {
       onSuccess: (updatedOpportunity) => {
@@ -297,7 +297,7 @@ export function useAssignOpportunityOwner() {
 
   return useApiMutation<Opportunity, { opportunityId: string; data: AssignOpportunityOwnerData }>(
     async ({ opportunityId, data }, client) => {
-      return client.patch<Opportunity>(`/api/v1/opportunities/${opportunityId}/owner`, data);
+      return client.patch<Opportunity>(`/opportunities/${opportunityId}/owner`, data);
     },
     {
       onSuccess: (updatedOpportunity) => {
@@ -321,7 +321,7 @@ export function useMarkOpportunityWon() {
 
   return useApiMutation<Opportunity, { opportunityId: string; data?: WinOpportunityData }>(
     async ({ opportunityId, data }, client) => {
-      return client.post<Opportunity>(`/api/v1/opportunities/${opportunityId}/win`, data ?? {});
+      return client.post<Opportunity>(`/opportunities/${opportunityId}/win`, data ?? {});
     },
     {
       onSuccess: (updatedOpportunity) => {
@@ -343,7 +343,7 @@ export function useMarkOpportunityLost() {
 
   return useApiMutation<Opportunity, { opportunityId: string; data: LoseOpportunityData }>(
     async ({ opportunityId, data }, client) => {
-      return client.post<Opportunity>(`/api/v1/opportunities/${opportunityId}/lose`, data);
+      return client.post<Opportunity>(`/opportunities/${opportunityId}/lose`, data);
     },
     {
       onSuccess: (updatedOpportunity) => {
@@ -375,7 +375,7 @@ export function useOpportunityNotes(opportunityId: string, options: UseOpportuni
   if (options.limit) queryParams.set('limit', String(options.limit));
   if (options.isPinned !== undefined) queryParams.set('isPinned', String(options.isPinned));
 
-  const endpoint = `/api/v1/opportunities/${opportunityId}/notes${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/opportunities/${opportunityId}/notes${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<OpportunityNotesResponse>(
     opportunityQueryKeys.notesList(opportunityId, options as Record<string, unknown>),
@@ -395,7 +395,7 @@ export function useAddOpportunityNote() {
 
   return useApiMutation<OpportunityNote, { opportunityId: string; data: CreateOpportunityNoteData }>(
     async ({ opportunityId, data }, client) => {
-      return client.post<OpportunityNote>(`/api/v1/opportunities/${opportunityId}/notes`, data);
+      return client.post<OpportunityNote>(`/opportunities/${opportunityId}/notes`, data);
     },
     {
       onSuccess: (_, { opportunityId }) => {
@@ -414,7 +414,7 @@ export function useUpdateOpportunityNote() {
 
   return useApiMutation<OpportunityNote, { opportunityId: string; noteId: string; data: UpdateOpportunityNoteData }>(
     async ({ opportunityId, noteId, data }, client) => {
-      return client.patch<OpportunityNote>(`/api/v1/opportunities/${opportunityId}/notes/${noteId}`, data);
+      return client.patch<OpportunityNote>(`/opportunities/${opportunityId}/notes/${noteId}`, data);
     },
     {
       onSuccess: (_, { opportunityId }) => {
@@ -432,7 +432,7 @@ export function useDeleteOpportunityNote() {
 
   return useApiMutation<void, { opportunityId: string; noteId: string }>(
     async ({ opportunityId, noteId }, client) => {
-      return client.delete(`/api/v1/opportunities/${opportunityId}/notes/${noteId}`);
+      return client.delete(`/opportunities/${opportunityId}/notes/${noteId}`);
     },
     {
       onSuccess: (_, { opportunityId }) => {
@@ -463,7 +463,7 @@ export function useOpportunityActivity(opportunityId: string, options: UseOpport
   if (options.startDate) queryParams.set('startDate', options.startDate);
   if (options.endDate) queryParams.set('endDate', options.endDate);
 
-  const endpoint = `/api/v1/opportunities/${opportunityId}/activity${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/opportunities/${opportunityId}/activity${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<OpportunityActivityResponse>(
     opportunityQueryKeys.activityList(opportunityId, options as Record<string, unknown>),
@@ -485,7 +485,7 @@ export function useOpportunityActivity(opportunityId: string, options: UseOpport
 export function usePipelineStages() {
   return useApiQuery<OpportunityPipelineStage[]>(
     opportunityQueryKeys.pipelineStages(),
-    '/api/v1/opportunities/pipeline/stages',
+    '/opportunities/pipeline/stages',
     {
       staleTime: 10 * 60 * 1000, // 10 minutes (stages don't change often)
     }
@@ -498,7 +498,7 @@ export function usePipelineStages() {
 export function usePipelineView() {
   return useApiQuery<PipelineView>(
     opportunityQueryKeys.pipelineView(),
-    '/api/v1/opportunities/pipeline/view',
+    '/opportunities/pipeline/view',
     {
       staleTime: 60 * 1000, // 1 minute
     }
@@ -513,7 +513,7 @@ export function useCreatePipelineStage() {
 
   return useApiMutation<OpportunityPipelineStage, CreatePipelineStageData>(
     async (data, client) => {
-      return client.post<OpportunityPipelineStage>('/api/v1/opportunities/pipeline/stages', data);
+      return client.post<OpportunityPipelineStage>('/opportunities/pipeline/stages', data);
     },
     {
       onSuccess: () => {
@@ -712,7 +712,7 @@ export function useReopenOpportunity() {
 
   return useApiMutation<Opportunity, { opportunityId: string; data?: ReopenOpportunityData }>(
     async ({ opportunityId, data }, client) => {
-      return client.post<Opportunity>(`/api/v1/opportunities/${opportunityId}/reopen`, data ?? {});
+      return client.post<Opportunity>(`/opportunities/${opportunityId}/reopen`, data ?? {});
     },
     {
       onSuccess: (updatedOpportunity) => {
@@ -738,7 +738,7 @@ export function useBulkAssignOpportunities() {
 
   return useApiMutation<BulkOpportunityOperationResult, Omit<BulkOpportunityAssignRequest, 'operation'>>(
     async (data, client) => {
-      return client.post<BulkOpportunityOperationResult>('/api/v1/opportunities/bulk/assign', {
+      return client.post<BulkOpportunityOperationResult>('/opportunities/bulk/assign', {
         ...data,
         operation: 'assign',
       });
@@ -760,7 +760,7 @@ export function useBulkDeleteOpportunities() {
 
   return useApiMutation<BulkOpportunityOperationResult, Omit<BulkOpportunityDeleteRequest, 'operation'>>(
     async (data, client) => {
-      return client.post<BulkOpportunityOperationResult>('/api/v1/opportunities/bulk/delete', {
+      return client.post<BulkOpportunityOperationResult>('/opportunities/bulk/delete', {
         ...data,
         operation: 'delete',
       });
@@ -783,7 +783,7 @@ export function useBulkUpdateOpportunityStatus() {
 
   return useApiMutation<BulkOpportunityOperationResult, Omit<BulkOpportunityStatusRequest, 'operation'>>(
     async (data, client) => {
-      return client.post<BulkOpportunityOperationResult>('/api/v1/opportunities/bulk/status', {
+      return client.post<BulkOpportunityOperationResult>('/opportunities/bulk/status', {
         ...data,
         operation: 'status',
       });
@@ -806,7 +806,7 @@ export function useBulkUpdateOpportunityStage() {
 
   return useApiMutation<BulkOpportunityOperationResult, Omit<BulkOpportunityStageRequest, 'operation'>>(
     async (data, client) => {
-      return client.post<BulkOpportunityOperationResult>('/api/v1/opportunities/bulk/stage', {
+      return client.post<BulkOpportunityOperationResult>('/opportunities/bulk/stage', {
         ...data,
         operation: 'stage',
       });
@@ -826,7 +826,7 @@ export function useBulkUpdateOpportunityStage() {
 export function useBulkExportOpportunities() {
   return useApiMutation<BulkOpportunityExportResult, Omit<BulkOpportunityExportRequest, 'operation'>>(
     async (data, client) => {
-      return client.post<BulkOpportunityExportResult>('/api/v1/opportunities/bulk/export', {
+      return client.post<BulkOpportunityExportResult>('/opportunities/bulk/export', {
         ...data,
         operation: 'export',
       });
@@ -931,7 +931,7 @@ export function useOpportunityForecast(options?: {
   if (options?.startDate) queryParams.set('startDate', options.startDate);
   if (options?.endDate) queryParams.set('endDate', options.endDate);
 
-  const endpoint = `/api/v1/opportunities/forecast${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/opportunities/forecast${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<ForecastSummary>(
     [...opportunityQueryKeys.all, 'forecast', options],

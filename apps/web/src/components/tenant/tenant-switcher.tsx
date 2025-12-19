@@ -96,7 +96,7 @@ function useTenants() {
   // Mutation for logging tenant switch (audit trail)
   const logTenantSwitch = useApiMutation<void, { tenantId: string; tenantName: string }>(
     async ({ tenantId, tenantName }, client) => {
-      return client.post('/api/v1/audit/log', {
+      return client.post('/audit/log', {
         action: 'tenant_switched',
         entityType: 'tenant',
         entityId: tenantId,

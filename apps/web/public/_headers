@@ -1,9 +1,11 @@
 # Cloudflare Pages Custom Headers
 # Fix MIME types for JavaScript files
 
+# Static assets with content hash - cache forever
 /_next/static/chunks/*
   Content-Type: text/javascript; charset=utf-8
   X-Content-Type-Options: nosniff
+  Cache-Control: public, max-age=31536000, immutable
 
 /_next/static/chunks/app/*
   Content-Type: text/javascript; charset=utf-8
@@ -30,3 +32,13 @@
   X-Frame-Options: DENY
   X-XSS-Protection: 1; mode=block
   Referrer-Policy: strict-origin-when-cross-origin
+
+# HTML pages - always revalidate
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/app/*
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/login
+  Cache-Control: no-cache, no-store, must-revalidate

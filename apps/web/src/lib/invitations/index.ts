@@ -122,7 +122,7 @@ export async function getInvitationByToken(
   token: string
 ): Promise<InvitationDetails> {
   const response = await fetch(
-    `${API_BASE_URL}/api/v1/invitations/token/${token}`
+    `${API_BASE_URL}/invitations/token/${token}`
   );
 
   if (response.status === 404) {
@@ -154,14 +154,14 @@ export async function getInvitationByToken(
  * Get pending invitations for current tenant
  */
 export async function getPendingInvitations(): Promise<Invitation[]> {
-  return apiClient.get<Invitation[]>('/api/v1/invitations');
+  return apiClient.get<Invitation[]>('/invitations');
 }
 
 /**
  * Get invitations sent to the current user
  */
 export async function getMyPendingInvitations(): Promise<Invitation[]> {
-  return apiClient.get<Invitation[]>('/api/v1/invitations/my-invitations');
+  return apiClient.get<Invitation[]>('/invitations/my-invitations');
 }
 
 /**
@@ -170,7 +170,7 @@ export async function getMyPendingInvitations(): Promise<Invitation[]> {
 export async function createInvitation(
   data: CreateInvitationInput
 ): Promise<Invitation> {
-  return apiClient.post<Invitation>('/api/v1/invitations', data);
+  return apiClient.post<Invitation>('/invitations', data);
 }
 
 /**
@@ -179,7 +179,7 @@ export async function createInvitation(
 export async function createBulkInvitations(
   data: BulkInvitationInput
 ): Promise<BulkInvitationResult> {
-  return apiClient.post<BulkInvitationResult>('/api/v1/invitations/bulk', data);
+  return apiClient.post<BulkInvitationResult>('/invitations/bulk', data);
 }
 
 /**
@@ -188,7 +188,7 @@ export async function createBulkInvitations(
 export async function acceptInvitation(
   token: string
 ): Promise<AcceptInvitationResult> {
-  return apiClient.post<AcceptInvitationResult>('/api/v1/invitations/accept', {
+  return apiClient.post<AcceptInvitationResult>('/invitations/accept', {
     token,
   });
 }
@@ -197,14 +197,14 @@ export async function acceptInvitation(
  * Resend an invitation
  */
 export async function resendInvitation(id: string): Promise<Invitation> {
-  return apiClient.post<Invitation>(`/api/v1/invitations/${id}/resend`);
+  return apiClient.post<Invitation>(`/invitations/${id}/resend`);
 }
 
 /**
  * Cancel an invitation
  */
 export async function cancelInvitation(id: string): Promise<void> {
-  return apiClient.delete<void>(`/api/v1/invitations/${id}`);
+  return apiClient.delete<void>(`/invitations/${id}`);
 }
 
 // ============================================

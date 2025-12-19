@@ -95,7 +95,7 @@ export function InviteAcceptContent() {
 
     const fetchInvitation = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/invitations/token/${token}`);
+        const response = await fetch(`${API_BASE_URL}/invitations/token/${token}`);
 
         if (response.status === 404) {
           setState({ status: 'not-found' });
@@ -165,7 +165,7 @@ export function InviteAcceptContent() {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/invitations/accept`, {
+      const response = await fetch(`${API_BASE_URL}/invitations/accept`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
