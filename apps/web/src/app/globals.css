@@ -170,8 +170,9 @@
     --tenant-surface-border: #1A5D5C;
 
     /* ============================================
-       KANBAN DYNAMIC THEMING SYSTEM v3.0
-       Set dynamically by useKanbanTheme hook
+       KANBAN DYNAMIC THEMING SYSTEM v4.0
+       All values set dynamically by useKanbanTheme hook
+       Fallbacks use Ventazo brand defaults
        ============================================ */
 
     /* Card states - tenant-derived */
@@ -185,11 +186,61 @@
     --kanban-drop-shadow: 0 0 0 3px rgba(14, 181, 140, 0.15), 0 0 30px rgba(14, 181, 140, 0.2);
     --kanban-drop-bg: rgba(14, 181, 140, 0.05);
 
-    /* Action buttons - tenant-derived */
-    --action-call-bg: rgba(14, 181, 140, 0.12);
+    /* Score badge gradients - temperature-based with tenant blend */
+    --score-hot-gradient: linear-gradient(135deg, #EA580C 0%, #F97316 50%, #FB923C 100%);
+    --score-hot-shadow: 0 4px 16px rgba(249, 115, 22, 0.35);
+    --score-hot-bg: rgba(249, 115, 22, 0.12);
+    --score-hot-border: rgba(249, 115, 22, 0.25);
+    --score-warm-gradient: linear-gradient(135deg, #D97706 0%, #F59E0B 50%, #FBBF24 100%);
+    --score-warm-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
+    --score-warm-bg: rgba(245, 158, 11, 0.12);
+    --score-warm-border: rgba(245, 158, 11, 0.25);
+    --score-cold-gradient: linear-gradient(135deg, #4B5563 0%, #6B7280 50%, #9CA3AF 100%);
+    --score-cold-shadow: 0 4px 16px rgba(107, 114, 128, 0.25);
+    --score-cold-bg: rgba(107, 114, 128, 0.12);
+    --score-cold-border: rgba(107, 114, 128, 0.25);
+
+    /* Action buttons - ALL variants with full theming */
+    --action-whatsapp-bg: rgba(37, 211, 102, 0.1);
+    --action-whatsapp-bg-hover: rgba(37, 211, 102, 0.15);
+    --action-whatsapp-text: #25D366;
+    --action-whatsapp-border: rgba(37, 211, 102, 0.25);
+    --action-call-bg: rgba(14, 181, 140, 0.1);
+    --action-call-bg-hover: rgba(14, 181, 140, 0.15);
     --action-call-text: var(--tenant-primary);
-    --action-primary-bg: rgba(14, 181, 140, 0.12);
+    --action-call-border: rgba(14, 181, 140, 0.25);
+    --action-email-bg: rgba(59, 130, 246, 0.1);
+    --action-email-bg-hover: rgba(59, 130, 246, 0.15);
+    --action-email-text: #3B82F6;
+    --action-email-border: rgba(59, 130, 246, 0.25);
+    --action-primary-bg: rgba(14, 181, 140, 0.1);
+    --action-primary-bg-hover: rgba(14, 181, 140, 0.15);
     --action-primary-text: var(--tenant-primary);
+    --action-primary-border: rgba(14, 181, 140, 0.25);
+
+    /* Channel colors - for lead source badges */
+    --channel-whatsapp: #25D366;
+    --channel-social: var(--tenant-accent);
+    --channel-email: #3B82F6;
+    --channel-phone: var(--tenant-primary);
+    --channel-website: #F97316;
+    --channel-organic: var(--tenant-accent);
+    --channel-referral: #8B5CF6;
+    --channel-ad: #EC4899;
+
+    /* Status colors - semantic with tenant-aware success/info */
+    --status-success-bg: rgba(94, 234, 212, 0.15);
+    --status-success-text: var(--tenant-accent);
+    --status-success-border: rgba(94, 234, 212, 0.35);
+    --status-warning-bg: rgba(245, 158, 11, 0.15);
+    --status-warning-text: #D97706;
+    --status-warning-border: rgba(245, 158, 11, 0.35);
+    --status-error-bg: rgba(239, 68, 68, 0.15);
+    --status-error-text: #DC2626;
+    --status-error-border: rgba(239, 68, 68, 0.35);
+    --status-info-bg: rgba(14, 181, 140, 0.15);
+    --status-info-text: var(--tenant-primary);
+    --status-info-border: rgba(14, 181, 140, 0.35);
 
     /* ============================================
        VENTAZO 2025 BRAND ALIGNMENT
@@ -1185,9 +1236,9 @@
   }
 
   .action-btn-premium:hover {
-    background: rgba(14, 181, 140, 0.1);
-    color: var(--text-accent);
-    border-color: rgba(14, 181, 140, 0.2);
+    background: var(--action-primary-bg);
+    color: var(--action-primary-text);
+    border-color: var(--action-primary-border);
   }
 
   .action-btn-premium:active {
@@ -1199,22 +1250,25 @@
     cursor: not-allowed;
   }
 
+  /* WhatsApp - Brand green (fixed color) */
   .action-btn-premium.whatsapp:hover {
-    background: rgba(37, 211, 102, 0.12);
-    color: #25D366;
-    border-color: rgba(37, 211, 102, 0.25);
+    background: var(--action-whatsapp-bg-hover);
+    color: var(--action-whatsapp-text);
+    border-color: var(--action-whatsapp-border);
   }
 
+  /* Call - Uses tenant primary (dynamic) */
   .action-btn-premium.call:hover {
-    background: var(--action-call-bg);
+    background: var(--action-call-bg-hover);
     color: var(--action-call-text);
-    border-color: var(--tenant-primary-glow);
+    border-color: var(--action-call-border);
   }
 
+  /* Email - Semantic blue */
   .action-btn-premium.email:hover {
-    background: rgba(59, 130, 246, 0.12);
-    color: #3B82F6;
-    border-color: rgba(59, 130, 246, 0.25);
+    background: var(--action-email-bg-hover);
+    color: var(--action-email-text);
+    border-color: var(--action-email-border);
   }
 
   /* Status Badge Premium */
@@ -3779,6 +3833,33 @@
   @media (min-width: 768px) {
     .mobile-fab {
       @apply hidden;
+    }
+  }
+
+  /* Leads FAB - Visible on all screen sizes */
+  .leads-fab {
+    @apply fixed z-50;
+    @apply flex items-center justify-center;
+    @apply w-14 h-14 rounded-full;
+    @apply transition-all duration-200;
+    @apply active:scale-95;
+    bottom: 24px;
+    right: 24px;
+    background: linear-gradient(135deg, #0D9488 0%, #14B8A6 50%, #0EB58C 100%);
+    color: white;
+    box-shadow: 0 4px 20px -4px rgba(14, 181, 140, 0.5);
+  }
+
+  .leads-fab:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 8px 28px -4px rgba(14, 181, 140, 0.6);
+  }
+
+  /* Adjust position on mobile to account for bottom navigation */
+  @media (max-width: 767px) {
+    .leads-fab {
+      bottom: calc(var(--bottom-bar-height, 64px) + 16px);
+      right: 16px;
     }
   }
 

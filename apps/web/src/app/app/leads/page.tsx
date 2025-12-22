@@ -24,10 +24,7 @@
  */
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
-import { Plus, LayoutList, RefreshCw } from 'lucide-react';
-
-import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
 import { PageContainer } from '@/components/layout';
 import { RBACGuard } from '@/lib/auth';
 import { usePipelineView, type Lead } from '@/lib/leads';
@@ -51,8 +48,6 @@ import { useKanbanTheme } from './hooks';
 // ============================================
 
 export default function LeadsPage() {
-  const router = useRouter();
-
   // Initialize dynamic Kanban theming (applies CSS variables)
   useKanbanTheme();
 
@@ -62,7 +57,6 @@ export default function LeadsPage() {
     isLoading,
     error,
     refetch,
-    isRefetching,
   } = usePipelineView();
 
   // Dialog states
@@ -74,7 +68,6 @@ export default function LeadsPage() {
 
   // Derived values
   const columns = pipelineData?.stages ?? [];
-  const totalLeads = pipelineData?.totalLeads ?? 0;
   const isEmpty = columns.length === 0 || columns.every((c) => c.leads.length === 0);
 
   // Handlers
@@ -85,64 +78,9 @@ export default function LeadsPage() {
   const handleClosePreview = () => setSelectedLead(null);
   const handleRefresh = () => refetch();
 
-  // Subtitle based on state
-  const subtitle = isLoading
-    ? 'Cargando...'
-    : error
-      ? 'Error al cargar'
-      : `${totalLeads} leads en pipeline`;
-
   return (
     <PageContainer variant="full-bleed">
-      {/* Header - Fixed height, never scrolls */}
-      <PageContainer.Header bordered>
-        <PageContainer.HeaderRow>
-          <PageContainer.Title subtitle={subtitle}>
-            Leads
-          </PageContainer.Title>
-
-          <PageContainer.Actions>
-            {/* Refresh Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleRefresh}
-              disabled={isRefetching}
-              className="h-8 w-8 sm:h-9 sm:w-9"
-              aria-label="Actualizar"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`}
-              />
-            </Button>
-
-            {/* List View Button - Hidden on mobile */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push('/app/leads/list')}
-              className="hidden sm:flex h-8 sm:h-9"
-            >
-              <LayoutList className="h-4 w-4 sm:mr-2" />
-              <span className="hidden md:inline">Vista Lista</span>
-            </Button>
-
-            {/* New Lead Button */}
-            <RBACGuard fallback={null} minRole="sales_rep">
-              <Button
-                onClick={() => setIsCreateOpen(true)}
-                className="ventazo-button h-8 sm:h-9 px-2.5 sm:px-3"
-                size="sm"
-              >
-                <Plus className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">Nuevo</span>
-              </Button>
-            </RBACGuard>
-          </PageContainer.Actions>
-        </PageContainer.HeaderRow>
-      </PageContainer.Header>
-
-      {/* Body: Content + Optional Sidebar */}
+      {/* Body: Full height Kanban */}
       <PageContainer.Body>
         {/*
           Main Content Area
@@ -157,17 +95,17 @@ export default function LeadsPage() {
               <p className="text-destructive text-center mb-4">
                 Error al cargar el pipeline
               </p>
-              <Button variant="outline" onClick={handleRefresh}>
-                <RefreshCw className="mr-2 h-4 w-4" />
+              <button
+                onClick={handleRefresh}
+                className="px-4 py-2 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
+              >
                 Reintentar
-              </Button>
+              </button>
             </div>
           ) : isEmpty ? (
             <div className="flex items-center justify-center h-full p-4">
               <LeadsEmptyState
                 onAddLead={() => setIsCreateOpen(true)}
-                onConnectWhatsApp={() => router.push('/app/settings/integrations')}
-                onImport={() => console.log('Import leads')}
               />
             </div>
           ) : (
@@ -202,11 +140,11 @@ export default function LeadsPage() {
         }}
       />
 
-      {/* Mobile FAB - Visible only on mobile/tablet */}
+      {/* FAB - Floating Action Button for creating leads */}
       <RBACGuard fallback={null} minRole="sales_rep">
         <button
           onClick={() => setIsCreateOpen(true)}
-          className="mobile-fab"
+          className="leads-fab"
           aria-label="Nuevo Lead"
         >
           <Plus className="h-6 w-6" />
