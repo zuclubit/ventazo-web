@@ -1,14 +1,14 @@
 'use client';
 
 /**
- * KanbanEmptyColumn Component
+ * KanbanEmptyColumn Component - Premium 2025 Redesign
  *
- * Placeholder shown when a Kanban column has no leads.
- * Responsive with touch-friendly sizing.
+ * Engaging placeholder with subtle animations and contextual messaging.
+ * Features floating icon animation and premium styling.
  */
 
 import * as React from 'react';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface KanbanEmptyColumnProps {
@@ -28,48 +28,66 @@ export function KanbanEmptyColumn({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center',
-        // Responsive padding
-        'py-6 sm:py-8 px-3 sm:px-4',
-        // Border styles
-        'border-2 border-dashed rounded-xl',
-        'transition-all duration-200',
-        // State-based colors
-        isOver
-          ? 'border-primary/50 bg-primary/5'
-          : 'border-muted-foreground/20 bg-muted/20',
+        'empty-state-container',
+        // Enhanced padding
+        'py-8 sm:py-10 px-4 sm:px-5',
+        // Override when dropping
+        isOver && 'border-primary/50 bg-primary/10',
         className
       )}
     >
-      {/* Icon container - Responsive size */}
+      {/* Icon container - Premium with animation */}
       <div
         className={cn(
-          'flex items-center justify-center rounded-full mb-2 sm:mb-3',
+          'relative flex items-center justify-center rounded-2xl mb-3 sm:mb-4',
           // Responsive sizing
-          'h-8 w-8 sm:h-10 sm:w-10',
-          'bg-muted/50 transition-colors',
-          isOver && 'bg-primary/10'
+          'h-12 w-12 sm:h-14 sm:w-14',
+          // Premium styling
+          'bg-gradient-to-br from-muted/80 to-muted/40',
+          'backdrop-blur-sm',
+          'shadow-inner',
+          'transition-all duration-300',
+          // Float animation when not dropping
+          !isOver && 'animate-float-subtle',
+          // Active state when dropping
+          isOver && [
+            'bg-gradient-to-br from-primary/20 to-primary/10',
+            'scale-110',
+            'shadow-lg shadow-primary/10',
+          ]
         )}
       >
         <UserPlus
           className={cn(
-            'h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground transition-colors',
-            isOver && 'text-primary'
+            'h-5 w-5 sm:h-6 sm:w-6 transition-all duration-300',
+            isOver ? 'text-primary scale-110' : 'text-muted-foreground/70'
           )}
           strokeWidth={1.5}
         />
       </div>
 
-      {/* Text - Responsive */}
-      <p className="text-2xs sm:text-xs text-muted-foreground text-center">
-        Sin leads en{' '}
-        <span className="font-medium">{stageName}</span>
+      {/* Text - Premium typography */}
+      <p className={cn(
+        'text-xs sm:text-sm text-center transition-colors duration-200',
+        isOver ? 'text-primary font-medium' : 'text-muted-foreground'
+      )}>
+        {isOver ? (
+          <span className="flex items-center gap-1.5">
+            <ArrowDown className="h-3.5 w-3.5 animate-bounce" />
+            Suelta aquí
+          </span>
+        ) : (
+          <>
+            Sin leads en{' '}
+            <span className="font-semibold text-foreground/80">{stageName}</span>
+          </>
+        )}
       </p>
 
-      {/* Drop indicator */}
-      {isOver && (
-        <p className="text-2xs sm:text-xs text-primary font-medium mt-1 sm:mt-1.5 animate-pulse">
-          Suelta aquí
+      {/* Subtle hint text */}
+      {!isOver && (
+        <p className="text-2xs text-muted-foreground/60 mt-2">
+          Arrastra un lead para agregarlo
         </p>
       )}
     </div>

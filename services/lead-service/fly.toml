@@ -1,0 +1,62 @@
+# =============================================================================
+# Fly.io Configuration - Lead Service (Staging) - BUN OPTIMIZED
+# =============================================================================
+# Deploy: flyctl deploy (from monorepo root)
+# Logs: flyctl logs
+# Status: flyctl status
+# Stop: flyctl scale count 0
+# Start: flyctl scale count 1
+# =============================================================================
+# Performance Optimizations Applied:
+# - Bun runtime: 4x faster startup, native TypeScript, efficient memory
+# - Machine always running to eliminate cold starts
+# - Increased concurrency limits
+# =============================================================================
+
+app = "zuclubit-lead-service"
+primary_region = "dfw"  # Dallas - Low latency for LATAM
+
+[build]
+  dockerfile = "Dockerfile.bun"
+  build-target = "production"
+
+[env]
+  NODE_ENV = "staging"
+  PORT = "8080"
+  HOST = "0.0.0.0"
+  LOG_LEVEL = "info"
+  # Database y secrets se configuran con: flyctl secrets set KEY=value
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false     # Keep machine always running for fast response
+  auto_start_machines = true     # Auto-start on incoming requests
+  min_machines_running = 1       # Always 1 machine running (eliminates cold starts)
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 500             # Increased for Fastify's high throughput (~50k RPS)
+    soft_limit = 400             # Start scaling earlier
+
+# Health check optimized for faster detection
+[[http_service.checks]]
+  grace_period = "15s"           # Allow time for app startup
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "10s"
+
+# VM Configuration - Optimized for Node.js/Fastify
+# Based on: https://fastify.dev/docs/latest/Guides/Recommendations/
+# "2 vCPU are recommended per app instance - the second vCPU will mostly
+# be used by the garbage collector and libuv threadpool"
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2                       # 2 vCPUs for GC and libuv optimization
+  memory_mb = 1024               # 1GB RAM for V8 heap + OS overhead
+
+[metrics]
+  port = 9091
+  path = "/metrics"

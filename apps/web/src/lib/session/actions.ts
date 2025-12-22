@@ -802,14 +802,25 @@ export async function getSessionUserAction(): Promise<{
 
 /**
  * Update tenant branding during onboarding
+ * Maps frontend field names to backend schema
+ * Supports 4-color semantic palette: sidebar, primary, accent, surface
  */
 export async function updateTenantBrandingAction(
   tenantId: string,
   data: {
     logoUrl?: string;
+    /** Sidebar/navigation background color */
+    sidebarColor?: string;
+    /** Main brand color for buttons, CTAs */
     primaryColor: string;
-    secondaryColor: string;
+    /** Accent color for highlights, links */
+    accentColor?: string;
+    /** Surface color for cards, dropdowns */
+    surfaceColor?: string;
+    /** @deprecated Use sidebarColor instead */
+    secondaryColor?: string;
     companyEmail?: string;
+    companyDisplayName?: string;
   }
 ): Promise<AuthResult> {
   const session = await getSession();
@@ -822,6 +833,20 @@ export async function updateTenantBrandingAction(
   }
 
   try {
+    // Map frontend field names to backend schema
+    // Support both old 2-color and new 4-color systems
+    const backendData = {
+      logo: data.logoUrl || null,
+      // 4-color semantic palette
+      sidebarColor: data.sidebarColor || data.secondaryColor || '#003C3B',
+      primaryColor: data.primaryColor,
+      accentColor: data.accentColor || '#5EEAD4',
+      surfaceColor: data.surfaceColor || '#052828',
+      // Keep secondaryColor for backward compatibility
+      secondaryColor: data.secondaryColor || data.sidebarColor || '#003C3B',
+      companyDisplayName: data.companyDisplayName,
+    };
+
     const response = await fetch(`${API_URL}/api/v1/tenant/branding`, {
       method: 'PATCH',
       headers: {
@@ -829,7 +854,7 @@ export async function updateTenantBrandingAction(
         'Content-Type': 'application/json',
         'x-tenant-id': tenantId,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(backendData),
       cache: 'no-store',
     });
 
@@ -1166,19 +1191,30 @@ export async function sendInvitationsAction(
 // Tenant Details Action
 // ============================================
 
+export interface TenantBranding {
+  logo?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  companyDisplayName?: string;
+  favicon?: string;
+}
+
 export interface TenantDetails {
   id: string;
   name: string;
   slug: string;
-  plan: 'free' | 'pro' | 'enterprise';
+  plan: 'free' | 'starter' | 'pro' | 'enterprise';
   isActive: boolean;
   settings?: Record<string, unknown>;
+  branding?: TenantBranding;
   createdAt: string;
 }
 
 /**
  * Fetch tenant details for the current session
  * Used by AuthProvider to populate TenantStore
+ *
+ * Fetches full tenant data including branding from /api/v1/tenant/
  */
 export async function getTenantDetailsAction(): Promise<TenantDetails | null> {
   const session = await getSession();
@@ -1187,68 +1223,65 @@ export async function getTenantDetailsAction(): Promise<TenantDetails | null> {
     return null;
   }
 
+  const minimalTenant: TenantDetails = {
+    id: session.tenantId,
+    name: 'Mi Negocio',
+    slug: 'mi-negocio',
+    plan: 'free',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  };
+
   try {
-    // Fetch tenant details from API
-    const response = await fetch(`${API_URL}/api/v1/auth/tenants`, {
+    // Fetch full tenant details including branding from /api/v1/tenant/
+    const response = await fetch(`${API_URL}/api/v1/tenant/`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${session.accessToken}`,
         'Content-Type': 'application/json',
+        'x-tenant-id': session.tenantId,
       },
       cache: 'no-store',
     });
 
     if (!response.ok) {
-      console.warn('[GetTenantDetailsAction] Failed to fetch tenants:', response.status);
-      // Return a minimal tenant object so the app can function
-      return {
-        id: session.tenantId,
-        name: 'Mi Negocio',
-        slug: 'mi-negocio',
-        plan: 'free',
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      };
+      console.warn('[GetTenantDetailsAction] Failed to fetch tenant details:', response.status);
+      return minimalTenant;
     }
 
-    const tenants = await response.json();
+    const tenant = await response.json();
 
-    // Find the tenant matching current session
-    const currentTenant = Array.isArray(tenants)
-      ? tenants.find((t: { id: string }) => t.id === session.tenantId)
-      : null;
-
-    if (currentTenant) {
-      return {
-        id: currentTenant.id,
-        name: currentTenant.name || 'Mi Negocio',
-        slug: currentTenant.slug || 'mi-negocio',
-        plan: currentTenant.plan || 'free',
-        isActive: currentTenant.isActive ?? true,
-        settings: currentTenant.settings,
-        createdAt: currentTenant.createdAt || new Date().toISOString(),
-      };
+    if (!tenant || !tenant.id) {
+      console.warn('[GetTenantDetailsAction] Invalid tenant response');
+      return minimalTenant;
     }
 
-    // If tenant not found in list, return minimal tenant
-    return {
-      id: session.tenantId,
-      name: 'Mi Negocio',
-      slug: 'mi-negocio',
-      plan: 'free',
-      isActive: true,
-      createdAt: new Date().toISOString(),
+    // Extract branding from metadata.branding
+    const metadata = tenant.metadata as Record<string, unknown> | undefined;
+    const brandingData = metadata?.['branding'] as TenantBranding | undefined;
+
+    // Build tenant details with branding
+    const tenantDetails: TenantDetails = {
+      id: tenant.id,
+      name: tenant.name || 'Mi Negocio',
+      slug: tenant.slug || 'mi-negocio',
+      plan: tenant.plan || 'free',
+      isActive: tenant.isActive ?? true,
+      settings: {
+        ...tenant.settings,
+        // Merge branding into settings for backwards compatibility
+        logo: brandingData?.logo,
+        logoUrl: brandingData?.logo, // Alias for frontend compatibility
+        primaryColor: brandingData?.primaryColor,
+        secondaryColor: brandingData?.secondaryColor,
+      },
+      branding: brandingData,
+      createdAt: tenant.createdAt || new Date().toISOString(),
     };
+
+    return tenantDetails;
   } catch (error) {
     console.error('[GetTenantDetailsAction] Error:', error);
-    // Return minimal tenant on error so app can function
-    return {
-      id: session.tenantId,
-      name: 'Mi Negocio',
-      slug: 'mi-negocio',
-      plan: 'free',
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
+    return minimalTenant;
   }
 }

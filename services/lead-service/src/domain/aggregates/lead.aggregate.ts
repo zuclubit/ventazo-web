@@ -10,7 +10,9 @@ export class Lead extends AggregateRoot {
   private constructor(
     public readonly id: string,
     public readonly tenantId: string,
-    private companyName: string,
+    private fullName: string,
+    private companyName: string | null,
+    private jobTitle: string | null,
     private email: Email,
     private phone: string | null,
     private website: string | null,
@@ -18,10 +20,12 @@ export class Lead extends AggregateRoot {
     private employeeCount: number | null,
     private annualRevenue: number | null,
     private status: LeadStatus,
+    private stageId: string | null,
     private score: LeadScore,
     private source: string,
     private ownerId: string | null,
     private notes: string | null,
+    private tags: string[],
     private customFields: Record<string, unknown>,
     public readonly createdAt: Date,
     private updatedAt: Date,
@@ -36,7 +40,9 @@ export class Lead extends AggregateRoot {
    */
   static create(props: {
     tenantId: string;
-    companyName: string;
+    fullName: string;
+    companyName?: string;
+    jobTitle?: string;
     email: string;
     phone?: string;
     website?: string;
@@ -44,17 +50,19 @@ export class Lead extends AggregateRoot {
     employeeCount?: number;
     annualRevenue?: number;
     source: string;
+    stageId?: string;
     ownerId?: string;
     notes?: string;
+    tags?: string[];
     customFields?: Record<string, unknown>;
   }): Result<Lead> {
     // Validation
-    if (!props.companyName || props.companyName.trim().length === 0) {
-      return Result.fail('Company name is required');
+    if (!props.fullName || props.fullName.trim().length === 0) {
+      return Result.fail('Full name is required');
     }
 
-    if (props.companyName.length > 255) {
-      return Result.fail('Company name is too long (max 255 characters)');
+    if (props.fullName.length > 255) {
+      return Result.fail('Full name is too long (max 255 characters)');
     }
 
     const emailResult = Email.create(props.email);
@@ -70,7 +78,9 @@ export class Lead extends AggregateRoot {
     const lead = new Lead(
       crypto.randomUUID(),
       props.tenantId,
-      props.companyName.trim(),
+      props.fullName.trim(),
+      props.companyName?.trim() || null,
+      props.jobTitle?.trim() || null,
       emailResult.getValue(),
       props.phone || null,
       props.website || null,
@@ -78,10 +88,12 @@ export class Lead extends AggregateRoot {
       props.employeeCount || null,
       props.annualRevenue || null,
       LeadStatus.new(),
+      props.stageId || null,
       LeadScore.default(),
       props.source.trim(),
       props.ownerId || null,
       props.notes || null,
+      props.tags || [],
       props.customFields || {},
       new Date(),
       new Date(),
@@ -94,7 +106,7 @@ export class Lead extends AggregateRoot {
       LeadEvents.created({
         leadId: lead.id,
         tenantId: lead.tenantId,
-        companyName: lead.companyName,
+        companyName: lead.companyName || lead.fullName,
         email: lead.email.value,
         source: lead.source,
       })
@@ -109,7 +121,9 @@ export class Lead extends AggregateRoot {
   static reconstitute(props: {
     id: string;
     tenantId: string;
-    companyName: string;
+    fullName: string;
+    companyName: string | null;
+    jobTitle: string | null;
     email: string;
     phone: string | null;
     website: string | null;
@@ -117,10 +131,12 @@ export class Lead extends AggregateRoot {
     employeeCount: number | null;
     annualRevenue: number | null;
     status: string;
+    stageId: string | null;
     score: number;
     source: string;
     ownerId: string | null;
     notes: string | null;
+    tags: string[];
     customFields: Record<string, unknown>;
     createdAt: Date;
     updatedAt: Date;
@@ -146,7 +162,9 @@ export class Lead extends AggregateRoot {
       new Lead(
         props.id,
         props.tenantId,
+        props.fullName,
         props.companyName,
+        props.jobTitle,
         emailResult.getValue(),
         props.phone,
         props.website,
@@ -154,10 +172,12 @@ export class Lead extends AggregateRoot {
         props.employeeCount,
         props.annualRevenue,
         statusResult.getValue(),
+        props.stageId,
         scoreResult.getValue(),
         props.source,
         props.ownerId,
         props.notes,
+        props.tags || [],
         props.customFields,
         props.createdAt,
         props.updatedAt,
@@ -171,24 +191,39 @@ export class Lead extends AggregateRoot {
    * Update lead information
    */
   update(props: {
+    fullName?: string;
     companyName?: string;
+    jobTitle?: string;
     email?: string;
     phone?: string;
     website?: string;
     industry?: string;
     employeeCount?: number;
     annualRevenue?: number;
+    stageId?: string;
     notes?: string;
+    tags?: string[];
   }): Result<void> {
     if (this.status.isClosed()) {
       return Result.fail('Cannot update closed lead');
     }
 
-    if (props.companyName !== undefined) {
-      if (!props.companyName || props.companyName.trim().length === 0) {
-        return Result.fail('Company name cannot be empty');
+    if (props.fullName !== undefined) {
+      if (!props.fullName || props.fullName.trim().length === 0) {
+        return Result.fail('Full name cannot be empty');
       }
-      this.companyName = props.companyName.trim();
+      if (props.fullName.length > 255) {
+        return Result.fail('Full name is too long (max 255 characters)');
+      }
+      this.fullName = props.fullName.trim();
+    }
+
+    if (props.companyName !== undefined) {
+      this.companyName = props.companyName?.trim() || null;
+    }
+
+    if (props.jobTitle !== undefined) {
+      this.jobTitle = props.jobTitle?.trim() || null;
     }
 
     if (props.email !== undefined) {
@@ -204,7 +239,9 @@ export class Lead extends AggregateRoot {
     if (props.industry !== undefined) this.industry = props.industry || null;
     if (props.employeeCount !== undefined) this.employeeCount = props.employeeCount || null;
     if (props.annualRevenue !== undefined) this.annualRevenue = props.annualRevenue || null;
+    if (props.stageId !== undefined) this.stageId = props.stageId || null;
     if (props.notes !== undefined) this.notes = props.notes || null;
+    if (props.tags !== undefined) this.tags = props.tags || [];
 
     this.updatedAt = new Date();
     return Result.ok();
@@ -374,8 +411,24 @@ export class Lead extends AggregateRoot {
   /**
    * Getters
    */
-  getCompanyName(): string {
+  getFullName(): string {
+    return this.fullName;
+  }
+
+  getCompanyName(): string | null {
     return this.companyName;
+  }
+
+  getJobTitle(): string | null {
+    return this.jobTitle;
+  }
+
+  getStageId(): string | null {
+    return this.stageId;
+  }
+
+  getTags(): string[] {
+    return this.tags;
   }
 
   getEmail(): Email {

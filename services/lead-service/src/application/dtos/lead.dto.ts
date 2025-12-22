@@ -4,7 +4,9 @@
 
 export interface CreateLeadDTO {
   tenantId: string;
-  companyName: string;
+  fullName: string;
+  companyName?: string;
+  jobTitle?: string;
   email: string;
   phone?: string;
   website?: string;
@@ -12,26 +14,34 @@ export interface CreateLeadDTO {
   employeeCount?: number;
   annualRevenue?: number;
   source: string;
+  stageId?: string;
   ownerId?: string;
   notes?: string;
+  tags?: string[];
   customFields?: Record<string, unknown>;
 }
 
 export interface UpdateLeadDTO {
+  fullName?: string;
   companyName?: string;
+  jobTitle?: string;
   email?: string;
   phone?: string;
   website?: string;
   industry?: string;
   employeeCount?: number;
   annualRevenue?: number;
+  stageId?: string;
   notes?: string;
+  tags?: string[];
 }
 
 export interface LeadResponseDTO {
   id: string;
   tenantId: string;
-  companyName: string;
+  fullName: string;
+  companyName: string | null;
+  jobTitle: string | null;
   email: string;
   phone: string | null;
   website: string | null;
@@ -39,11 +49,13 @@ export interface LeadResponseDTO {
   employeeCount: number | null;
   annualRevenue: number | null;
   status: string;
+  stageId: string | null;
   score: number;
   scoreCategory: 'hot' | 'warm' | 'cold';
   source: string;
   ownerId: string | null;
   notes: string | null;
+  tags: string[];
   customFields: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -53,11 +65,13 @@ export interface LeadResponseDTO {
 }
 
 export interface PaginatedLeadsResponseDTO {
-  items: LeadResponseDTO[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  data: LeadResponseDTO[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface LeadStatsDTO {
@@ -80,7 +94,9 @@ export class LeadMapper {
     return {
       id: lead.id,
       tenantId: lead.tenantId,
+      fullName: lead.getFullName(),
       companyName: lead.getCompanyName(),
+      jobTitle: lead.getJobTitle() || null,
       email: lead.getEmail().value,
       phone: lead.getPhone() || null,
       website: lead.getWebsite() || null,
@@ -88,11 +104,13 @@ export class LeadMapper {
       employeeCount: lead.getEmployeeCount() || null,
       annualRevenue: lead.getAnnualRevenue() || null,
       status: lead.getStatus().value,
+      stageId: lead.getStageId() || null,
       score: lead.getScore().value,
       scoreCategory: lead.getScore().getCategory(),
       source: lead.getSource(),
       ownerId: lead.getOwnerId() || null,
       notes: lead.getNotes() || null,
+      tags: lead.getTags() || [],
       customFields: lead.getCustomFields(),
       createdAt: lead.createdAt.toISOString(),
       updatedAt: lead.getUpdatedAt().toISOString(),
@@ -104,5 +122,22 @@ export class LeadMapper {
 
   static toResponseDTOArray(leads: Lead[]): LeadResponseDTO[] {
     return leads.map(lead => this.toResponseDTO(lead));
+  }
+
+  static toPaginatedResponse(
+    leads: Lead[],
+    total: number,
+    page: number,
+    limit: number
+  ): PaginatedLeadsResponseDTO {
+    return {
+      data: this.toResponseDTOArray(leads),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 }

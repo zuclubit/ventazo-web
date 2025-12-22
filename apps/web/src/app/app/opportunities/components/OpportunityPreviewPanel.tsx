@@ -19,8 +19,8 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { format, formatDistanceToNow } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { format, formatDistanceToNow, type Locale } from 'date-fns';
+import { es, enUS, ptBR } from 'date-fns/locale';
 import {
   X,
   ExternalLink,
@@ -50,9 +50,21 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import type { Opportunity } from '@/lib/opportunities';
 import { OpportunityProbabilityIndicator, OpportunityProbabilityBar } from './OpportunityProbabilityIndicator';
+
+// Date locale mapping
+const dateLocales: Record<string, Locale> = {
+  'es-MX': es,
+  'es-CO': es,
+  'es-AR': es,
+  'es-CL': es,
+  'es-PE': es,
+  'pt-BR': ptBR,
+  'en-US': enUS,
+};
 
 // ============================================
 // Types
@@ -78,41 +90,20 @@ export interface OpportunityPreviewPanelProps {
 }
 
 // ============================================
-// Priority Config
+// Style Configs (labels come from i18n)
 // ============================================
 
-const priorityConfig: Record<string, { label: string; className: string }> = {
-  low: {
-    label: 'Baja',
-    className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-  },
-  medium: {
-    label: 'Media',
-    className: 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300',
-  },
-  high: {
-    label: 'Alta',
-    className: 'bg-orange-100 text-orange-600 dark:bg-orange-900/50 dark:text-orange-300',
-  },
-  critical: {
-    label: 'Critica',
-    className: 'bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-300',
-  },
+const priorityStyles: Record<string, string> = {
+  low: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  medium: 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300',
+  high: 'bg-orange-100 text-orange-600 dark:bg-orange-900/50 dark:text-orange-300',
+  critical: 'bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-300',
 };
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-  open: {
-    label: 'Abierta',
-    className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
-  },
-  won: {
-    label: 'Ganada',
-    className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
-  },
-  lost: {
-    label: 'Perdida',
-    className: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
-  },
+const statusStyles: Record<string, string> = {
+  open: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
+  won: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
+  lost: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
 };
 
 // ============================================
@@ -176,10 +167,16 @@ function PanelContent({
   onViewDetails,
   isMobile = false,
 }: PanelContentProps) {
-  const priority = priorityConfig[opportunity.priority] || priorityConfig.medium;
-  const status = statusConfig[opportunity.status] || statusConfig.open;
+  const { t, locale } = useI18n();
+  const dateLocale = dateLocales[locale] || es;
+
+  const priorityStyle = priorityStyles[opportunity.priority] || priorityStyles['medium'];
+  const statusStyle = statusStyles[opportunity.status] || statusStyles['open'];
   const isOpen = opportunity.status === 'open';
-  const forecast = (opportunity.amount * opportunity.probability) / 100;
+
+  // Get translated labels
+  const priorityLabel = t.opportunities.priority[opportunity.priority as keyof typeof t.opportunities.priority] || opportunity.priority;
+  const statusLabel = t.opportunities.status[opportunity.status as keyof typeof t.opportunities.status] || opportunity.status;
 
   return (
     <div className="flex flex-col h-full">
@@ -188,10 +185,10 @@ function PanelContent({
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-lg leading-tight line-clamp-2">
-              {opportunity.title}
+              {opportunity.name}
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              {opportunity.customer?.name || opportunity.lead?.fullName || 'Sin cliente'}
+              {opportunity.customer?.name || opportunity.lead?.fullName || t.opportunities.preview.noClient}
             </p>
           </div>
           {!isMobile && (
@@ -208,9 +205,9 @@ function PanelContent({
 
         {/* Status & Priority Badges */}
         <div className="flex gap-2 mt-3">
-          <Badge className={status.className}>{status.label}</Badge>
-          <Badge variant="outline" className={priority.className}>
-            {priority.label}
+          <Badge className={statusStyle}>{statusLabel}</Badge>
+          <Badge variant="outline" className={priorityStyle}>
+            {priorityLabel}
           </Badge>
         </div>
       </div>
@@ -223,7 +220,7 @@ function PanelContent({
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="h-5 w-5 text-emerald-600" />
               <span className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
-                Valor de la oportunidad
+                {t.opportunities.preview.opportunityValue}
               </span>
             </div>
             <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
@@ -236,7 +233,7 @@ function PanelContent({
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Target className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Probabilidad de cierre</span>
+                <span className="text-sm font-medium">{t.opportunities.preview.closeProbability}</span>
               </div>
               <OpportunityProbabilityIndicator
                 probability={opportunity.probability}
@@ -257,21 +254,21 @@ function PanelContent({
           {/* Details Section */}
           <div className="space-y-1">
             <h4 className="text-sm font-medium text-muted-foreground mb-2">
-              Detalles
+              {t.opportunities.preview.details}
             </h4>
 
             {opportunity.expectedCloseDate && (
               <InfoRow
                 icon={<Calendar className="h-4 w-4" />}
-                label="Fecha de cierre esperada"
-                value={format(new Date(opportunity.expectedCloseDate), "d 'de' MMMM 'de' yyyy", { locale: es })}
+                label={t.opportunities.preview.expectedCloseDate}
+                value={format(new Date(opportunity.expectedCloseDate), 'PPP', { locale: dateLocale })}
               />
             )}
 
             {opportunity.customer && (
               <InfoRow
                 icon={<Building2 className="h-4 w-4" />}
-                label="Cliente"
+                label={t.opportunities.preview.client}
                 value={opportunity.customer.name}
               />
             )}
@@ -279,7 +276,7 @@ function PanelContent({
             {opportunity.lead && (
               <InfoRow
                 icon={<User className="h-4 w-4" />}
-                label="Lead asociado"
+                label={t.opportunities.preview.associatedLead}
                 value={opportunity.lead.fullName}
               />
             )}
@@ -287,17 +284,17 @@ function PanelContent({
             {opportunity.ownerId && (
               <InfoRow
                 icon={<User className="h-4 w-4" />}
-                label="Propietario"
-                value={opportunity.owner?.name || 'Sin asignar'}
+                label={t.opportunities.preview.owner}
+                value={opportunity.owner?.name || t.opportunities.preview.unassigned}
               />
             )}
 
             <InfoRow
               icon={<Clock className="h-4 w-4" />}
-              label="Creada"
+              label={t.opportunities.preview.created}
               value={formatDistanceToNow(new Date(opportunity.createdAt), {
                 addSuffix: true,
-                locale: es,
+                locale: dateLocale,
               })}
             />
           </div>
@@ -309,7 +306,7 @@ function PanelContent({
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Descripcion</span>
+                  <span className="text-sm font-medium">{t.opportunities.preview.description}</span>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {opportunity.description}
@@ -325,7 +322,7 @@ function PanelContent({
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <Tag className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Etiquetas</span>
+                  <span className="text-sm font-medium">{t.opportunities.preview.tags}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {opportunity.tags.map((tag) => (
@@ -351,7 +348,7 @@ function PanelContent({
               onClick={() => onWin?.(opportunity)}
             >
               <Trophy className="mr-2 h-4 w-4" />
-              Ganada
+              {t.opportunities.status.won}
             </Button>
             <Button
               variant="outline"
@@ -359,7 +356,7 @@ function PanelContent({
               onClick={() => onLost?.(opportunity)}
             >
               <XCircle className="mr-2 h-4 w-4" />
-              Perdida
+              {t.opportunities.status.lost}
             </Button>
           </div>
         )}
@@ -372,10 +369,10 @@ function PanelContent({
             onClick={() => onEdit?.(opportunity)}
           >
             <Edit2 className="mr-2 h-4 w-4" />
-            Editar
+            {t.opportunities.actions.edit}
           </Button>
           <Button className="flex-1" onClick={onViewDetails}>
-            Ver detalles
+            {t.opportunities.preview.viewDetails}
             <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -399,6 +396,7 @@ export function OpportunityPreviewPanel({
   className,
 }: OpportunityPreviewPanelProps) {
   const router = useRouter();
+  const { t } = useI18n();
   const isMobile = useMediaQuery('(max-width: 1023px)');
 
   const handleViewDetails = () => {
@@ -427,7 +425,7 @@ export function OpportunityPreviewPanel({
       <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <SheetContent side="bottom" className="h-[85vh] p-0 rounded-t-2xl">
           <SheetHeader className="sr-only">
-            <SheetTitle>Detalle de oportunidad</SheetTitle>
+            <SheetTitle>{t.opportunities.preview.opportunityDetails}</SheetTitle>
           </SheetHeader>
           <PanelContent
             opportunity={opportunity}

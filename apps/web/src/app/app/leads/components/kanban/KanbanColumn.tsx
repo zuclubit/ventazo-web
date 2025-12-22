@@ -1,13 +1,21 @@
 'use client';
 
 /**
- * KanbanColumn Component
+ * KanbanColumn Component - V3 AI Score Prominence
  *
- * Droppable column for a pipeline stage.
- * Responsive design:
- * - Mobile: Full viewport width with snap
- * - Tablet: Medium fixed width
- * - Desktop: Optimal width with flexible height
+ * Droppable column with the new LeadCardV3 design.
+ * AI Score is THE most prominent element.
+ *
+ * Features:
+ * - LeadCardV3 with AI Priority Indicator
+ * - Premium glass container
+ * - Animated drop zone highlight
+ * - Smooth transitions (200-300ms)
+ *
+ * Layout Architecture:
+ * - Column has FULL height from parent (KanbanBoard h-full)
+ * - Fixed width using CSS clamp()
+ * - Internal structure: Header (shrink-0) + Cards (flex-1 overflow-y-auto)
  */
 
 import * as React from 'react';
@@ -20,7 +28,7 @@ import { cn } from '@/lib/utils';
 import type { Lead, PipelineColumn as PipelineColumnType } from '@/lib/leads';
 import { KanbanColumnHeader } from './KanbanColumnHeader';
 import { KanbanEmptyColumn } from './KanbanEmptyColumn';
-import { KanbanCard } from './KanbanCard';
+import { LeadCardV3 } from '../LeadCardV3';
 
 export interface KanbanColumnProps {
   /** Pipeline column data with stage info and leads */
@@ -38,6 +46,14 @@ export interface KanbanColumnProps {
   /** Additional CSS classes */
   className?: string;
 }
+
+// Column width by breakpoint (responsive)
+const COLUMN_WIDTHS = {
+  mobile: '17.5rem',    // 280px - good for single column view with peek
+  tablet: '16.25rem',   // 260px - fits ~2.5 columns
+  desktop: '17.5rem',   // 280px - fits ~4 columns
+  wide: '18.75rem',     // 300px - fits 5+ columns
+} as const;
 
 export function KanbanColumn({
   column,
@@ -68,30 +84,30 @@ export function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        // Base styles
-        'flex flex-col rounded-xl',
-        'bg-muted/30 backdrop-blur-sm',
-        'border border-transparent',
-        'transition-all duration-200',
-        // Responsive width
-        // Mobile: Almost full width with some peek of next column
-        'w-[85vw] min-w-[280px] max-w-[320px]',
-        // Tablet: Fixed medium width
-        'sm:w-72 sm:min-w-[288px] sm:max-w-none',
-        // Desktop: Slightly larger
-        'lg:w-80 lg:min-w-[320px]',
-        // Flex shrink behavior
-        'flex-shrink-0',
-        // Mobile snap
-        'snap-center',
-        'md:snap-align-none',
+        // Premium glass container
+        'kanban-column-premium',
+        // CRITICAL: Flex column for header + cards layout
+        'flex flex-col',
+        // CRITICAL: Full height from parent
+        'h-full',
+        // CRITICAL: Never shrink width
+        'shrink-0 grow-0',
+        // Transition for drop zone highlight
+        'transition-all duration-300',
         // Highlight when dragging over
-        isHighlighted && 'border-primary/30 bg-primary/5 shadow-lg shadow-primary/5',
+        isHighlighted && 'drop-zone-active',
         className
       )}
+      style={{
+        // Responsive width using CSS clamp
+        width: `clamp(${COLUMN_WIDTHS.tablet}, 20vw, ${COLUMN_WIDTHS.wide})`,
+      }}
+      data-kanban-column
+      role="listbox"
+      aria-label={`${stage.label} - ${count} leads`}
     >
-      {/* Column Header - Sticky on scroll */}
-      <div className="sticky top-0 z-10 bg-inherit rounded-t-xl">
+      {/* Column Header - Premium with glass effect */}
+      <div className="shrink-0 sticky top-0 z-10">
         <KanbanColumnHeader
           title={stage.label}
           count={count}
@@ -99,25 +115,31 @@ export function KanbanColumn({
         />
       </div>
 
-      {/* Cards Container - Scrollable */}
+      {/*
+        Cards Container - Premium scrolling area
+        Smooth internal scrolling with custom scrollbar
+      */}
       <div
         className={cn(
-          // Padding responsive
-          'p-2 sm:p-2.5 lg:p-3',
-          'pt-0',
-          // Spacing between cards
-          'space-y-2 sm:space-y-2.5',
-          // Responsive height - account for header
-          'min-h-[150px] sm:min-h-[180px]',
-          'max-h-[calc(100vh-16rem)] sm:max-h-[calc(100vh-15rem)] lg:max-h-[calc(100vh-14rem)]',
-          // Scrollable
+          // CRITICAL: Fill remaining space
+          'flex-1',
+          // CRITICAL: Allow shrinking to enable overflow
+          'min-h-0',
+          // Padding - slightly more for premium feel
+          'p-2.5 sm:p-3',
+          'pt-2',
+          // Vertical scroll for cards
           'overflow-y-auto overflow-x-hidden',
-          // Smooth scroll
-          'scroll-smooth',
-          // Custom scrollbar
-          'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/20',
+          // iOS momentum scrolling
+          '-webkit-overflow-scrolling-touch',
+          // Spacing between cards - more breathing room
+          'space-y-2.5 sm:space-y-3',
+          // Custom scrollbar styling
+          'scrollbar-thin scrollbar-track-transparent',
+          'scrollbar-thumb-muted-foreground/20',
           'hover:scrollbar-thumb-muted-foreground/40'
         )}
+        role="list"
       >
         <SortableContext items={leadIds} strategy={verticalListSortingStrategy}>
           {leads.length === 0 ? (
@@ -126,22 +148,34 @@ export function KanbanColumn({
               isOver={isHighlighted}
             />
           ) : (
-            leads.map((lead) => (
-              <KanbanCard
+            leads.map((lead, index) => (
+              <div
                 key={lead.id}
-                lead={lead}
-                onClick={() => onLeadClick?.(lead)}
-                onEdit={() => onLeadEdit?.(lead)}
-                onDelete={() => onLeadDelete?.(lead)}
-                onConvert={() => onLeadConvert?.(lead)}
-              />
+                className="animate-card-enter"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <LeadCardV3
+                  lead={lead}
+                  variant="standard"
+                  onClick={() => onLeadClick?.(lead)}
+                  stageName={stage.label}
+                  stageColor={stage.color}
+                />
+              </div>
             ))
           )}
         </SortableContext>
 
-        {/* Drop placeholder when dragging over */}
+        {/* Premium drop indicator when dragging over */}
         {isHighlighted && leads.length > 0 && (
-          <div className="h-1.5 sm:h-2 rounded-full bg-primary/30 animate-pulse" />
+          <div
+            className={cn(
+              'h-2 rounded-full mx-2',
+              'bg-gradient-to-r from-transparent via-primary/40 to-transparent',
+              'animate-pulse'
+            )}
+            aria-hidden="true"
+          />
         )}
       </div>
     </div>

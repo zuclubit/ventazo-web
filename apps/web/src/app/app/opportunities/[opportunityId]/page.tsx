@@ -4,8 +4,20 @@ import * as React from 'react';
 
 import { useParams, useRouter } from 'next/navigation';
 
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { format, type Locale } from 'date-fns';
+import { es, enUS, ptBR } from 'date-fns/locale';
+import { useI18n } from '@/lib/i18n';
+
+// Date locale mapping
+const dateLocales: Record<string, Locale> = {
+  'es-MX': es,
+  'es-CO': es,
+  'es-AR': es,
+  'es-CL': es,
+  'es-PE': es,
+  'pt-BR': ptBR,
+  'en-US': enUS,
+};
 import {
   Activity,
   ArrowLeft,
@@ -51,11 +63,9 @@ import {
   useOpportunityActivity,
   type OpportunityNote,
   type OpportunityActivity as OpportunityActivityType,
-  STATUS_LABELS,
+  type OpportunityActivityType as ActivityTypeEnum,
   STATUS_COLORS,
-  PRIORITY_LABELS,
   PRIORITY_COLORS,
-  ACTIVITY_LABELS,
   ACTIVITY_COLORS,
   formatCurrency,
   calculateForecast,
@@ -76,6 +86,9 @@ interface NoteCardProps {
 }
 
 function NoteCard({ note, onPin, onDelete }: NoteCardProps) {
+  const { t, locale } = useI18n();
+  const dateLocale = dateLocales[locale] || es;
+
   return (
     <Card className={note.isPinned ? 'border-yellow-400 bg-yellow-50/50 dark:bg-yellow-950/20' : ''}>
       <CardContent className="pt-4">
@@ -87,9 +100,9 @@ function NoteCard({ note, onPin, onDelete }: NoteCardProps) {
               </AvatarFallback>
             </Avatar>
             <div>
-              <p className="text-sm font-medium">{note.author?.name || 'Usuario'}</p>
+              <p className="text-sm font-medium">{note.author?.name || t.opportunities.detail.notes.user}</p>
               <p className="text-xs text-muted-foreground">
-                {format(new Date(note.createdAt), "d 'de' MMMM, HH:mm", { locale: es })}
+                {format(new Date(note.createdAt), 'PPp', { locale: dateLocale })}
               </p>
             </div>
           </div>
@@ -102,12 +115,12 @@ function NoteCard({ note, onPin, onDelete }: NoteCardProps) {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => onPin(note.id, !note.isPinned)}>
                 <Pin className="mr-2 h-4 w-4" />
-                {note.isPinned ? 'Desfijar' : 'Fijar'}
+                {note.isPinned ? t.opportunities.detail.notes.unpin : t.opportunities.detail.notes.pin}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onDelete(note.id)}>
                 <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar
+                {t.opportunities.detail.notes.delete}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -122,11 +135,37 @@ function NoteCard({ note, onPin, onDelete }: NoteCardProps) {
 // Activity Item Component
 // ============================================
 
+// Map backend activity types (snake_case) to i18n keys (camelCase)
+const activityTypeToI18nKey: Record<string, keyof typeof import('@/lib/i18n').translations['es-MX']['opportunities']['activity']> = {
+  created: 'created',
+  updated: 'updated',
+  status_changed: 'statusChanged',
+  stage_changed: 'stageChanged',
+  owner_changed: 'ownerChanged',
+  amount_changed: 'amountChanged',
+  probability_changed: 'probabilityChanged',
+  won: 'won',
+  lost: 'lost',
+  reopened: 'reopened',
+  note_added: 'noteAdded',
+  note_updated: 'noteUpdated',
+  note_deleted: 'noteDeleted',
+  close_date_changed: 'closeDateChanged',
+  contact_linked: 'contactLinked',
+  contact_unlinked: 'contactUnlinked',
+};
+
 interface ActivityItemProps {
   activity: OpportunityActivityType;
 }
 
 function ActivityItem({ activity }: ActivityItemProps) {
+  const { t, locale } = useI18n();
+  const dateLocale = dateLocales[locale] || es;
+
+  const i18nKey = activityTypeToI18nKey[activity.actionType] || 'updated';
+  const activityLabel = t.opportunities.activity[i18nKey as keyof typeof t.opportunities.activity];
+
   return (
     <div className="flex gap-3 pb-4">
       <div className="flex flex-col items-center">
@@ -138,17 +177,17 @@ function ActivityItem({ activity }: ActivityItemProps) {
       <div className="flex-1 pb-2">
         <div className="flex items-center gap-2">
           <Badge className={ACTIVITY_COLORS[activity.actionType]} variant="secondary">
-            {ACTIVITY_LABELS[activity.actionType]}
+            {activityLabel}
           </Badge>
           <span className="text-xs text-muted-foreground">
-            {format(new Date(activity.createdAt), "d 'de' MMMM, HH:mm", { locale: es })}
+            {format(new Date(activity.createdAt), 'PPp', { locale: dateLocale })}
           </span>
         </div>
         {activity.description && (
           <p className="mt-1 text-sm text-muted-foreground">{activity.description}</p>
         )}
         {activity.user && (
-          <p className="mt-1 text-xs text-muted-foreground">por {activity.user.name}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t.opportunities.detail.notes.by} {activity.user.name}</p>
         )}
       </div>
     </div>
@@ -163,6 +202,8 @@ export default function OpportunityDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { t, locale } = useI18n();
+  const dateLocale = dateLocales[locale] || es;
   const opportunityId = params['opportunityId'] as string;
 
   // Data
@@ -286,13 +327,13 @@ export default function OpportunityDetailPage() {
       await addNoteAsync({ content: newNote });
       setNewNote('');
       toast({
-        title: 'Nota agregada',
-        description: 'La nota ha sido agregada exitosamente.',
+        title: t.opportunities.detail.notes.noteAdded,
+        description: t.opportunities.detail.notes.noteAddedDescription,
       });
     } catch {
       toast({
-        title: 'Error',
-        description: 'No se pudo agregar la nota.',
+        title: t.opportunities.detail.error.title,
+        description: t.opportunities.detail.error.description,
         variant: 'destructive',
       });
     }
@@ -302,11 +343,11 @@ export default function OpportunityDetailPage() {
     try {
       await updateNoteAsync(noteId, { isPinned });
       toast({
-        title: isPinned ? 'Nota fijada' : 'Nota desfijada',
+        title: isPinned ? t.opportunities.detail.notes.notePinned : t.opportunities.detail.notes.noteUnpinned,
       });
     } catch {
       toast({
-        title: 'Error',
+        title: t.opportunities.detail.error.title,
         variant: 'destructive',
       });
     }
@@ -316,11 +357,11 @@ export default function OpportunityDetailPage() {
     try {
       await deleteNoteAsync(noteId);
       toast({
-        title: 'Nota eliminada',
+        title: t.opportunities.detail.notes.noteDeleted,
       });
     } catch {
       toast({
-        title: 'Error',
+        title: t.opportunities.detail.error.title,
         variant: 'destructive',
       });
     }
@@ -337,7 +378,7 @@ export default function OpportunityDetailPage() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
-    return format(new Date(dateStr), "d 'de' MMMM 'de' yyyy", { locale: es });
+    return format(new Date(dateStr), 'PPP', { locale: dateLocale });
   };
 
   // Loading
@@ -356,18 +397,18 @@ export default function OpportunityDetailPage() {
         <div className="rounded-full bg-destructive/10 p-4 mb-4">
           <XCircle className="h-8 w-8 text-destructive" />
         </div>
-        <h3 className="text-lg font-semibold">Error al cargar la oportunidad</h3>
+        <h3 className="text-lg font-semibold">{t.opportunities.detail.error.title}</h3>
         <p className="text-sm text-muted-foreground mt-1 max-w-md">
-          {opportunityError?.message || 'No se pudo cargar la información. Por favor, intenta de nuevo.'}
+          {opportunityError?.message || t.opportunities.detail.error.description}
         </p>
         <div className="flex gap-2 mt-4">
           <Button variant="outline" onClick={() => router.push('/app/opportunities')}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver
+            {t.opportunities.detail.error.back}
           </Button>
           <Button onClick={() => void refetchOpportunity()}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            Reintentar
+            {t.opportunities.detail.error.retry}
           </Button>
         </div>
       </div>
@@ -378,9 +419,9 @@ export default function OpportunityDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Target className="h-12 w-12 text-muted-foreground/50" />
-        <p className="mt-4 text-lg font-medium">Oportunidad no encontrada</p>
+        <p className="mt-4 text-lg font-medium">{t.opportunities.detail.error.notFound}</p>
         <Button className="mt-4" variant="outline" onClick={() => router.push('/app/opportunities')}>
-          Volver a oportunidades
+          {t.opportunities.detail.error.backToOpportunities}
         </Button>
       </div>
     );
@@ -398,20 +439,20 @@ export default function OpportunityDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">{opportunity.title}</h1>
+              <h1 className="text-2xl font-bold tracking-tight">{opportunity.name}</h1>
               <Badge className={STATUS_COLORS[opportunity.status]}>
-                {STATUS_LABELS[opportunity.status]}
+                {t.opportunities.status[opportunity.status as keyof typeof t.opportunities.status]}
               </Badge>
             </div>
             <p className="text-muted-foreground">
-              {opportunity.customer?.name || opportunity.lead?.fullName || 'Sin cliente asignado'}
+              {opportunity.customer?.name || opportunity.lead?.fullName || t.opportunities.detail.noCustomer}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => refetchOpportunity()}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            Actualizar
+            {t.opportunities.detail.refresh}
           </Button>
           <RBACGuard fallback={null} minRole="sales_rep">
             {opportunity.status === 'open' && (
@@ -422,7 +463,7 @@ export default function OpportunityDetailPage() {
                   onClick={() => setWinLostAction('win')}
                 >
                   <Trophy className="mr-2 h-4 w-4" />
-                  Ganada
+                  {t.opportunities.detail.won}
                 </Button>
                 <Button
                   size="sm"
@@ -430,7 +471,7 @@ export default function OpportunityDetailPage() {
                   onClick={() => setWinLostAction('lost')}
                 >
                   <XCircle className="mr-2 h-4 w-4" />
-                  Perdida
+                  {t.opportunities.detail.lost}
                 </Button>
               </>
             )}
@@ -443,7 +484,7 @@ export default function OpportunityDetailPage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Editar
+                  {t.opportunities.actions.edit}
                 </DropdownMenuItem>
                 <RBACGuard fallback={null} minRole="admin">
                   <DropdownMenuSeparator />
@@ -452,7 +493,7 @@ export default function OpportunityDetailPage() {
                     onClick={() => setIsDeleteOpen(true)}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Eliminar
+                    {t.opportunities.actions.delete}
                   </DropdownMenuItem>
                 </RBACGuard>
               </DropdownMenuContent>
@@ -467,7 +508,7 @@ export default function OpportunityDetailPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monto</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.opportunities.detail.amount}</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -478,7 +519,7 @@ export default function OpportunityDetailPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Probabilidad</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.opportunities.detail.probability}</CardTitle>
             <Target className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
@@ -488,7 +529,7 @@ export default function OpportunityDetailPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Forecast</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.opportunities.detail.forecast}</CardTitle>
             <Target className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
@@ -496,13 +537,13 @@ export default function OpportunityDetailPage() {
               {formatCurrency(forecast, opportunity.currency)}
             </div>
             <p className="text-xs text-muted-foreground">
-              = Monto x Probabilidad
+              {t.opportunities.detail.forecastFormula}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cierre Esperado</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.opportunities.detail.expectedClose}</CardTitle>
             <Calendar className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
@@ -518,23 +559,23 @@ export default function OpportunityDetailPage() {
         <TabsList>
           <TabsTrigger value="overview">
             <Building2 className="mr-2 h-4 w-4" />
-            Resumen
+            {t.opportunities.detail.tabs.overview}
           </TabsTrigger>
           <TabsTrigger value="ai" className="flex items-center gap-1.5">
             <Target className="h-3.5 w-3.5 text-purple-500" />
-            AI Insights
+            {t.opportunities.detail.tabs.aiInsights}
           </TabsTrigger>
           <TabsTrigger value="notes">
             <NotebookPen className="mr-2 h-4 w-4" />
-            Notas ({notes.length})
+            {t.opportunities.detail.tabs.notes} ({notes.length})
           </TabsTrigger>
           <TabsTrigger value="activity">
             <Activity className="mr-2 h-4 w-4" />
-            Actividad
+            {t.opportunities.detail.tabs.activity}
           </TabsTrigger>
           <TabsTrigger value="related">
             <User className="mr-2 h-4 w-4" />
-            Relacionados
+            {t.opportunities.detail.tabs.related}
           </TabsTrigger>
         </TabsList>
 
@@ -544,24 +585,24 @@ export default function OpportunityDetailPage() {
             {/* Info Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Informacion General</CardTitle>
+                <CardTitle>{t.opportunities.detail.generalInfo}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Estado</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.opportunities.status.label}</p>
                     <Badge className={STATUS_COLORS[opportunity.status]}>
-                      {STATUS_LABELS[opportunity.status]}
+                      {t.opportunities.status[opportunity.status as keyof typeof t.opportunities.status]}
                     </Badge>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Prioridad</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.opportunities.priority.label}</p>
                     <Badge className={PRIORITY_COLORS[opportunity.priority]}>
-                      {PRIORITY_LABELS[opportunity.priority]}
+                      {t.opportunities.priority[opportunity.priority as keyof typeof t.opportunities.priority]}
                     </Badge>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Etapa</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.opportunities.detail.stage}</p>
                     <p className="text-sm">
                       {opportunity.stage ? (
                         <Badge
@@ -579,21 +620,21 @@ export default function OpportunityDetailPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Moneda</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.opportunities.detail.currency}</p>
                     <p className="text-sm">{opportunity.currency}</p>
                   </div>
                 </div>
 
                 {opportunity.description && (
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Descripcion</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.opportunities.detail.description}</p>
                     <p className="text-sm whitespace-pre-wrap">{opportunity.description}</p>
                   </div>
                 )}
 
                 {opportunity.tags.length > 0 && (
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-2">Etiquetas</p>
+                    <p className="text-sm font-medium text-muted-foreground mb-2">{t.opportunities.detail.tags}</p>
                     <div className="flex flex-wrap gap-1">
                       {opportunity.tags.map((tag) => (
                         <Badge key={tag} variant="secondary">
@@ -609,38 +650,38 @@ export default function OpportunityDetailPage() {
             {/* Dates & Status Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Fechas y Estado</CardTitle>
+                <CardTitle>{t.opportunities.detail.datesAndStatus}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Creada</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.opportunities.detail.created}</p>
                     <p className="text-sm">{formatDate(opportunity.createdAt)}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Actualizada</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.opportunities.detail.updated}</p>
                     <p className="text-sm">{formatDate(opportunity.updatedAt)}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Cierre Esperado</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.opportunities.detail.expectedClose}</p>
                     <p className="text-sm">{formatDate(opportunity.expectedCloseDate)}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Cierre Real</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.opportunities.detail.actualClose}</p>
                     <p className="text-sm">{formatDate(opportunity.actualCloseDate)}</p>
                   </div>
                 </div>
 
                 {opportunity.status === 'won' && opportunity.wonNotes && (
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Notas de Cierre</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.opportunities.detail.closingNotes}</p>
                     <p className="text-sm text-green-600">{opportunity.wonNotes}</p>
                   </div>
                 )}
 
                 {opportunity.status === 'lost' && opportunity.lostReason && (
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Motivo de Perdida</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t.opportunities.detail.lossReason}</p>
                     <p className="text-sm text-red-600">{opportunity.lostReason}</p>
                   </div>
                 )}
@@ -677,7 +718,7 @@ export default function OpportunityDetailPage() {
               <CardContent className="pt-4">
                 <Textarea
                   className="min-h-[100px]"
-                  placeholder="Escribe una nota..."
+                  placeholder={t.opportunities.detail.notes.placeholder}
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
                 />
@@ -685,7 +726,7 @@ export default function OpportunityDetailPage() {
                   <Button disabled={!newNote.trim() || isAdding} onClick={handleAddNote}>
                     {isAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     <Send className="mr-2 h-4 w-4" />
-                    Agregar Nota
+                    {t.opportunities.detail.notes.addNote}
                   </Button>
                 </div>
               </CardContent>
@@ -700,7 +741,7 @@ export default function OpportunityDetailPage() {
           ) : notes.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <NotebookPen className="h-10 w-10 text-muted-foreground/50" />
-              <p className="mt-2 text-sm text-muted-foreground">Sin notas todavia</p>
+              <p className="mt-2 text-sm text-muted-foreground">{t.opportunities.detail.notes.noNotes}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -734,9 +775,9 @@ export default function OpportunityDetailPage() {
         <TabsContent className="space-y-4" value="activity">
           <Card>
             <CardHeader>
-              <CardTitle>Historial de Actividad</CardTitle>
+              <CardTitle>{t.opportunities.detail.activityHistory}</CardTitle>
               <CardDescription>
-                Todas las acciones realizadas en esta oportunidad
+                {t.opportunities.detail.activityDescription}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -747,7 +788,7 @@ export default function OpportunityDetailPage() {
               ) : (fullActivity?.data ?? activity).length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <Activity className="h-10 w-10 text-muted-foreground/50" />
-                  <p className="mt-2 text-sm text-muted-foreground">Sin actividad registrada</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{t.opportunities.detail.noActivity}</p>
                 </div>
               ) : (
                 <div className="space-y-0">
@@ -768,7 +809,7 @@ export default function OpportunityDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Building2 className="h-4 w-4" />
-                  Cliente
+                  {t.opportunities.detail.customer}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -787,7 +828,7 @@ export default function OpportunityDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Sin cliente asignado</p>
+                  <p className="text-sm text-muted-foreground">{t.opportunities.detail.noCustomerAssigned}</p>
                 )}
               </CardContent>
             </Card>
@@ -797,7 +838,7 @@ export default function OpportunityDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Lead
+                  {t.opportunities.detail.lead}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -816,7 +857,7 @@ export default function OpportunityDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Sin lead asociado</p>
+                  <p className="text-sm text-muted-foreground">{t.opportunities.detail.noLeadAssigned}</p>
                 )}
               </CardContent>
             </Card>
@@ -826,7 +867,7 @@ export default function OpportunityDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Propietario
+                  {t.opportunities.detail.owner}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -843,7 +884,7 @@ export default function OpportunityDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Sin propietario asignado</p>
+                  <p className="text-sm text-muted-foreground">{t.opportunities.detail.noOwnerAssigned}</p>
                 )}
               </CardContent>
             </Card>
@@ -853,7 +894,7 @@ export default function OpportunityDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Contacto
+                  {t.opportunities.detail.contact}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -872,7 +913,7 @@ export default function OpportunityDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Sin contacto asignado</p>
+                  <p className="text-sm text-muted-foreground">{t.opportunities.detail.noContactAssigned}</p>
                 )}
               </CardContent>
             </Card>

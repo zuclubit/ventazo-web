@@ -1,15 +1,29 @@
 'use client';
 
 /**
- * Dashboard Shell Component
+ * Dashboard Shell Component - v2.0
  *
- * Premium 2025 layout wrapper for all internal CRM pages.
- * Features atmospheric background, glass sidebar, and glass navbar.
+ * Premium 2025 layout wrapper using CSS Grid architecture.
+ * Provides bulletproof containment for all internal CRM pages.
  *
  * Architecture:
- * - SidebarProvider wraps everything for synchronized state
- * - Main content area dynamically adjusts padding based on sidebar state
- * - Supports both desktop (collapsible sidebar) and mobile (sheet drawer)
+ * - CSS Grid for main layout (sidebar + content area)
+ * - Flexbox for internal component arrangement
+ * - Proper height containment chain (dvh → 100% → flex-1 → min-h-0)
+ * - Isolated scroll contexts to prevent overflow leaks
+ *
+ * Layout Structure:
+ * ┌─────────────────────────────────────────────────────┐
+ * │                    [root - grid]                    │
+ * │ ┌──────────┬────────────────────────────────────┐   │
+ * │ │          │          [navbar - sticky]          │   │
+ * │ │ sidebar  ├────────────────────────────────────┤   │
+ * │ │ (fixed)  │                                    │   │
+ * │ │          │           [main - flex]            │   │
+ * │ │          │              ↓                     │   │
+ * │ │          │         [children]                 │   │
+ * │ └──────────┴────────────────────────────────────┘   │
+ * └─────────────────────────────────────────────────────┘
  *
  * @module components/layout/dashboard-shell
  */
@@ -20,6 +34,7 @@ import { cn } from '@/lib/utils';
 
 import { Navbar } from './navbar';
 import { Sidebar } from './sidebar';
+import { MobileBottomBar } from './mobile-bottom-bar';
 import { SidebarProvider, useSidebar } from './sidebar-context';
 
 // ============================================
@@ -28,7 +43,7 @@ import { SidebarProvider, useSidebar } from './sidebar-context';
 
 function PremiumDashboardBackground() {
   return (
-    <div className="fixed inset-0 -z-10 overflow-hidden">
+    <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
       {/* Base Gradient */}
       <div
         className="absolute inset-0"
@@ -38,17 +53,15 @@ function PremiumDashboardBackground() {
         }}
       />
 
-      {/* Subtle Atmospheric Glows - Less intense for dashboard */}
-      <div className="pointer-events-none absolute inset-0">
-        {/* Top-right teal glow */}
+      {/* Subtle Atmospheric Glows */}
+      <div className="absolute inset-0">
         <div className="absolute -right-60 -top-60 h-[500px] w-[500px] rounded-full bg-[#0D9488]/8 blur-[150px]" />
-        {/* Bottom-left accent */}
         <div className="absolute -bottom-40 -left-40 h-[400px] w-[400px] rounded-full bg-[#14B8A6]/6 blur-[120px]" />
       </div>
 
-      {/* Noise Texture - Very subtle */}
+      {/* Noise Texture */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.012]"
+        className="absolute inset-0 opacity-[0.012]"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
         }}
@@ -67,28 +80,57 @@ interface MainContentProps {
 }
 
 function MainContent({ children, className }: MainContentProps) {
-  const { currentWidth, isMobile, isCollapsed, config } = useSidebar();
+  const { currentWidth, isMobile } = useSidebar();
 
   return (
     <div
       className={cn(
-        'flex flex-1 flex-col min-h-screen',
-        // Transition for smooth width changes
-        'transition-[padding-left] duration-300 ease-in-out',
-        'motion-reduce:transition-none'
+        // Grid area assignment
+        'col-start-2 col-end-3 row-start-1 row-end-2',
+        // Flex container for navbar + main
+        'flex flex-col',
+        // CRITICAL: Full height from grid, no overflow here
+        'h-full',
+        // Prevent any overflow at this level
+        'overflow-hidden',
+        // Smooth transition for sidebar toggle
+        'transition-[margin-left] duration-300 ease-in-out',
+        'motion-reduce:transition-none',
+        className
       )}
       style={{
-        // Dynamic padding based on sidebar state
-        // On mobile: no padding (sidebar is a sheet overlay)
-        // On desktop: padding matches sidebar width
-        paddingLeft: isMobile ? 0 : currentWidth,
-      }}
+        // Dynamic margin based on sidebar state
+        // On mobile: no margin (sidebar is sheet overlay)
+        // On desktop: margin matches sidebar width
+        marginLeft: isMobile ? 0 : currentWidth,
+        // CSS custom properties for child components
+        '--content-offset': isMobile ? '0px' : `${currentWidth}px`,
+        '--sidebar-current-width': `${currentWidth}px`,
+      } as React.CSSProperties}
     >
-      <Navbar />
+      {/* Navbar - Fixed height, sticky behavior */}
+      <Navbar className="shrink-0" />
+
+      {/*
+        Main Area Container
+        This is where page content lives.
+        CRITICAL: Uses flex-1 with min-h-0 for proper containment.
+        Overflow is HIDDEN here - children must manage their own scroll.
+      */}
       <main
         className={cn(
-          'relative flex-1 space-y-4 p-4 md:p-6 lg:p-8',
-          className
+          // Flex behavior - fill remaining space
+          'relative flex-1',
+          // CRITICAL: min-h-0 allows flex item to shrink below content size
+          'min-h-0',
+          // Also need min-w-0 for horizontal containment
+          'min-w-0',
+          // Overflow hidden - children manage their own scroll
+          'overflow-hidden',
+          // Display as flex column for nested flex children
+          'flex flex-col',
+          // Mobile bottom bar padding
+          isMobile && 'pb-[var(--bottom-bar-height)]'
         )}
       >
         {children}
@@ -132,15 +174,38 @@ function DashboardShellContent({
   const { isMobile } = useSidebar();
 
   return (
-    <div className="relative flex min-h-screen">
-      {/* Premium Background */}
+    <div
+      className={cn(
+        // CRITICAL: Root container uses CSS Grid for layout
+        'grid',
+        // Grid template: sidebar column (auto width) + content column (remaining)
+        // Sidebar is fixed position, so it doesn't participate in grid flow
+        // but we still define the template for semantic clarity
+        'grid-cols-1',
+        'grid-rows-1',
+        // CRITICAL: Use dvh for proper mobile viewport handling
+        // dvh excludes mobile browser chrome (address bar)
+        'h-dvh max-h-dvh',
+        // Width constraints
+        'w-full max-w-full',
+        // CRITICAL: overflow-hidden at root prevents any body scroll
+        'overflow-hidden',
+        // Relative for stacking context
+        'relative',
+        className
+      )}
+    >
+      {/* Premium Background - z-index: -10 */}
       <PremiumDashboardBackground />
 
-      {/* Sidebar - hidden on mobile (uses sheet instead) */}
+      {/* Sidebar - Fixed positioned, hidden on mobile (uses sheet) */}
       {!isMobile && <Sidebar />}
 
-      {/* Main content area with dynamic padding */}
-      <MainContent className={className}>{children}</MainContent>
+      {/* Main content area with dynamic margin */}
+      <MainContent>{children}</MainContent>
+
+      {/* Mobile Bottom Navigation Bar */}
+      {isMobile && <MobileBottomBar />}
     </div>
   );
 }

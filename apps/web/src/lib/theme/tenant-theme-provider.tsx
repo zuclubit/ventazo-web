@@ -6,7 +6,7 @@
 // ============================================
 
 import * as React from 'react';
-import { useTenant } from '@/lib/tenant/tenant-context';
+import { useTenantStore } from '@/store';
 import {
   hexToHslString,
   getOptimalForeground,
@@ -17,6 +17,7 @@ import {
 } from './color-utils';
 import type { TenantBranding, TenantThemeContextValue } from './types';
 import { DEFAULT_BRANDING, BORDER_RADIUS_MAP } from './types';
+import { isValidHexColor, sanitizeHexColor } from '@/lib/auth';
 
 // ============================================
 // Context
@@ -174,29 +175,62 @@ export function TenantThemeProvider({
   children,
   initialBranding,
 }: TenantThemeProviderProps) {
-  const tenantContext = useTenant();
+  // Use Zustand store for tenant data (includes metadata.branding from onboarding)
+  const currentTenant = useTenantStore((state) => state.currentTenant);
+  const storeSettings = useTenantStore((state) => state.settings);
+
   const [branding, setBranding] = React.useState<TenantBranding | null>(
     initialBranding || null
   );
   const [isLoading, setIsLoading] = React.useState(!initialBranding);
 
   // Load branding when tenant changes
+  // Priority: 1) metadata.branding (onboarding) 2) settings 3) store settings 4) defaults
   React.useEffect(() => {
-    const tenant = tenantContext?.tenant;
+    let resolvedBranding: TenantBranding = DEFAULT_BRANDING;
+    let hasCustomColors = false;
 
-    if (tenant?.settings) {
-      // Check if tenant has branding settings
-      const tenantSettings = tenant.settings as Record<string, unknown>;
-      const tenantBranding = tenantSettings['branding'] as Partial<TenantBranding> | undefined;
+    // Priority 1: Check metadata.branding (where onboarding stores data)
+    const metadataBranding = currentTenant?.metadata?.branding;
+    if (metadataBranding) {
+      const partialBranding: Partial<TenantBranding> = {};
 
-      if (tenantBranding) {
-        const mergedBranding = mergeBranding(DEFAULT_BRANDING, tenantBranding);
-        setBranding(mergedBranding);
-        applyCssVariables(mergedBranding);
-      } else if (tenantSettings['primaryColor']) {
-        // Legacy support: just primary and secondary colors
-        const primaryColor = tenantSettings['primaryColor'] as string;
-        const legacyBranding = mergeBranding(DEFAULT_BRANDING, {
+      if (isValidHexColor(metadataBranding.primaryColor)) {
+        const primaryColor = sanitizeHexColor(metadataBranding.primaryColor, DEFAULT_BRANDING.colors.primary);
+        partialBranding.colors = {
+          ...DEFAULT_BRANDING.colors,
+          primary: primaryColor,
+          primaryForeground: getOptimalForeground(primaryColor),
+          ring: primaryColor,
+          info: primaryColor,
+          infoForeground: getOptimalForeground(primaryColor),
+        };
+
+        // Apply secondary if provided
+        if (isValidHexColor(metadataBranding.secondaryColor)) {
+          const secondaryColor = sanitizeHexColor(metadataBranding.secondaryColor, DEFAULT_BRANDING.colors.secondary);
+          partialBranding.colors = {
+            ...partialBranding.colors,
+            secondary: secondaryColor,
+            secondaryForeground: getOptimalForeground(secondaryColor),
+          };
+        }
+
+        hasCustomColors = true;
+      }
+
+      if (hasCustomColors) {
+        resolvedBranding = mergeBranding(DEFAULT_BRANDING, partialBranding);
+      }
+    }
+
+    // Priority 2: Legacy tenant.settings support
+    if (!hasCustomColors && currentTenant?.settings) {
+      const tenantSettings = currentTenant.settings as Record<string, unknown>;
+
+      if (isValidHexColor(tenantSettings['primaryColor'])) {
+        const primaryColor = sanitizeHexColor(tenantSettings['primaryColor'] as string, DEFAULT_BRANDING.colors.primary);
+        resolvedBranding = mergeBranding(DEFAULT_BRANDING, {
           colors: {
             ...DEFAULT_BRANDING.colors,
             primary: primaryColor,
@@ -206,21 +240,37 @@ export function TenantThemeProvider({
             infoForeground: getOptimalForeground(primaryColor),
           },
         });
-        setBranding(legacyBranding);
-        applyCssVariables(legacyBranding);
-      } else {
-        // Use default branding
-        setBranding(DEFAULT_BRANDING);
-        applyCssVariables(DEFAULT_BRANDING);
+        hasCustomColors = true;
       }
-    } else {
-      // No tenant - use defaults
-      setBranding(DEFAULT_BRANDING);
-      applyCssVariables(DEFAULT_BRANDING);
     }
 
+    // Priority 3: Zustand store settings (runtime updates)
+    if (!hasCustomColors && storeSettings.primaryColor && isValidHexColor(storeSettings.primaryColor)) {
+      const primaryColor = sanitizeHexColor(storeSettings.primaryColor, DEFAULT_BRANDING.colors.primary);
+      const partialColors: Partial<typeof DEFAULT_BRANDING.colors> = {
+        primary: primaryColor,
+        primaryForeground: getOptimalForeground(primaryColor),
+        ring: primaryColor,
+        info: primaryColor,
+        infoForeground: getOptimalForeground(primaryColor),
+      };
+
+      if (storeSettings.secondaryColor && isValidHexColor(storeSettings.secondaryColor)) {
+        const secondaryColor = sanitizeHexColor(storeSettings.secondaryColor, DEFAULT_BRANDING.colors.secondary);
+        partialColors.secondary = secondaryColor;
+        partialColors.secondaryForeground = getOptimalForeground(secondaryColor);
+      }
+
+      resolvedBranding = mergeBranding(DEFAULT_BRANDING, {
+        colors: { ...DEFAULT_BRANDING.colors, ...partialColors },
+      });
+    }
+
+    // Apply the resolved branding
+    setBranding(resolvedBranding);
+    applyCssVariables(resolvedBranding);
     setIsLoading(false);
-  }, [tenantContext?.tenant]);
+  }, [currentTenant, storeSettings.primaryColor, storeSettings.secondaryColor]);
 
   // Apply theme function - for programmatic updates
   const applyTheme = React.useCallback((partial: Partial<TenantBranding>) => {

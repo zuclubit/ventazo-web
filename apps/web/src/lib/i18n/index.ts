@@ -9,6 +9,7 @@ import { esAR, esCL, esCO, esMX, esPE, enUS, ptBR } from './locales';
 export * from './types';
 export * from './countries';
 export * from './onboarding';
+export { I18nProvider, useI18n } from './context';
 
 // All translations mapped by locale
 export const translations: Record<LocaleCode, Translations> = {

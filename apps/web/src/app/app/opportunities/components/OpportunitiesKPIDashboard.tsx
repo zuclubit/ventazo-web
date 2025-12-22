@@ -28,6 +28,7 @@ import {
   TrendingDown,
   Minus,
 } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 // ============================================
@@ -264,6 +265,8 @@ export function OpportunitiesKPIDashboard({
   isLoading = false,
   className,
 }: OpportunitiesKPIDashboardProps) {
+  const { t } = useI18n();
+
   // Calculate trends
   const pipelineTrend = calculateTrend(pipelineTotal, previousPeriod?.pipelineTotal);
   const forecastTrend = calculateTrend(forecastValue, previousPeriod?.forecastValue);
@@ -286,9 +289,9 @@ export function OpportunitiesKPIDashboard({
       {/* Pipeline Total */}
       <KPICard
         icon={<DollarSign className="h-5 w-5" />}
-        title="Pipeline Total"
+        title={t.opportunities.kpi.pipelineTotal}
         value={formatCurrency(pipelineTotal)}
-        subtitle={`${totalCount} oportunidades`}
+        subtitle={`${totalCount} ${t.opportunities.kpi.opportunities}`}
         trend={pipelineTrend}
         isActive={activeFilter === 'all'}
         colorScheme="primary"
@@ -298,9 +301,9 @@ export function OpportunitiesKPIDashboard({
       {/* Forecast */}
       <KPICard
         icon={<Target className="h-5 w-5" />}
-        title="Forecast"
+        title={t.opportunities.kpi.forecast}
         value={formatCurrency(forecastValue)}
-        subtitle="Valor ponderado"
+        subtitle={t.opportunities.kpi.weightedValue}
         trend={forecastTrend}
         isActive={activeFilter === 'open'}
         colorScheme="info"
@@ -310,9 +313,9 @@ export function OpportunitiesKPIDashboard({
       {/* Won */}
       <KPICard
         icon={<Trophy className="h-5 w-5" />}
-        title="Ganadas"
+        title={t.opportunities.kpi.won}
         value={formatCurrency(wonAmount)}
-        subtitle={`${wonCount} cerradas`}
+        subtitle={`${wonCount} ${t.opportunities.kpi.closed}`}
         trend={wonTrend}
         isActive={activeFilter === 'won'}
         colorScheme="success"
@@ -322,9 +325,9 @@ export function OpportunitiesKPIDashboard({
       {/* Lost */}
       <KPICard
         icon={<XCircle className="h-5 w-5" />}
-        title="Perdidas"
+        title={t.opportunities.kpi.lost}
         value={formatCurrency(lostAmount)}
-        subtitle={`${lostCount} cerradas`}
+        subtitle={`${lostCount} ${t.opportunities.kpi.closed}`}
         trend={lostTrend}
         isActive={activeFilter === 'lost'}
         colorScheme="danger"

@@ -26,7 +26,7 @@ import { Label } from '@/components/ui/label';
 // Types
 // ============================================
 
-export interface PasswordInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
+export interface PasswordInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'size'> {
   /** Field label */
   label?: string;
   /** Error message */

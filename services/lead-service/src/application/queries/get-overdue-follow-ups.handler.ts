@@ -1,4 +1,4 @@
-import { injectable } from 'tsyringe';
+import { injectable, inject } from 'tsyringe';
 import { Result } from '@zuclubit/domain';
 import { IQueryHandler } from '../common';
 import { GetOverdueFollowUpsQuery } from './get-overdue-follow-ups.query';
@@ -12,7 +12,7 @@ import { LeadResponseDTO, LeadMapper } from '../dtos';
 export class GetOverdueFollowUpsHandler
   implements IQueryHandler<GetOverdueFollowUpsQuery, LeadResponseDTO[]>
 {
-  constructor(private readonly leadRepository: ILeadRepository) {}
+  constructor(@inject('ILeadRepository') private readonly leadRepository: ILeadRepository) {}
 
   async execute(query: GetOverdueFollowUpsQuery): Promise<Result<LeadResponseDTO[]>> {
     const result = await this.leadRepository.findOverdueFollowUps(query.tenantId);

@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useI18n } from '@/lib/i18n';
 import {
   useDeleteOpportunity,
   type Opportunity,
@@ -39,6 +40,7 @@ export function DeleteOpportunityDialog({
   onClose,
 }: DeleteOpportunityDialogProps) {
   const { toast } = useToast();
+  const { t } = useI18n();
   const deleteOpportunity = useDeleteOpportunity();
 
   const handleDelete = async () => {
@@ -47,14 +49,14 @@ export function DeleteOpportunityDialog({
     try {
       await deleteOpportunity.mutateAsync(opportunity.id);
       toast({
-        title: 'Oportunidad eliminada',
-        description: 'La oportunidad ha sido eliminada exitosamente.',
+        title: t.opportunities.deleteDialog.success,
+        description: t.opportunities.deleteDialog.successDescription,
       });
       onClose();
     } catch {
       toast({
-        title: 'Error',
-        description: 'No se pudo eliminar la oportunidad.',
+        title: t.opportunities.form.errors.updateFailed,
+        description: t.opportunities.deleteDialog.error,
         variant: 'destructive',
       });
     }
@@ -68,15 +70,14 @@ export function DeleteOpportunityDialog({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            Eliminar Oportunidad
+            {t.opportunities.deleteDialog.title}
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-2">
             <p>
-              Esta accion no se puede deshacer. Se eliminara permanentemente la
-              oportunidad y toda su informacion asociada.
+              {t.opportunities.deleteDialog.description}
             </p>
             <div className="mt-4 rounded-md bg-muted p-3">
-              <p className="font-medium">{opportunity.title}</p>
+              <p className="font-medium">{opportunity.name}</p>
               <p className="text-sm text-muted-foreground">
                 {formatCurrency(opportunity.amount, opportunity.currency)}
               </p>
@@ -84,7 +85,7 @@ export function DeleteOpportunityDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel>{t.opportunities.actions.cancel}</AlertDialogCancel>
           <AlertDialogAction
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             disabled={deleteOpportunity.isPending}
@@ -93,7 +94,7 @@ export function DeleteOpportunityDialog({
             {deleteOpportunity.isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            Eliminar
+            {t.opportunities.actions.delete}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

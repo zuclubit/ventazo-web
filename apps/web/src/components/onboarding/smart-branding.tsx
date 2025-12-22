@@ -27,11 +27,13 @@ import { cn } from '@/lib/utils';
 import { getAccessToken } from '@/lib/auth/token-manager';
 import {
   extractColorsFromImage,
-  suggestBrandColors,
+  suggest4ColorPalette,
+  deriveFullPaletteFromPrimary,
   isValidHex,
   normalizeHex,
   getOptimalForeground,
   type ExtractedColor,
+  type SemanticBrandPalette,
 } from '@/lib/theme';
 
 // ============================================
@@ -49,15 +51,26 @@ const premiumInputClasses = cn(
 // Types
 // ============================================
 
+/**
+ * 4-Color Semantic Brand Palette for professional CRM theming
+ */
 export interface SmartBrandingProps {
   companyName: string;
   onCompanyNameChange: (name: string) => void;
   logoUrl: string | null;
   onLogoChange: (url: string | null) => void;
+  /** Sidebar/navigation background color */
+  sidebarColor: string;
+  onSidebarColorChange: (color: string) => void;
+  /** Main brand color for buttons, CTAs */
   primaryColor: string;
   onPrimaryColorChange: (color: string) => void;
-  secondaryColor: string;
-  onSecondaryColorChange: (color: string) => void;
+  /** Accent color for highlights, links */
+  accentColor: string;
+  onAccentColorChange: (color: string) => void;
+  /** Surface color for cards, dropdowns */
+  surfaceColor: string;
+  onSurfaceColorChange: (color: string) => void;
   isLoading?: boolean;
   uploadEndpoint?: string;
   translations?: {
@@ -66,8 +79,10 @@ export interface SmartBrandingProps {
     uploadLogo?: string;
     detectingColors?: string;
     suggestedColors?: string;
+    sidebarColor?: string;
     primaryColor?: string;
-    secondaryColor?: string;
+    accentColor?: string;
+    surfaceColor?: string;
     preview?: string;
   };
 }
@@ -88,10 +103,14 @@ export function SmartBranding({
   onCompanyNameChange,
   logoUrl,
   onLogoChange,
+  sidebarColor,
+  onSidebarColorChange,
   primaryColor,
   onPrimaryColorChange,
-  secondaryColor,
-  onSecondaryColorChange,
+  accentColor,
+  onAccentColorChange,
+  surfaceColor,
+  onSurfaceColorChange,
   isLoading = false,
   uploadEndpoint = '/api/upload/logo',
   translations: t = {},
@@ -106,6 +125,7 @@ export function SmartBranding({
   const [isDragOver, setIsDragOver] = React.useState(false);
   const [extractedColors, setExtractedColors] = React.useState<ExtractedColor[]>([]);
   const [isExtractingColors, setIsExtractingColors] = React.useState(false);
+  const [showAdvanced, setShowAdvanced] = React.useState(false);
 
   // Labels with defaults
   const labels = {
@@ -114,8 +134,10 @@ export function SmartBranding({
     uploadLogo: t.uploadLogo || 'Sube tu logo',
     detectingColors: t.detectingColors || 'Detectando colores...',
     suggestedColors: t.suggestedColors || 'Colores detectados',
-    primaryColor: t.primaryColor || 'Color principal',
-    secondaryColor: t.secondaryColor || 'Color secundario',
+    sidebarColor: t.sidebarColor || 'Sidebar',
+    primaryColor: t.primaryColor || 'Principal',
+    accentColor: t.accentColor || 'Acento',
+    surfaceColor: t.surfaceColor || 'Superficie',
     preview: t.preview || 'Vista previa',
   };
 
@@ -129,25 +151,32 @@ export function SmartBranding({
       .slice(0, 2);
   };
 
+  // Apply a complete 4-color palette
+  const applyPalette = React.useCallback((palette: SemanticBrandPalette) => {
+    onSidebarColorChange(palette.sidebarColor);
+    onPrimaryColorChange(palette.primaryColor);
+    onAccentColorChange(palette.accentColor);
+    onSurfaceColorChange(palette.surfaceColor);
+  }, [onSidebarColorChange, onPrimaryColorChange, onAccentColorChange, onSurfaceColorChange]);
+
   // Extract colors from image
   const extractColors = React.useCallback(async (imageSource: string | File) => {
     setIsExtractingColors(true);
     try {
-      const colors = await extractColorsFromImage(imageSource, 6, 7);
+      const colors = await extractColorsFromImage(imageSource, 8, 7);
       setExtractedColors(colors);
 
-      // Auto-suggest brand colors if we have results
+      // Auto-suggest 4-color palette if we have results
       if (colors.length > 0) {
-        const suggested = suggestBrandColors(colors);
-        onPrimaryColorChange(suggested.primary);
-        onSecondaryColorChange(suggested.secondary);
+        const palette = suggest4ColorPalette(colors);
+        applyPalette(palette);
       }
     } catch (error) {
       console.error('Color extraction failed:', error);
     } finally {
       setIsExtractingColors(false);
     }
-  }, [onPrimaryColorChange, onSecondaryColorChange]);
+  }, [applyPalette]);
 
   // Handle file upload
   const uploadFile = async (file: File) => {
@@ -269,13 +298,28 @@ export function SmartBranding({
     onLogoChange(null);
   };
 
-  // Apply a suggested color
-  const applySuggestedColor = (color: string, type: 'primary' | 'secondary') => {
-    if (type === 'primary') {
-      onPrimaryColorChange(color);
-    } else {
-      onSecondaryColorChange(color);
+  // Apply a suggested color to a specific slot
+  const applySuggestedColor = (color: string, type: 'sidebar' | 'primary' | 'accent' | 'surface') => {
+    switch (type) {
+      case 'sidebar':
+        onSidebarColorChange(color);
+        break;
+      case 'primary':
+        onPrimaryColorChange(color);
+        break;
+      case 'accent':
+        onAccentColorChange(color);
+        break;
+      case 'surface':
+        onSurfaceColorChange(color);
+        break;
     }
+  };
+
+  // Generate full palette from a single primary color
+  const generateFromPrimary = (hex: string) => {
+    const palette = deriveFullPaletteFromPrimary(hex);
+    applyPalette(palette);
   };
 
   const hasLogo = logoUrl || uploadState.localPreview;
@@ -383,36 +427,30 @@ export function SmartBranding({
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {extractedColors.map((color, i) => {
+                    const isSidebar = color.hex.toUpperCase() === sidebarColor.toUpperCase();
                     const isPrimary = color.hex.toUpperCase() === primaryColor.toUpperCase();
-                    const isSecondary = color.hex.toUpperCase() === secondaryColor.toUpperCase();
+                    const isAccent = color.hex.toUpperCase() === accentColor.toUpperCase();
+                    const isSurface = color.hex.toUpperCase() === surfaceColor.toUpperCase();
+                    const isSelected = isSidebar || isPrimary || isAccent || isSurface;
 
                     return (
                       <button
                         key={i}
                         type="button"
-                        onClick={() => applySuggestedColor(color.hex, 'primary')}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          applySuggestedColor(color.hex, 'secondary');
-                        }}
+                        onClick={() => generateFromPrimary(color.hex)}
                         className={cn(
                           'relative w-9 h-9 rounded-lg transition-all hover:scale-110',
                           'border-2',
-                          isPrimary || isSecondary
+                          isSelected
                             ? 'border-white shadow-lg'
                             : 'border-white/20 hover:border-white/40'
                         )}
                         style={{ backgroundColor: color.hex }}
-                        title={`${color.hex} (${color.percentage}%)`}
+                        title={`${color.hex} (${color.percentage}%) - Click para usar como base`}
                       >
                         {isPrimary && (
                           <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#0EB58C] rounded-full text-[8px] text-white flex items-center justify-center font-bold">
                             P
-                          </span>
-                        )}
-                        {isSecondary && !isPrimary && (
-                          <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#F97316] rounded-full text-[8px] text-white flex items-center justify-center font-bold">
-                            S
                           </span>
                         )}
                       </button>
@@ -420,7 +458,7 @@ export function SmartBranding({
                   })}
                 </div>
                 <p className="text-[10px] text-[#7A8F8F]">
-                  Click = primario • Click derecho = secundario
+                  Click en un color para generar la paleta completa
                 </p>
               </div>
             )}
@@ -429,49 +467,27 @@ export function SmartBranding({
             {!hasExtractedColors && !isExtractingColors && (
               <div className="space-y-3 pt-1">
                 <p className="text-xs text-[#7A8F8F]">
-                  Sube un logo para detectar colores automáticamente, o ingresa manualmente:
+                  Sube un logo para detectar colores, o elige un color principal:
                 </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={isValidHex(primaryColor) ? primaryColor : '#0D9488'}
-                      onChange={(e) => onPrimaryColorChange(normalizeHex(e.target.value))}
-                      disabled={isLoading}
-                      className="h-8 w-8 rounded cursor-pointer border border-white/20"
-                    />
-                    <Input
-                      value={primaryColor}
-                      onChange={(e) => {
-                        let v = e.target.value.trim();
-                        if (v && !v.startsWith('#')) v = `#${v}`;
-                        if (isValidHex(v)) onPrimaryColorChange(normalizeHex(v));
-                      }}
-                      placeholder="#0D9488"
-                      className={cn(premiumInputClasses, 'font-mono uppercase text-xs flex-1')}
-                      maxLength={7}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={isValidHex(secondaryColor) ? secondaryColor : '#F97316'}
-                      onChange={(e) => onSecondaryColorChange(normalizeHex(e.target.value))}
-                      disabled={isLoading}
-                      className="h-8 w-8 rounded cursor-pointer border border-white/20"
-                    />
-                    <Input
-                      value={secondaryColor}
-                      onChange={(e) => {
-                        let v = e.target.value.trim();
-                        if (v && !v.startsWith('#')) v = `#${v}`;
-                        if (isValidHex(v)) onSecondaryColorChange(normalizeHex(v));
-                      }}
-                      placeholder="#F97316"
-                      className={cn(premiumInputClasses, 'font-mono uppercase text-xs flex-1')}
-                      maxLength={7}
-                    />
-                  </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={isValidHex(primaryColor) ? primaryColor : '#0EB58C'}
+                    onChange={(e) => generateFromPrimary(normalizeHex(e.target.value))}
+                    disabled={isLoading}
+                    className="h-10 w-10 rounded-lg cursor-pointer border border-white/20"
+                  />
+                  <Input
+                    value={primaryColor}
+                    onChange={(e) => {
+                      let v = e.target.value.trim();
+                      if (v && !v.startsWith('#')) v = `#${v}`;
+                      if (isValidHex(v)) generateFromPrimary(normalizeHex(v));
+                    }}
+                    placeholder="#0EB58C"
+                    className={cn(premiumInputClasses, 'font-mono uppercase text-sm flex-1')}
+                    maxLength={7}
+                  />
                 </div>
               </div>
             )}
@@ -487,83 +503,226 @@ export function SmartBranding({
         )}
       </div>
 
-      {/* Selected Colors Summary + Preview */}
+      {/* 4-Color Palette Summary */}
       <div className="space-y-3">
-        <div className="flex items-center gap-4">
-          {/* Primary */}
-          <div className="flex items-center gap-2">
+        {/* Color Swatches Row */}
+        <div className="grid grid-cols-4 gap-2">
+          {/* Sidebar */}
+          <div className="space-y-1">
             <div
-              className="w-8 h-8 rounded-lg border-2 border-white/30"
-              style={{ backgroundColor: primaryColor }}
+              className="h-10 rounded-lg border-2 border-white/30"
+              style={{ backgroundColor: sidebarColor }}
             />
-            <div className="text-xs">
-              <p className="text-[#7A8F8F]">{labels.primaryColor}</p>
-              <p className="text-white font-mono">{primaryColor}</p>
-            </div>
+            <p className="text-[10px] text-center text-[#7A8F8F]">{labels.sidebarColor}</p>
           </div>
 
-          {/* Secondary */}
-          <div className="flex items-center gap-2">
+          {/* Primary */}
+          <div className="space-y-1">
             <div
-              className="w-8 h-8 rounded-lg border-2 border-white/30"
-              style={{ backgroundColor: secondaryColor }}
+              className="h-10 rounded-lg border-2 border-white/30"
+              style={{ backgroundColor: primaryColor }}
             />
-            <div className="text-xs">
-              <p className="text-[#7A8F8F]">{labels.secondaryColor}</p>
-              <p className="text-white font-mono">{secondaryColor}</p>
-            </div>
+            <p className="text-[10px] text-center text-[#7A8F8F]">{labels.primaryColor}</p>
+          </div>
+
+          {/* Accent */}
+          <div className="space-y-1">
+            <div
+              className="h-10 rounded-lg border-2 border-white/30"
+              style={{ backgroundColor: accentColor }}
+            />
+            <p className="text-[10px] text-center text-[#7A8F8F]">{labels.accentColor}</p>
+          </div>
+
+          {/* Surface */}
+          <div className="space-y-1">
+            <div
+              className="h-10 rounded-lg border-2 border-white/30"
+              style={{ backgroundColor: surfaceColor }}
+            />
+            <p className="text-[10px] text-center text-[#7A8F8F]">{labels.surfaceColor}</p>
           </div>
         </div>
 
-        {/* Live Mini Preview */}
+        {/* Advanced Edit Toggle */}
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="text-xs text-[#0EB58C] hover:text-[#5EEAD4] transition-colors"
+        >
+          {showAdvanced ? '▼ Ocultar edición avanzada' : '▶ Editar colores individualmente'}
+        </button>
+
+        {/* Advanced 4-Color Editors */}
+        {showAdvanced && (
+          <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/10">
+            {/* Sidebar Color */}
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={isValidHex(sidebarColor) ? sidebarColor : '#003C3B'}
+                onChange={(e) => onSidebarColorChange(normalizeHex(e.target.value))}
+                disabled={isLoading}
+                className="h-8 w-8 rounded cursor-pointer border border-white/20"
+              />
+              <div className="flex-1">
+                <p className="text-[10px] text-[#7A8F8F]">{labels.sidebarColor}</p>
+                <Input
+                  value={sidebarColor}
+                  onChange={(e) => {
+                    let v = e.target.value.trim();
+                    if (v && !v.startsWith('#')) v = `#${v}`;
+                    if (isValidHex(v)) onSidebarColorChange(normalizeHex(v));
+                  }}
+                  className={cn(premiumInputClasses, 'font-mono uppercase text-[10px] h-7')}
+                  maxLength={7}
+                />
+              </div>
+            </div>
+
+            {/* Primary Color */}
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={isValidHex(primaryColor) ? primaryColor : '#0EB58C'}
+                onChange={(e) => onPrimaryColorChange(normalizeHex(e.target.value))}
+                disabled={isLoading}
+                className="h-8 w-8 rounded cursor-pointer border border-white/20"
+              />
+              <div className="flex-1">
+                <p className="text-[10px] text-[#7A8F8F]">{labels.primaryColor}</p>
+                <Input
+                  value={primaryColor}
+                  onChange={(e) => {
+                    let v = e.target.value.trim();
+                    if (v && !v.startsWith('#')) v = `#${v}`;
+                    if (isValidHex(v)) onPrimaryColorChange(normalizeHex(v));
+                  }}
+                  className={cn(premiumInputClasses, 'font-mono uppercase text-[10px] h-7')}
+                  maxLength={7}
+                />
+              </div>
+            </div>
+
+            {/* Accent Color */}
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={isValidHex(accentColor) ? accentColor : '#5EEAD4'}
+                onChange={(e) => onAccentColorChange(normalizeHex(e.target.value))}
+                disabled={isLoading}
+                className="h-8 w-8 rounded cursor-pointer border border-white/20"
+              />
+              <div className="flex-1">
+                <p className="text-[10px] text-[#7A8F8F]">{labels.accentColor}</p>
+                <Input
+                  value={accentColor}
+                  onChange={(e) => {
+                    let v = e.target.value.trim();
+                    if (v && !v.startsWith('#')) v = `#${v}`;
+                    if (isValidHex(v)) onAccentColorChange(normalizeHex(v));
+                  }}
+                  className={cn(premiumInputClasses, 'font-mono uppercase text-[10px] h-7')}
+                  maxLength={7}
+                />
+              </div>
+            </div>
+
+            {/* Surface Color */}
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={isValidHex(surfaceColor) ? surfaceColor : '#052828'}
+                onChange={(e) => onSurfaceColorChange(normalizeHex(e.target.value))}
+                disabled={isLoading}
+                className="h-8 w-8 rounded cursor-pointer border border-white/20"
+              />
+              <div className="flex-1">
+                <p className="text-[10px] text-[#7A8F8F]">{labels.surfaceColor}</p>
+                <Input
+                  value={surfaceColor}
+                  onChange={(e) => {
+                    let v = e.target.value.trim();
+                    if (v && !v.startsWith('#')) v = `#${v}`;
+                    if (isValidHex(v)) onSurfaceColorChange(normalizeHex(v));
+                  }}
+                  className={cn(premiumInputClasses, 'font-mono uppercase text-[10px] h-7')}
+                  maxLength={7}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Live Mini Preview - Now uses all 4 colors */}
         <div className={cn(
-          'rounded-xl overflow-hidden border border-white/10',
-          'bg-gradient-to-br from-[#001A1A] to-[#002525]'
-        )}>
+          'rounded-xl overflow-hidden border border-white/10'
+        )}
+        style={{ backgroundColor: surfaceColor }}
+        >
           <div className="flex">
-            {/* Mini Sidebar Preview */}
+            {/* Mini Sidebar Preview - Uses sidebarColor */}
             <div
-              className="w-10 py-2 flex flex-col items-center gap-1.5"
-              style={{ backgroundColor: primaryColor }}
+              className="w-12 py-2 flex flex-col items-center gap-1.5"
+              style={{ backgroundColor: sidebarColor }}
             >
               {hasLogo ? (
                 <img
                   src={uploadState.localPreview || logoUrl || ''}
                   alt=""
-                  className="w-6 h-6 rounded object-contain bg-white"
+                  className="w-7 h-7 rounded object-contain bg-white"
                 />
               ) : (
                 <div
-                  className="w-6 h-6 rounded flex items-center justify-center text-[8px] font-bold"
+                  className="w-7 h-7 rounded flex items-center justify-center text-[8px] font-bold"
                   style={{
-                    backgroundColor: 'rgba(255,255,255,0.2)',
-                    color: getOptimalForeground(primaryColor)
+                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    color: getOptimalForeground(sidebarColor)
                   }}
                 >
                   {getInitials(companyName || 'AA')}
                 </div>
               )}
-              <div className="w-4 h-0.5 rounded-full bg-white/30" />
-              <div className="w-4 h-0.5 rounded-full bg-white/20" />
+              {/* Active nav item - uses primaryColor */}
+              <div
+                className="w-7 h-1 rounded-full"
+                style={{ backgroundColor: primaryColor }}
+              />
+              <div className="w-5 h-0.5 rounded-full bg-white/20" />
+              <div className="w-5 h-0.5 rounded-full bg-white/20" />
             </div>
 
             {/* Mini Content Preview */}
             <div className="flex-1 p-2 space-y-1.5">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-16 rounded bg-white/20" />
+                {/* Badge uses primaryColor */}
                 <div
                   className="h-4 px-1.5 rounded text-[7px] flex items-center font-medium"
                   style={{
-                    backgroundColor: secondaryColor,
-                    color: getOptimalForeground(secondaryColor)
+                    backgroundColor: primaryColor,
+                    color: getOptimalForeground(primaryColor)
                   }}
                 >
                   Nuevo
                 </div>
               </div>
               <div className="flex gap-1.5">
-                <div className="flex-1 h-8 rounded bg-white/[0.05] border border-white/10" />
-                <div className="flex-1 h-8 rounded bg-white/[0.05] border border-white/10" />
+                {/* Cards use accentColor border on hover */}
+                <div
+                  className="flex-1 h-8 rounded border"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.03)',
+                    borderColor: 'rgba(255,255,255,0.1)'
+                  }}
+                />
+                <div
+                  className="flex-1 h-8 rounded border-2"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.03)',
+                    borderColor: accentColor
+                  }}
+                />
               </div>
             </div>
           </div>

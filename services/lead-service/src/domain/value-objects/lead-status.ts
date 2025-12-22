@@ -2,17 +2,21 @@ import { ValueObject, Result } from '@zuclubit/domain';
 
 /**
  * Lead Status Value Object
- * Represents the current status in the sales pipeline
+ *
+ * Represents the current status in the sales pipeline.
+ * Simplified to 6 core states that represent the lifecycle of a lead.
+ *
+ * Note: Visual pipeline stages (Kanban columns) are managed separately
+ * via the pipeline_stages table, allowing per-tenant customization.
+ * This enum represents the business logic state machine.
  */
 export enum LeadStatusEnum {
   NEW = 'new',
   CONTACTED = 'contacted',
   QUALIFIED = 'qualified',
   PROPOSAL = 'proposal',
-  NEGOTIATION = 'negotiation',
   WON = 'won',
   LOST = 'lost',
-  UNQUALIFIED = 'unqualified',
 }
 
 interface LeadStatusProps {
@@ -64,6 +68,13 @@ export class LeadStatus extends ValueObject<LeadStatusProps> {
 
   /**
    * Check if transition to new status is valid
+   *
+   * Simplified transition rules:
+   * - NEW → CONTACTED, LOST
+   * - CONTACTED → QUALIFIED, LOST
+   * - QUALIFIED → PROPOSAL, LOST
+   * - PROPOSAL → WON, LOST
+   * - WON/LOST → (terminal, no transitions)
    */
   canTransitionTo(newStatus: LeadStatus): boolean {
     const currentStatus = this.props.value;
@@ -74,32 +85,26 @@ export class LeadStatus extends ValueObject<LeadStatusProps> {
       return false;
     }
 
-    // Define valid transitions
+    // Define valid transitions (simplified linear pipeline)
     const validTransitions: Record<LeadStatusEnum, LeadStatusEnum[]> = {
       [LeadStatusEnum.NEW]: [
         LeadStatusEnum.CONTACTED,
-        LeadStatusEnum.UNQUALIFIED,
         LeadStatusEnum.LOST,
       ],
       [LeadStatusEnum.CONTACTED]: [
         LeadStatusEnum.QUALIFIED,
-        LeadStatusEnum.UNQUALIFIED,
         LeadStatusEnum.LOST,
       ],
       [LeadStatusEnum.QUALIFIED]: [
         LeadStatusEnum.PROPOSAL,
-        LeadStatusEnum.UNQUALIFIED,
         LeadStatusEnum.LOST,
       ],
       [LeadStatusEnum.PROPOSAL]: [
-        LeadStatusEnum.NEGOTIATION,
         LeadStatusEnum.WON,
         LeadStatusEnum.LOST,
       ],
-      [LeadStatusEnum.NEGOTIATION]: [LeadStatusEnum.WON, LeadStatusEnum.LOST],
       [LeadStatusEnum.WON]: [],
       [LeadStatusEnum.LOST]: [],
-      [LeadStatusEnum.UNQUALIFIED]: [],
     };
 
     return validTransitions[currentStatus]?.includes(targetStatus) ?? false;

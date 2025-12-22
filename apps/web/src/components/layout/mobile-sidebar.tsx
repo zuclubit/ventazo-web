@@ -1,30 +1,48 @@
 'use client';
 
 /**
- * Mobile Sidebar Component
+ * Mobile Sidebar Component (Sheet-based)
  *
- * Sheet-based navigation drawer for mobile viewports.
- * Uses SidebarContext for synchronized state management.
+ * Premium drawer navigation for mobile viewports.
+ * Used as a hamburger menu alternative with full navigation access.
  *
  * Features:
- * - Sheet drawer that slides from left
- * - Auto-closes on navigation
- * - Synchronized with desktop sidebar via context
- * - Accessible with proper ARIA labels
- * - Integrated Ventazo brand logo
+ * - Sheet drawer with glass effect
+ * - Dynamic tenant branding
+ * - Smooth animations
+ * - Auto-close on navigation
+ * - WCAG accessible
+ *
+ * Note: For quick access on mobile, use MobileBottomBar instead.
+ * This component is for accessing the full navigation menu.
  *
  * @module components/layout/mobile-sidebar
  */
 
 import * as React from 'react';
-
-import Image from 'next/image';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { Menu } from 'lucide-react';
+import {
+  BarChart3,
+  BookOpen,
+  Building2,
+  Calendar,
+  CheckSquare,
+  FileText,
+  Home,
+  Layers,
+  Mail,
+  Menu,
+  MessageSquare,
+  Settings,
+  Target,
+  Users,
+  Wallet,
+  Workflow,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Sheet,
   SheetContent,
@@ -32,62 +50,114 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 import { useSidebar } from './sidebar-context';
-import { SidebarNav } from './sidebar-nav';
+import { SidebarBrand } from './sidebar-brand';
+import { NavItemPremium, NavSectionHeader } from './nav-item-premium';
 
 // ============================================
-// Mobile Logo Component
+// Types
 // ============================================
 
-interface MobileLogoProps {
-  onClose: () => void;
+interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string | number;
+  isExternal?: boolean;
+  exactMatch?: boolean;
 }
 
-function MobileLogo({ onClose }: MobileLogoProps) {
-  return (
-    <Link
-      className="group flex items-center gap-3 outline-none focus-visible:ring-2 focus-visible:ring-[#5EEAD4] rounded-lg"
-      href="/app"
-      onClick={onClose}
-    >
-      {/* Logo image with organic glow */}
-      <div className="relative shrink-0">
-        {/* Ambient glow - organic shape */}
-        <div
-          className="absolute inset-0 bg-[#0EB58C]/40 blur-lg transition-all group-hover:bg-[#0EB58C]/50 group-hover:blur-xl"
-          style={{ borderRadius: '40% 60% 55% 45% / 55% 45% 55% 45%' }}
-        />
-        {/* Logo image */}
-        <Image
-          priority
-          alt="Ventazo logo"
-          className="relative object-contain drop-shadow-lg transition-transform group-hover:scale-105"
-          height={36}
-          src="/images/hero/logo.png"
-          width={36}
-        />
-      </div>
-      {/* Brand text */}
-      <span className="text-lg font-bold text-white transition-colors group-hover:text-[#5EEAD4]">
-        Ventazo
-      </span>
-    </Link>
-  );
+interface NavSection {
+  id: string;
+  title: string;
+  items: NavItem[];
 }
 
 // ============================================
-// Mobile Sidebar Component
+// Navigation Configuration
+// ============================================
+
+const NAVIGATION: NavSection[] = [
+  {
+    id: 'main',
+    title: 'Principal',
+    items: [
+      { title: 'Dashboard', href: '/app', icon: Home, exactMatch: true },
+      { title: 'Leads', href: '/app/leads', icon: Users },
+      { title: 'Oportunidades', href: '/app/opportunities', icon: Target },
+      { title: 'Clientes', href: '/app/customers', icon: Building2 },
+      { title: 'Tareas', href: '/app/tasks', icon: CheckSquare },
+    ],
+  },
+  {
+    id: 'sales',
+    title: 'Ventas',
+    items: [
+      { title: 'Pipeline', href: '/app/opportunities/pipeline', icon: Layers },
+      { title: 'Cotizaciones', href: '/app/quotes', icon: FileText },
+      { title: 'Facturación', href: '/app/settings/billing', icon: Wallet },
+    ],
+  },
+  {
+    id: 'communication',
+    title: 'Comunicación',
+    items: [
+      { title: 'Email', href: '/app/email', icon: Mail },
+      { title: 'WhatsApp', href: '/app/whatsapp', icon: MessageSquare },
+      { title: 'Calendario', href: '/app/calendar', icon: Calendar },
+    ],
+  },
+  {
+    id: 'automation',
+    title: 'Automatización',
+    items: [
+      { title: 'Workflows', href: '/app/workflows', icon: Workflow },
+      { title: 'Reportes', href: '/app/reports', icon: BarChart3 },
+    ],
+  },
+  {
+    id: 'developers',
+    title: 'Desarrolladores',
+    items: [
+      {
+        title: 'API Docs',
+        href:
+          process.env['NEXT_PUBLIC_API_DOCS_URL'] ||
+          'https://zuclubit-lead-service.fly.dev/reference',
+        icon: BookOpen,
+        isExternal: true,
+      },
+    ],
+  },
+];
+
+// ============================================
+// Main Component
 // ============================================
 
 export function MobileSidebar() {
   const { isMobileOpen, setMobileOpen, isMobile } = useSidebar();
   const pathname = usePathname();
 
+  // Section open state
+  const [openSections, setOpenSections] = React.useState<string[]>([
+    'main',
+    'sales',
+  ]);
+
   // Close sheet on route change
   React.useEffect(() => {
     setMobileOpen(false);
   }, [pathname, setMobileOpen]);
+
+  const toggleSection = (id: string) => {
+    setOpenSections((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
+  };
 
   // Don't render trigger on desktop
   if (!isMobile) {
@@ -98,26 +168,75 @@ export function MobileSidebar() {
     <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>
       <SheetTrigger asChild>
         <Button
-          aria-label="Abrir menú de navegación"
-          className="md:hidden text-[#6B7A7D] hover:text-white hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-[#5EEAD4]"
-          size="icon"
           variant="ghost"
+          size="icon"
+          className={cn(
+            'md:hidden',
+            'text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text-primary)]',
+            'hover:bg-[var(--sidebar-hover-bg)]',
+            'focus-visible:ring-2 focus-visible:ring-[var(--sidebar-active-border)]'
+          )}
+          aria-label="Abrir menú de navegación"
         >
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
       <SheetContent
-        aria-label="Menú de navegación"
-        className="w-64 p-0 bg-[#041A1A]/95 backdrop-blur-xl border-r border-white/[0.06]"
         side="left"
+        className={cn(
+          'w-[280px] p-0',
+          'bg-[var(--sidebar-glass-bg)] backdrop-blur-[var(--sidebar-glass-blur)]',
+          'border-r border-[var(--sidebar-divider)]'
+        )}
+        aria-label="Menú de navegación"
       >
-        <SheetHeader className="border-b border-white/[0.06] px-4 py-4">
-          <SheetTitle className="text-left">
-            <MobileLogo onClose={() => setMobileOpen(false)} />
+        {/* Header with Brand */}
+        <SheetHeader className="border-b border-[var(--sidebar-divider)] px-4 py-4">
+          <SheetTitle asChild>
+            <SidebarBrand isCollapsed={false} />
           </SheetTitle>
         </SheetHeader>
-        <div className="flex h-[calc(100vh-65px)] flex-col">
-          <SidebarNav isCollapsed={false} />
+
+        {/* Navigation */}
+        <ScrollArea className="h-[calc(100vh-140px)]">
+          <TooltipProvider delayDuration={0}>
+            <nav className="space-y-1 py-3" aria-label="Navegación principal">
+              {NAVIGATION.map((section) => (
+                <div key={section.id} className="px-2">
+                  <NavSectionHeader
+                    title={section.title}
+                    isCollapsed={false}
+                    isOpen={openSections.includes(section.id)}
+                    onToggle={() => toggleSection(section.id)}
+                  />
+
+                  {openSections.includes(section.id) && (
+                    <div className="space-y-1">
+                      {section.items.map((item) => (
+                        <NavItemPremium
+                          key={item.href}
+                          {...item}
+                          isCollapsed={false}
+                          onClick={() => setMobileOpen(false)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </nav>
+          </TooltipProvider>
+        </ScrollArea>
+
+        {/* Footer with Settings */}
+        <div className="absolute bottom-0 left-0 right-0 border-t border-[var(--sidebar-divider)] p-3">
+          <NavItemPremium
+            title="Configuración"
+            href="/app/settings"
+            icon={Settings}
+            isCollapsed={false}
+            onClick={() => setMobileOpen(false)}
+          />
         </div>
       </SheetContent>
     </Sheet>
@@ -125,4 +244,3 @@ export function MobileSidebar() {
 }
 
 MobileSidebar.displayName = 'MobileSidebar';
-MobileLogo.displayName = 'MobileLogo';

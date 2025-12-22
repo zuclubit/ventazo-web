@@ -21,6 +21,10 @@ export type { SmartKPICardProps, KPICardGridProps } from './SmartKPICard';
 export { LeadCard } from './LeadCard';
 export type { LeadCardProps } from './LeadCard';
 
+// Lead Card V3 - AI Score Prominence Design
+export { LeadCardV3, LeadCardV3Skeleton, LeadCardV3Overlay } from './LeadCardV3';
+export type { LeadCardV3Props, CardVariant, ScoreLevel, ActionVariant } from './LeadCardV3';
+
 // KPI Dashboard
 export { LeadsKPIDashboard } from './LeadsKPIDashboard';
 export type { LeadsKPIDashboardProps, LeadsFilter } from './LeadsKPIDashboard';
@@ -65,3 +69,7 @@ export {
   KanbanEmptyColumn,
   KanbanSkeleton,
 } from './kanban';
+
+// KPI Bar (Pipeline Dashboard)
+export { LeadsKPIBar } from './LeadsKPIBar';
+export type { LeadsKPIBarProps, KPIFilterType } from './LeadsKPIBar';

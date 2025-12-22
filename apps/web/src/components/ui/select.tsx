@@ -20,14 +20,27 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
+      // Base styles
+      'flex w-full items-center justify-between rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground',
+      // Responsive height - 48px on mobile (touch friendly), 44px on desktop
+      'h-12 sm:h-11',
+      // Responsive padding
+      'px-3 py-2',
+      // Focus states
+      'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+      // Disabled state
+      'disabled:cursor-not-allowed disabled:opacity-50',
+      // Text truncation
+      '[&>span]:line-clamp-1 [&>span]:text-left',
+      // Transition
+      'transition-colors duration-200',
       className
     )}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-50" />
+      <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -124,7 +137,16 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+      // Base styles
+      'relative flex w-full cursor-default select-none items-center rounded-sm text-sm outline-none',
+      // Responsive padding - larger on mobile for touch targets (min 44px height)
+      'py-2.5 sm:py-1.5 pl-8 pr-2',
+      // Focus states
+      'focus:bg-accent focus:text-accent-foreground',
+      // Disabled state
+      'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+      // Transition
+      'transition-colors duration-150',
       className
     )}
     {...props}

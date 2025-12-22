@@ -1,4 +1,4 @@
-import { injectable } from 'tsyringe';
+import { injectable, inject } from 'tsyringe';
 import { Result } from '@zuclubit/domain';
 import { IQueryHandler } from '../common';
 import { GetLeadStatsQuery } from './get-lead-stats.query';
@@ -10,7 +10,7 @@ import { LeadStatsDTO } from '../dtos';
  */
 @injectable()
 export class GetLeadStatsHandler implements IQueryHandler<GetLeadStatsQuery, LeadStatsDTO> {
-  constructor(private readonly leadRepository: ILeadRepository) {}
+  constructor(@inject('ILeadRepository') private readonly leadRepository: ILeadRepository) {}
 
   async execute(query: GetLeadStatsQuery): Promise<Result<LeadStatsDTO>> {
     // Get all leads count

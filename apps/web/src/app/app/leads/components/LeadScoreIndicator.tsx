@@ -1,15 +1,23 @@
 'use client';
 
 /**
- * LeadScoreIndicator Component
+ * LeadScoreIndicator Component - Premium 2025 Redesign
  *
- * Visual indicator for lead score (0-100) with color-coded feedback.
- * Colors: <40 red (cold), 40-70 amber (warm), >70 green (hot)
- * Shows fire emoji for scores >80 (priority leads)
+ * Visual indicator for lead score (0-100) with temperature icons.
+ * - Hot (>=70): Green with Flame icon
+ * - Warm (40-69): Amber with TrendingUp icon
+ * - Cold (<40): Gray-blue with Snowflake icon
+ *
+ * Features tooltips with contextual labels and premium styling.
  */
 
 import * as React from 'react';
-import { Flame } from 'lucide-react';
+import { Flame, TrendingUp, Snowflake } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 // ============================================
@@ -24,7 +32,15 @@ export interface LeadScoreIndicatorProps {
   /** Show temperature label (Frio, Tibio, Caliente) */
   showLabel?: boolean;
   /** Show as compact inline badge */
-  variant?: 'default' | 'compact' | 'badge';
+  variant?: 'default' | 'compact' | 'badge' | 'ai-enhanced';
+  /** Show AI context tooltip with score factors */
+  showAIContext?: boolean;
+  /** Whether lead has recent activity (for AI context) */
+  hasRecentActivity?: boolean;
+  /** Whether lead has a scheduled follow-up (for AI context) */
+  hasFollowUp?: boolean;
+  /** Lead source (for AI context) */
+  source?: string;
   /** Additional CSS classes */
   className?: string;
 }
@@ -49,6 +65,90 @@ function getScoreLabel(category: ScoreCategory): string {
       return 'Tibio';
     case 'hot':
       return 'Caliente';
+  }
+}
+
+function getScoreTooltip(category: ScoreCategory, score: number): string {
+  switch (category) {
+    case 'cold':
+      return `Lead frio (${score}) - Necesita mas nurturing`;
+    case 'warm':
+      return `Lead tibio (${score}) - Buen potencial`;
+    case 'hot':
+      return `Lead caliente (${score}) - Alta probabilidad de conversion`;
+  }
+}
+
+/**
+ * AI Score Context - Explains what factors contribute to the score
+ */
+interface ScoreContext {
+  factors: Array<{
+    label: string;
+    impact: 'positive' | 'negative' | 'neutral';
+    weight: number;
+  }>;
+  recommendation: string;
+}
+
+function getScoreContext(
+  score: number,
+  category: ScoreCategory,
+  hasRecentActivity?: boolean,
+  hasFollowUp?: boolean,
+  source?: string
+): ScoreContext {
+  const factors: ScoreContext['factors'] = [];
+
+  // Score level factor
+  if (score >= 70) {
+    factors.push({ label: 'Score alto', impact: 'positive', weight: 30 });
+  } else if (score >= 40) {
+    factors.push({ label: 'Score medio', impact: 'neutral', weight: 20 });
+  } else {
+    factors.push({ label: 'Score bajo', impact: 'negative', weight: 10 });
+  }
+
+  // Activity factor
+  if (hasRecentActivity) {
+    factors.push({ label: 'Actividad reciente', impact: 'positive', weight: 20 });
+  } else {
+    factors.push({ label: 'Sin actividad reciente', impact: 'negative', weight: -10 });
+  }
+
+  // Follow-up factor
+  if (hasFollowUp) {
+    factors.push({ label: 'Seguimiento programado', impact: 'positive', weight: 15 });
+  }
+
+  // Source factor (organic/referral tend to be higher quality)
+  if (source === 'referral') {
+    factors.push({ label: 'Fuente: Referido', impact: 'positive', weight: 15 });
+  } else if (source === 'organic') {
+    factors.push({ label: 'Fuente: Organico', impact: 'positive', weight: 10 });
+  }
+
+  // Recommendations based on category
+  const recommendations: Record<ScoreCategory, string> = {
+    hot: 'Contactar inmediatamente - alta probabilidad de cierre',
+    warm: 'Nutrir con contenido relevante y agendar llamada',
+    cold: 'Incluir en campana de email automatizada',
+  };
+
+  return {
+    factors,
+    recommendation: recommendations[category],
+  };
+}
+
+function getScoreIcon(category: ScoreCategory) {
+  switch (category) {
+    case 'cold':
+      return Snowflake;
+    case 'warm':
+      return TrendingUp;
+    case 'hot':
+      return Flame;
   }
 }
 
@@ -117,6 +217,10 @@ export function LeadScoreIndicator({
   size = 'md',
   showLabel = true,
   variant = 'default',
+  showAIContext = false,
+  hasRecentActivity,
+  hasFollowUp,
+  source,
   className,
 }: LeadScoreIndicatorProps) {
   // Clamp score to 0-100
@@ -126,24 +230,138 @@ export function LeadScoreIndicator({
   const sizes = sizeConfig[size];
   const isHotLead = normalizedScore >= 80;
 
-  // Compact badge variant (for tables/lists)
-  if (variant === 'badge') {
+  // Calculate AI context if enabled
+  const aiContext = React.useMemo(() => {
+    if (!showAIContext && variant !== 'ai-enhanced') return null;
+    return getScoreContext(normalizedScore, category, hasRecentActivity, hasFollowUp, source);
+  }, [normalizedScore, category, hasRecentActivity, hasFollowUp, source, showAIContext, variant]);
+
+  // AI-Enhanced variant with rich tooltip
+  if (variant === 'ai-enhanced') {
+    const Icon = getScoreIcon(category);
+
     return (
-      <div
-        className={cn(
-          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border',
-          colors.bgClass,
-          colors.borderClass,
-          className
-        )}
-      >
-        {isHotLead && (
-          <Flame className={cn('h-3 w-3', colors.textClass)} />
-        )}
-        <span className={cn('text-xs font-semibold', colors.textClass)}>
-          {normalizedScore}
-        </span>
-      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={cn(
+              // Premium styling with orange for hot leads
+              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full',
+              'cursor-help transition-all duration-200',
+              'border shadow-sm',
+              'hover:scale-105 hover:shadow-md',
+              // Category-specific colors
+              category === 'hot' && 'bg-[var(--brand-warm-bg)] border-[var(--brand-orange)]/40 text-[var(--brand-orange)]',
+              category === 'warm' && 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-400',
+              category === 'cold' && 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-500/10 dark:border-slate-500/30 dark:text-slate-400',
+              className
+            )}
+          >
+            <Icon className={cn(
+              'h-3.5 w-3.5',
+              isHotLead && 'hot-lead-fire'
+            )} />
+            <span className="text-sm font-bold tabular-nums">
+              {normalizedScore}
+            </span>
+            <span className="text-[10px] font-medium opacity-80">
+              {getScoreLabel(category)}
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          className="max-w-[280px] p-3"
+        >
+          <div className="space-y-2">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-sm">
+                Score IA: {normalizedScore}
+              </span>
+              <span className={cn(
+                'text-xs font-medium px-1.5 py-0.5 rounded',
+                category === 'hot' && 'bg-[var(--brand-orange)]/15 text-[var(--brand-orange)]',
+                category === 'warm' && 'bg-amber-100 text-amber-700',
+                category === 'cold' && 'bg-slate-100 text-slate-600'
+              )}>
+                {getScoreLabel(category)}
+              </span>
+            </div>
+
+            {/* Factors */}
+            {aiContext && aiContext.factors.length > 0 && (
+              <div className="space-y-1">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  Factores
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {aiContext.factors.map((factor, idx) => (
+                    <span
+                      key={idx}
+                      className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded',
+                        factor.impact === 'positive' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+                        factor.impact === 'negative' && 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+                        factor.impact === 'neutral' && 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400'
+                      )}
+                    >
+                      {factor.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recommendation */}
+            {aiContext && (
+              <div className="pt-1 border-t border-border/50">
+                <span className="text-[10px] text-muted-foreground">
+                  <strong>Recomendacion:</strong> {aiContext.recommendation}
+                </span>
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  // Premium badge variant with temperature icon and tooltip
+  if (variant === 'badge') {
+    const Icon = getScoreIcon(category);
+    const tooltipText = getScoreTooltip(category, normalizedScore);
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={cn(
+              // Use premium score badge classes
+              category === 'hot' && 'score-badge-hot',
+              category === 'warm' && 'score-badge-warm',
+              category === 'cold' && 'score-badge-cold',
+              // Layout
+              'inline-flex items-center gap-1 px-2 py-0.5 rounded-full',
+              // Interaction
+              'cursor-help transition-all duration-200',
+              'hover:scale-105',
+              className
+            )}
+          >
+            <Icon className={cn(
+              'h-3 w-3',
+              isHotLead && 'animate-pulse'
+            )} />
+            <span className="text-xs font-bold tabular-nums">
+              {normalizedScore}
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          {tooltipText}
+        </TooltipContent>
+      </Tooltip>
     );
   }
 

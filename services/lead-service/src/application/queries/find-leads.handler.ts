@@ -1,4 +1,4 @@
-import { injectable } from 'tsyringe';
+import { injectable, inject } from 'tsyringe';
 import { Result } from '@zuclubit/domain';
 import { IQueryHandler } from '../common';
 import { FindLeadsQuery } from './find-leads.query';
@@ -10,7 +10,7 @@ import { PaginatedLeadsResponseDTO, LeadMapper } from '../dtos';
  */
 @injectable()
 export class FindLeadsHandler implements IQueryHandler<FindLeadsQuery, PaginatedLeadsResponseDTO> {
-  constructor(private readonly leadRepository: ILeadRepository) {}
+  constructor(@inject('ILeadRepository') private readonly leadRepository: ILeadRepository) {}
 
   async execute(query: FindLeadsQuery): Promise<Result<PaginatedLeadsResponseDTO>> {
     const result = await this.leadRepository.findAll({
@@ -34,12 +34,13 @@ export class FindLeadsHandler implements IQueryHandler<FindLeadsQuery, Paginated
 
     const paginatedResult = result.getValue();
 
-    return Result.ok({
-      items: LeadMapper.toResponseDTOArray(paginatedResult.items),
-      total: paginatedResult.total,
-      page: paginatedResult.page,
-      limit: paginatedResult.limit,
-      totalPages: paginatedResult.totalPages,
-    });
+    return Result.ok(
+      LeadMapper.toPaginatedResponse(
+        paginatedResult.items,
+        paginatedResult.total,
+        paginatedResult.page,
+        paginatedResult.limit
+      )
+    );
   }
 }

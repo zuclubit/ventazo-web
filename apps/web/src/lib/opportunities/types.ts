@@ -16,6 +16,17 @@ export type OpportunityPriority = typeof OPPORTUNITY_PRIORITY[number];
 export const OPPORTUNITY_STAGE_TYPE = ['open', 'won', 'lost'] as const;
 export type OpportunityStageType = typeof OPPORTUNITY_STAGE_TYPE[number];
 
+export const OPPORTUNITY_SOURCE = ['lead_conversion', 'direct', 'referral', 'upsell', 'cross_sell'] as const;
+export type OpportunitySource = typeof OPPORTUNITY_SOURCE[number];
+
+export const SOURCE_LABELS: Record<OpportunitySource, string> = {
+  lead_conversion: 'Conversión de Lead',
+  direct: 'Directo',
+  referral: 'Referido',
+  upsell: 'Upsell',
+  cross_sell: 'Cross-sell',
+};
+
 export const OPPORTUNITY_ACTIVITY_TYPE = [
   'created',
   'updated',
@@ -58,7 +69,7 @@ export const PRIORITY_LABELS: Record<OpportunityPriority, string> = {
   low: 'Baja',
   medium: 'Media',
   high: 'Alta',
-  critical: 'Critica',
+  critical: 'Crítica',
 };
 
 export const PRIORITY_COLORS: Record<OpportunityPriority, string> = {
@@ -146,7 +157,8 @@ export interface Opportunity {
   ownerId: string | null;
   teamId?: string | null; // FASE 6.4 — Added for team assignment
   pipelineId: string | null; // FASE 6.4 — Added for pipeline association
-  title: string;
+  name: string; // Backend uses 'name', not 'title'
+  stageLabel?: string | null; // Stage label (string from backend)
   description: string | null;
   stageId: string | null;
   status: OpportunityStatus;
@@ -261,35 +273,41 @@ export interface PipelineView {
 // ============================================
 
 export interface CreateOpportunityData {
-  title: string;
+  name: string; // Backend uses 'name', not 'title'
   description?: string;
   leadId?: string;
   customerId?: string;
   contactId?: string;
   ownerId?: string;
-  stageId?: string;
+  pipelineId?: string;
+  stage: string; // Required: stage label (e.g., "Prospección") - backend requires this
+  stageId?: string; // Optional: for frontend reference
   status?: OpportunityStatus;
   priority?: OpportunityPriority;
   amount?: number;
   currency?: string;
   probability?: number;
   expectedCloseDate?: string;
+  source?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
 }
 
 export interface UpdateOpportunityData {
-  title?: string;
+  name?: string; // Backend uses 'name', not 'title'
   description?: string;
   leadId?: string | null;
   customerId?: string | null;
   contactId?: string | null;
   ownerId?: string | null;
+  pipelineId?: string | null;
+  stage?: string; // Stage label (e.g., "Propuesta") - backend uses this
   priority?: OpportunityPriority;
   amount?: number;
   currency?: string;
   probability?: number;
   expectedCloseDate?: string | null;
+  source?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
 }
@@ -420,7 +438,7 @@ export interface OpportunityFilters {
 }
 
 export interface OpportunitySort {
-  sortBy?: 'title' | 'amount' | 'probability' | 'expectedCloseDate' | 'createdAt' | 'updatedAt';
+  sortBy?: 'name' | 'amount' | 'probability' | 'expectedCloseDate' | 'createdAt' | 'updatedAt';
   sortOrder?: 'asc' | 'desc';
 }
 

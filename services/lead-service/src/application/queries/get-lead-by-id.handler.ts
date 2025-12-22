@@ -1,4 +1,4 @@
-import { injectable } from 'tsyringe';
+import { injectable, inject } from 'tsyringe';
 import { Result } from '@zuclubit/domain';
 import { IQueryHandler } from '../common';
 import { GetLeadByIdQuery } from './get-lead-by-id.query';
@@ -10,7 +10,7 @@ import { LeadResponseDTO, LeadMapper } from '../dtos';
  */
 @injectable()
 export class GetLeadByIdHandler implements IQueryHandler<GetLeadByIdQuery, LeadResponseDTO | null> {
-  constructor(private readonly leadRepository: ILeadRepository) {}
+  constructor(@inject('ILeadRepository') private readonly leadRepository: ILeadRepository) {}
 
   async execute(query: GetLeadByIdQuery): Promise<Result<LeadResponseDTO | null>> {
     const result = await this.leadRepository.findById(query.leadId, query.tenantId);

@@ -1,10 +1,12 @@
 'use client';
 
 /**
- * QuickActionsBar Component
+ * QuickActionsBar Component - Premium 2025 Redesign
  *
  * One-click communication actions for leads.
- * Prioritizes WhatsApp for the Mexican market.
+ * Prioritizes WhatsApp for the LATAM market.
+ * Features premium hover effects and glow states.
+ *
  * Actions: WhatsApp (primary), Call, Email
  */
 
@@ -138,51 +140,61 @@ function ActionButton({
     icon: typeof MessageCircle;
     label: string;
     tooltip: string;
-    className: string;
-    hoverClassName: string;
+    baseClass: string;
+    activeClass: string;
   }> = {
     whatsapp: {
       icon: MessageCircle,
       label: 'WhatsApp',
       tooltip: 'Enviar WhatsApp',
-      className: 'whatsapp-button border-[var(--whatsapp)]',
-      hoverClassName: 'hover:bg-[var(--whatsapp-hover)] hover:border-[var(--whatsapp-hover)]',
+      baseClass: 'quick-action-btn whatsapp',
+      activeClass: 'bg-[#25D366] text-white border-[#25D366] shadow-lg shadow-[#25D366]/30',
     },
     call: {
       icon: Phone,
       label: 'Llamar',
       tooltip: 'Hacer llamada',
-      className: 'bg-[var(--status-info-bg)] status-info-text border-[var(--status-info)]/30',
-      hoverClassName: 'hover:bg-[var(--status-info)]/20 hover:border-[var(--status-info)]/50',
+      baseClass: 'quick-action-btn',
+      activeClass: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30',
     },
     email: {
       icon: Mail,
       label: 'Email',
       tooltip: 'Enviar correo',
-      className: 'bg-muted text-muted-foreground border-border',
-      hoverClassName: 'hover:bg-accent hover:text-accent-foreground',
+      baseClass: 'quick-action-btn',
+      activeClass: 'bg-muted text-muted-foreground border-border/50',
     },
   };
 
-  const { icon: Icon, label, tooltip, className, hoverClassName } = config[action];
+  const { icon: Icon, label, tooltip, baseClass, activeClass } = config[action];
 
   const button = (
     <Button
-      variant="outline"
+      variant="ghost"
       size="icon"
       disabled={disabled}
       onClick={onClick}
       className={cn(
         sizes.button,
-        'rounded-full border transition-all duration-200',
-        !disabled && className,
-        !disabled && hoverClassName,
-        disabled && 'opacity-40 cursor-not-allowed',
-        action === 'whatsapp' && !disabled && 'shadow-sm shadow-[var(--whatsapp)]/20'
+        // Premium styling
+        'rounded-xl border',
+        'transition-all duration-200',
+        // Apply base class for animations
+        baseClass,
+        // Active styling when enabled
+        !disabled && activeClass,
+        // Special WhatsApp styling
+        action === 'whatsapp' && !disabled && [
+          'bg-[#25D366]/10 text-[#25D366] border-[#25D366]/30',
+          'hover:bg-[#25D366] hover:text-white hover:border-[#25D366]',
+          'hover:shadow-lg hover:shadow-[#25D366]/30',
+        ],
+        // Disabled state
+        disabled && 'opacity-30 cursor-not-allowed hover:scale-100 hover:bg-transparent'
       )}
       aria-label={tooltip}
     >
-      <Icon className={sizes.icon} />
+      <Icon className={cn(sizes.icon, 'transition-transform duration-200')} />
     </Button>
   );
 

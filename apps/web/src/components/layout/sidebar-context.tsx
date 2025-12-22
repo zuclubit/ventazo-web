@@ -76,8 +76,8 @@ export interface SidebarContextValue extends SidebarState, SidebarActions {
 // ============================================
 
 const DEFAULT_CONFIG: SidebarConfig = {
-  collapsedWidth: 64,
-  expandedWidth: 256,
+  collapsedWidth: 72,
+  expandedWidth: 280,
   mobileBreakpoint: '(min-width: 768px)',
   enableKeyboardShortcut: true,
   persistState: true,

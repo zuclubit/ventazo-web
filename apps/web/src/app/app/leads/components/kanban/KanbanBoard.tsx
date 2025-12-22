@@ -1,13 +1,26 @@
 'use client';
 
 /**
- * KanbanBoard Component
+ * KanbanBoard Component - v2.0
  *
- * Main orchestrator component for the Kanban board.
- * Fully responsive with optimized layouts for:
- * - Mobile: Horizontal snap scrolling, full-width columns
- * - Tablet: Scrollable columns, medium width
- * - Desktop: All columns visible, optimal spacing
+ * Main orchestrator for the Kanban board with bulletproof layout.
+ * Uses horizontal flexbox with proper containment for scrolling.
+ *
+ * Layout Architecture:
+ * - Parent (PageContent scroll="horizontal") provides the scroll context
+ * - KanbanBoard is a flex row that MUST fill 100% height of parent
+ * - Columns are fixed-width, flex-shrink-0, with FULL height
+ * - Cards container inside each column has overflow-y-auto
+ *
+ * Responsive Breakpoints:
+ * - Mobile (< 640px): Single column visible, snap scroll
+ * - Tablet (640px - 1023px): 2-3 columns visible
+ * - Desktop (1024px - 1535px): 4-5 columns visible
+ * - 4K (1536px+): All columns visible
+ *
+ * CRITICAL: This component expects to be inside a container with:
+ * - Defined height (h-full or flex-1 with min-h-0)
+ * - overflow-x-auto (PageContent provides this)
  */
 
 import * as React from 'react';
@@ -21,7 +34,7 @@ import { cn } from '@/lib/utils';
 import type { Lead, PipelineColumn } from '@/lib/leads';
 import { useKanbanDragDrop } from '../../hooks/useKanbanDragDrop';
 import { KanbanColumn } from './KanbanColumn';
-import { KanbanCardOverlay } from './KanbanCard';
+import { LeadCardV3Overlay } from '../LeadCardV3';
 
 export interface KanbanBoardProps {
   /** Pipeline columns with leads */
@@ -55,7 +68,6 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const {
     sensors,
-    activeId,
     activeLead,
     overId,
     handleDragStart,
@@ -74,29 +86,31 @@ export function KanbanBoard({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      {/* Board Container - Responsive */}
+      {/*
+        Board Container
+        CRITICAL: Uses inline flex with nowrap to enable horizontal scroll
+        Height is 100% of parent (PageContent)
+      */}
       <div
         className={cn(
-          // Base layout
-          'flex h-full overflow-x-auto overflow-y-hidden',
-          // Responsive gap
+          // CRITICAL: Inline flex to allow horizontal sizing
+          'inline-flex flex-nowrap',
+          // CRITICAL: Fill full height from parent
+          'h-full',
+          // CRITICAL: Min dimensions to allow proper sizing
+          'min-h-0',
+          // Align columns to top (don't stretch column height)
+          'items-stretch',
+          // Gap between columns - responsive
           'gap-3 sm:gap-4 lg:gap-5',
-          // Mobile: Full bleed with padding, snap scrolling
-          '-mx-4 px-4',
-          'sm:-mx-6 sm:px-6',
-          'md:mx-0 md:px-0',
-          // Snap scrolling for mobile
-          'snap-x snap-mandatory',
-          'md:snap-none',
-          // Smooth scrolling
-          'scroll-smooth',
-          // Bottom padding for scrollbar
-          'pb-4',
-          // Hide scrollbar on mobile, show on desktop
-          'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/20',
-          'hover:scrollbar-thumb-muted-foreground/40',
+          // Padding for first/last column visibility
+          'px-3 sm:px-4 lg:px-5',
+          // Bottom padding for visual breathing room
+          'pb-3',
           className
         )}
+        role="region"
+        aria-label="Kanban board"
       >
         {columns.map((column) => (
           <KanbanColumn
@@ -111,9 +125,9 @@ export function KanbanBoard({
         ))}
       </div>
 
-      {/* Drag Overlay - Shows the dragged card */}
+      {/* Drag Overlay - Shows the dragged card with AI Score */}
       <DragOverlay dropAnimation={null}>
-        {activeLead && <KanbanCardOverlay lead={activeLead} />}
+        {activeLead && <LeadCardV3Overlay lead={activeLead} />}
       </DragOverlay>
     </DndContext>
   );

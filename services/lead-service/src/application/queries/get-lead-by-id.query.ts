@@ -1,10 +1,10 @@
 import { IQuery } from '../common';
-import { LeadDTO } from '../dtos';
+import { LeadResponseDTO } from '../dtos';
 
 /**
  * Query to get a lead by ID
  */
-export class GetLeadByIdQuery implements IQuery<LeadDTO | null> {
+export class GetLeadByIdQuery implements IQuery<LeadResponseDTO | null> {
   readonly type = 'GetLeadByIdQuery';
 
   constructor(

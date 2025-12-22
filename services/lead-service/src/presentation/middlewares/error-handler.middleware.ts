@@ -1,5 +1,9 @@
 import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { getCorrelationId } from './correlation-id.middleware';
+import { HttpError } from './validation.middleware';
+
+// Re-export HttpError so it can be imported from this file
+export { HttpError };
 
 /**
  * Error categories for better error handling and monitoring
@@ -43,19 +47,75 @@ interface ErrorResponse {
  * - Stack traces in development only
  */
 export function errorHandler(
-  error: FastifyError,
+  error: FastifyError | HttpError | Error,
   request: FastifyRequest,
   reply: FastifyReply
 ): void {
   const correlationId = getCorrelationId(request);
   const { method, url } = request;
 
+  // Handle ZodError specifically (validation errors from schema parsing)
+  if (error.name === 'ZodError') {
+    const response: ErrorResponse = {
+      statusCode: 400,
+      error: 'Validation Error',
+      message: 'Request validation failed',
+      category: ErrorCategory.VALIDATION,
+      correlationId,
+      timestamp: new Date().toISOString(),
+      path: url,
+      details: (error as any).issues || (error as any).errors,
+    };
+
+    request.log.warn({
+      correlationId,
+      statusCode: 400,
+      method,
+      url,
+      error: error.message,
+    }, 'Validation error occurred');
+
+    reply.status(400).send(response);
+    return;
+  }
+
+  // Handle HttpError specifically (thrown by getTenantId, getUserId, etc.)
+  if (error instanceof HttpError) {
+    const response: ErrorResponse = {
+      statusCode: error.statusCode,
+      error: error.error,
+      message: error.message,
+      category: ErrorCategory.VALIDATION,
+      correlationId,
+      timestamp: new Date().toISOString(),
+      path: url,
+    };
+
+    if (error.details) {
+      response.details = error.details;
+    }
+
+    request.log.warn({
+      correlationId,
+      statusCode: error.statusCode,
+      method,
+      url,
+      error: error.message,
+    }, 'HTTP error occurred');
+
+    reply.status(error.statusCode).send(response);
+    return;
+  }
+
+  // Cast to FastifyError for standard handling
+  const fastifyError = error as FastifyError;
+
   // Determine error category and status code
-  const category = categorizeError(error);
-  const statusCode = error.statusCode || getStatusCodeForCategory(category);
+  const category = categorizeError(fastifyError);
+  const statusCode = fastifyError.statusCode || getStatusCodeForCategory(category);
 
   // Sanitize error message for production
-  const message = sanitizeErrorMessage(error, category);
+  const message = sanitizeErrorMessage(fastifyError, category);
 
   // Log error with full context
   const logContext = {

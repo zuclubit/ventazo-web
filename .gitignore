@@ -61,3 +61,9 @@ temp/
 .turbo/
 *.tsbuildinfo
 .eslintcache
+
+/src/generated/prisma
+
+# Ignored folders
+ktor/
+design/

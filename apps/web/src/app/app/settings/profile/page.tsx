@@ -3,7 +3,8 @@
 import * as React from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Camera, Loader2, Save } from 'lucide-react';
+import { Camera, Loader2, Moon, Save, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -12,7 +13,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { useUserManagement, ROLE_LABELS, ROLE_COLORS } from '@/lib/users';
 import { useAuthStore } from '@/store';
 
@@ -34,6 +37,8 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
   const user = useAuthStore((state) => state.user);
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
   const {
     profile,
     isProfileLoading,
@@ -46,6 +51,11 @@ export default function ProfilePage() {
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [saveMessage, setSaveMessage] = React.useState<string | null>(null);
+
+  // Avoid hydration mismatch for theme
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Form
   const {
@@ -345,6 +355,88 @@ export default function ProfilePage() {
                 <p className="text-sm text-muted-foreground">Sin permisos asignados</p>
               )}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Appearance Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Apariencia</CardTitle>
+          <CardDescription>
+            Personaliza la apariencia de la aplicacion
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Theme Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="theme-toggle" className="text-base font-medium">
+                Modo Oscuro
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Activa el modo oscuro para reducir la fatiga visual
+              </p>
+            </div>
+            {mounted && (
+              <div className="flex items-center gap-3">
+                <Sun className="h-4 w-4 text-muted-foreground" />
+                <Switch
+                  id="theme-toggle"
+                  checked={theme === 'dark'}
+                  onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+                />
+                <Moon className="h-4 w-4 text-muted-foreground" />
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Theme Options */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Seleccionar Tema</Label>
+            <div className="grid grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => setTheme('light')}
+                className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all hover:bg-accent ${
+                  theme === 'light' ? 'border-primary bg-accent' : 'border-transparent bg-muted/50'
+                }`}
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm">
+                  <Sun className="h-5 w-5 text-amber-500" />
+                </div>
+                <span className="text-sm font-medium">Claro</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme('dark')}
+                className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all hover:bg-accent ${
+                  theme === 'dark' ? 'border-primary bg-accent' : 'border-transparent bg-muted/50'
+                }`}
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800 shadow-sm">
+                  <Moon className="h-5 w-5 text-slate-300" />
+                </div>
+                <span className="text-sm font-medium">Oscuro</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme('system')}
+                className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all hover:bg-accent ${
+                  theme === 'system' ? 'border-primary bg-accent' : 'border-transparent bg-muted/50'
+                }`}
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-white to-slate-800 shadow-sm">
+                  <div className="h-4 w-4 rounded-full bg-primary" />
+                </div>
+                <span className="text-sm font-medium">Sistema</span>
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              El tema &quot;Sistema&quot; sigue la configuracion de tu dispositivo
+            </p>
           </div>
         </CardContent>
       </Card>

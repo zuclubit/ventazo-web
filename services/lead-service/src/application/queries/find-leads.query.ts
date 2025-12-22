@@ -19,7 +19,7 @@ export class FindLeadsQuery implements IQuery<PaginatedLeadsResponseDTO> {
     public readonly minScore?: number,
     public readonly maxScore?: number,
     public readonly searchTerm?: string,
-    public readonly sortBy?: string,
+    public readonly sortBy?: 'createdAt' | 'updatedAt' | 'score' | 'companyName',
     public readonly sortOrder?: 'asc' | 'desc'
   ) {}
 }

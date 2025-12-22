@@ -10,6 +10,9 @@ export class AssignLeadCommand implements ICommand {
     public readonly leadId: string,
     public readonly tenantId: string,
     public readonly ownerId: string,
-    public readonly assignedBy: string
+    public readonly assignedBy: string,
+    // Email notification fields
+    public readonly assigneeEmail?: string,
+    public readonly assigneeName?: string
   ) {}
 }

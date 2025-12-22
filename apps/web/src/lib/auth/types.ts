@@ -321,18 +321,190 @@ export interface AuthUser {
   createdAt: string;
 }
 
-// Plan types
+// ============================================
+// Plan Types
+// ============================================
+
+/** Available subscription plan tiers */
 export type PlanTier = 'free' | 'starter' | 'pro' | 'enterprise';
 
-// Tenant interface
+/** Plan tier hierarchy for feature comparison */
+export const PLAN_HIERARCHY: readonly PlanTier[] = ['free', 'starter', 'pro', 'enterprise'] as const;
+
+// ============================================
+// Tenant Branding Types
+// ============================================
+
+/** Valid hex color pattern (3, 4, 6, or 8 characters) */
+export const HEX_COLOR_REGEX = /^#([A-Fa-f0-9]{3,4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/;
+
+/** Valid URL pattern for logos/assets */
+export const ASSET_URL_REGEX = /^(https?:\/\/|\/)[^\s<>"{}|\\^`[\]]*$/;
+
+/**
+ * Tenant branding configuration
+ * Stores visual customization settings for white-labeling
+ */
+/**
+ * Tenant Branding Configuration
+ *
+ * Supports 2-4 colors with semantic roles:
+ * - sidebarColor: Navigation/sidebar background (required, dark professional tone)
+ * - primaryColor: Main brand color for buttons, CTAs, active states (required)
+ * - accentColor: Highlights, links, hover effects (optional, derived from primary if not set)
+ * - surfaceColor: Cards, dropdowns, secondary backgrounds (optional, derived from sidebar if not set)
+ *
+ * @example Cuervo palette:
+ * {
+ *   sidebarColor: '#002050',  // Dark navy - professional sidebar
+ *   primaryColor: '#D4A574',  // Warm gold - main actions
+ *   accentColor: '#8B6914',   // Amber - highlights
+ *   surfaceColor: '#0A1628',  // Darker navy - surfaces
+ * }
+ */
+export interface TenantBranding {
+  /** Sidebar/navigation background color (dark, professional tone) */
+  sidebarColor?: string;
+  /** Main brand color for buttons, CTAs, active states */
+  primaryColor?: string;
+  /** Accent color for highlights, links, hover effects */
+  accentColor?: string;
+  /** Surface color for cards, dropdowns, secondary backgrounds */
+  surfaceColor?: string;
+  /** @deprecated Use sidebarColor instead. Kept for backward compatibility */
+  secondaryColor?: string;
+  /** Logo path or URL (relative or absolute) */
+  logo?: string;
+  /** Alternative logo URL field (for compatibility) */
+  logoUrl?: string;
+  /** Favicon path or URL */
+  favicon?: string;
+}
+
+/**
+ * Business hours schedule for a single day
+ */
+export interface BusinessDaySchedule {
+  open: string;  // Format: "HH:mm"
+  close: string; // Format: "HH:mm"
+}
+
+/**
+ * Tenant metadata structure
+ * Contains configuration, preferences, and feature flags
+ */
+export interface TenantMetadata {
+  /** Branding customization settings */
+  branding?: TenantBranding;
+  /** Enabled modules/features map */
+  modules?: Record<string, boolean>;
+  /** Business hours configuration */
+  businessHours?: {
+    timezone?: string;
+    schedule?: Record<string, BusinessDaySchedule>;
+  };
+  /** Whether onboarding flow is completed */
+  onboardingCompleted?: boolean;
+  /** Extensible for future metadata */
+  [key: string]: unknown;
+}
+
+/**
+ * Tenant entity representing a customer organization
+ * Supports multi-tenant SaaS architecture
+ */
 export interface Tenant {
+  /** Unique tenant identifier (UUID) */
   id: string;
+  /** Display name of the organization */
   name: string;
+  /** URL-friendly slug for routing */
   slug: string;
+  /** Current subscription plan */
   plan: PlanTier;
+  /** Whether tenant account is active */
   isActive: boolean;
+  /** Legacy settings object (deprecated, use metadata) */
   settings?: Record<string, unknown>;
+  /** Structured metadata with branding, modules, etc. */
+  metadata?: TenantMetadata;
+  /** ISO timestamp of tenant creation */
   createdAt: string;
+}
+
+// ============================================
+// Type Guards & Validators
+// ============================================
+
+/**
+ * Validates if a string is a valid hex color
+ * @param color - Color string to validate
+ * @returns True if valid hex color format
+ */
+export function isValidHexColor(color: unknown): color is string {
+  return typeof color === 'string' && HEX_COLOR_REGEX.test(color);
+}
+
+/**
+ * Validates if a string is a valid asset URL
+ * @param url - URL string to validate
+ * @returns True if valid URL format for assets
+ */
+export function isValidAssetUrl(url: unknown): url is string {
+  if (typeof url !== 'string' || !url.trim()) return false;
+  return ASSET_URL_REGEX.test(url);
+}
+
+/**
+ * Type guard for TenantBranding
+ * @param obj - Object to validate
+ * @returns True if object matches TenantBranding shape
+ */
+export function isTenantBranding(obj: unknown): obj is TenantBranding {
+  if (!obj || typeof obj !== 'object') return false;
+  const branding = obj as Record<string, unknown>;
+
+  // All fields are optional, but if present must be valid
+  if (branding['primaryColor'] !== undefined && !isValidHexColor(branding['primaryColor'])) {
+    return false;
+  }
+  if (branding['secondaryColor'] !== undefined && !isValidHexColor(branding['secondaryColor'])) {
+    return false;
+  }
+  if (branding['logo'] !== undefined && !isValidAssetUrl(branding['logo'])) {
+    return false;
+  }
+  if (branding['logoUrl'] !== undefined && !isValidAssetUrl(branding['logoUrl'])) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Sanitizes a hex color string for safe usage
+ * @param color - Color string to sanitize
+ * @param fallback - Fallback color if invalid
+ * @returns Sanitized hex color or fallback
+ */
+export function sanitizeHexColor(color: unknown, fallback: string): string {
+  if (isValidHexColor(color)) {
+    return color.toUpperCase();
+  }
+  return fallback;
+}
+
+/**
+ * Sanitizes a URL for safe usage in src attributes
+ * @param url - URL to sanitize
+ * @param fallback - Fallback URL if invalid
+ * @returns Sanitized URL or fallback
+ */
+export function sanitizeAssetUrl(url: unknown, fallback: string): string {
+  if (isValidAssetUrl(url)) {
+    return url;
+  }
+  return fallback;
 }
 
 // Tenant membership

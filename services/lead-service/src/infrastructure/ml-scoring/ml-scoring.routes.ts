@@ -1,0 +1,664 @@
+/**
+ * ML Scoring Routes
+ * REST API endpoints for ML-based lead scoring
+ */
+import { FastifyPluginAsync } from 'fastify';
+import { container } from 'tsyringe';
+import { z } from 'zod';
+import { toJsonSchema } from '../../utils/zod-schema';
+import { MLScoringService } from './ml-scoring.service';
+
+// Validation schemas
+const ScoreLeadSchema = z.object({
+  leadId: z.string().uuid(),
+  features: z.object({
+    companySize: z.string().optional(),
+    industry: z.string().optional(),
+    jobTitle: z.string().optional(),
+    location: z.string().optional(),
+    emailOpens: z.number().optional(),
+    emailClicks: z.number().optional(),
+    websiteVisits: z.number().optional(),
+    pageViews: z.number().optional(),
+    formSubmissions: z.number().optional(),
+    contentDownloads: z.number().optional(),
+    webinarAttendance: z.number().optional(),
+    demoRequests: z.number().optional(),
+    daysSinceFirstTouch: z.number().optional(),
+    daysSinceLastActivity: z.number().optional(),
+    totalTouchpoints: z.number().optional(),
+    averageSessionDuration: z.number().optional(),
+    socialEngagements: z.number().optional(),
+    revenue: z.number().optional(),
+    employeeCount: z.number().optional(),
+    fundingStage: z.string().optional(),
+    techStack: z.array(z.string()).optional(),
+    pricingPageViews: z.number().optional(),
+    competitorMentions: z.number().optional(),
+    searchKeywords: z.array(z.string()).optional(),
+    previousPurchases: z.number().optional(),
+    lifetimeValue: z.number().optional(),
+    referralSource: z.string().optional(),
+  }).optional(),
+});
+
+const BatchScoreSchema = z.object({
+  leadIds: z.array(z.string().uuid()).min(1).max(1000),
+});
+
+const PriorityQueueSchema = z.object({
+  minScore: z.number().min(0).max(100).optional(),
+  maxCount: z.number().min(1).max(500).optional(),
+  includeGrades: z.array(z.enum(['A', 'B', 'C', 'D', 'F'])).optional(),
+});
+
+const ScoringRuleSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  condition: z.object({
+    field: z.string(),
+    operator: z.enum([
+      'equals', 'not_equals', 'contains', 'not_contains',
+      'greater_than', 'less_than', 'in', 'not_in', 'between',
+      'exists', 'not_exists',
+    ]),
+    value: z.unknown(),
+    logic: z.enum(['and', 'or']).optional(),
+    nested: z.array(z.lazy(() => z.object({}))).optional(),
+  }),
+  points: z.number().min(-100).max(100),
+  category: z.string().optional(),
+  isActive: z.boolean().optional(),
+  priority: z.number().optional(),
+});
+
+const ICPProfileSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  attributes: z.array(z.object({
+    field: z.string(),
+    idealValues: z.array(z.unknown()),
+    weight: z.number().min(0).max(1),
+    matchType: z.enum(['exact', 'range', 'contains', 'similarity']),
+  })),
+  weight: z.number().min(0).max(1).optional(),
+  isActive: z.boolean().optional(),
+  matchThreshold: z.number().min(0).max(100).optional(),
+});
+
+const ABTestSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  controlModelId: z.string(),
+  treatmentModelId: z.string(),
+  splitPercentage: z.number().min(1).max(99),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime().optional(),
+});
+
+const RealTimeEventSchema = z.object({
+  leadId: z.string().uuid(),
+  eventType: z.string(),
+  eventData: z.record(z.unknown()),
+});
+
+const RecalculateSchema = z.object({
+  leadIds: z.array(z.string().uuid()).optional(),
+  filters: z.record(z.unknown()).optional(),
+  modelId: z.string().optional(),
+  force: z.boolean().optional(),
+  async: z.boolean().optional(),
+});
+
+export const mlScoringRoutes: FastifyPluginAsync = async (fastify) => {
+  const service = container.resolve(MLScoringService);
+
+  // Score a single lead
+  fastify.post('/score', {
+    schema: {
+      description: 'Score a lead using ML model',
+      tags: ['ML Scoring'],
+      body: toJsonSchema(ScoreLeadSchema),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { leadId, features } = request.body as z.infer<typeof ScoreLeadSchema>;
+
+      const result = await service.scoreLead(tenantId, leadId, features);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Get score for a lead
+  fastify.get('/score/:leadId', {
+    schema: {
+      description: 'Get score for a specific lead',
+      tags: ['ML Scoring'],
+      params: { type: 'object', properties: { leadId: { type: 'string', format: 'uuid' } }, required: ['leadId'] },
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { leadId } = request.params as { leadId: string };
+
+      const result = await service.scoreLead(tenantId, leadId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Batch score leads
+  fastify.post('/score/batch', {
+    schema: {
+      description: 'Score multiple leads in batch',
+      tags: ['ML Scoring'],
+      body: toJsonSchema(BatchScoreSchema),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { leadIds } = request.body as z.infer<typeof BatchScoreSchema>;
+
+      const result = await service.batchScoreLeads(tenantId, leadIds);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Recalculate scores
+  fastify.post('/score/recalculate', {
+    schema: {
+      description: 'Recalculate scores for leads',
+      tags: ['ML Scoring'],
+      body: toJsonSchema(RecalculateSchema),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const body = request.body as z.infer<typeof RecalculateSchema>;
+
+      const result = await service.recalculateScores(tenantId, body);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Get priority queue
+  fastify.get('/priority-queue', {
+    schema: {
+      description: 'Get priority queue of high-scoring leads',
+      tags: ['ML Scoring'],
+      querystring: toJsonSchema(PriorityQueueSchema),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const options = request.query as z.infer<typeof PriorityQueueSchema>;
+
+      const result = await service.getPriorityQueue(tenantId, options);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Get score history
+  fastify.get('/history/:leadId', {
+    schema: {
+      description: 'Get score history for a lead',
+      tags: ['ML Scoring'],
+      params: { type: 'object', properties: { leadId: { type: 'string', format: 'uuid' } }, required: ['leadId'] },
+      querystring: toJsonSchema(z.object({
+        limit: z.coerce.number().optional(),
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      })),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { leadId } = request.params as { leadId: string };
+      const options = request.query as { limit?: number; startDate?: string; endDate?: string };
+
+      const result = await service.getScoreHistory(tenantId, leadId, {
+        limit: options.limit,
+        startDate: options.startDate ? new Date(options.startDate) : undefined,
+        endDate: options.endDate ? new Date(options.endDate) : undefined,
+      });
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Get predictive insights
+  fastify.get('/insights/:leadId', {
+    schema: {
+      description: 'Get predictive insights for a lead',
+      tags: ['ML Scoring'],
+      params: { type: 'object', properties: { leadId: { type: 'string', format: 'uuid' } }, required: ['leadId'] },
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { leadId } = request.params as { leadId: string };
+
+      const result = await service.getPredictiveInsights(tenantId, leadId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Compare model scores
+  fastify.get('/compare/:leadId', {
+    schema: {
+      description: 'Compare scores from different models',
+      tags: ['ML Scoring'],
+      params: { type: 'object', properties: { leadId: { type: 'string', format: 'uuid' } }, required: ['leadId'] },
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { leadId } = request.params as { leadId: string };
+
+      const result = await service.compareModelScores(tenantId, leadId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Handle real-time event
+  fastify.post('/events', {
+    schema: {
+      description: 'Handle real-time scoring event',
+      tags: ['ML Scoring'],
+      body: toJsonSchema(RealTimeEventSchema),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { leadId, eventType, eventData } = request.body as z.infer<typeof RealTimeEventSchema>;
+
+      const result = await service.handleRealTimeEvent(
+        tenantId,
+        leadId,
+        eventType,
+        eventData
+      );
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Get score distribution
+  fastify.get('/distribution', {
+    schema: {
+      description: 'Get score distribution analytics',
+      tags: ['ML Scoring'],
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+
+      const result = await service.getScoreDistribution(tenantId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Get dashboard
+  fastify.get('/dashboard', {
+    schema: {
+      description: 'Get ML scoring dashboard',
+      tags: ['ML Scoring'],
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+
+      const result = await service.getDashboard(tenantId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // === Model Management ===
+
+  // Get models
+  fastify.get('/models', {
+    schema: {
+      description: 'Get all scoring models',
+      tags: ['ML Scoring - Models'],
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+
+      const result = await service.getModelConfig(tenantId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Get model by ID
+  fastify.get('/models/:modelId', {
+    schema: {
+      description: 'Get specific model configuration',
+      tags: ['ML Scoring - Models'],
+      params: toJsonSchema(z.object({ modelId: z.string() })),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { modelId } = request.params as { modelId: string };
+
+      const result = await service.getModelConfig(tenantId, modelId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Get model metrics
+  fastify.get('/models/:modelId/metrics', {
+    schema: {
+      description: 'Get model performance metrics',
+      tags: ['ML Scoring - Models'],
+      params: toJsonSchema(z.object({ modelId: z.string() })),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { modelId } = request.params as { modelId: string };
+
+      const result = await service.getModelMetrics(tenantId, modelId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Train model
+  fastify.post('/models/:modelId/train', {
+    schema: {
+      description: 'Trigger model training',
+      tags: ['ML Scoring - Models'],
+      params: toJsonSchema(z.object({ modelId: z.string() })),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { modelId } = request.params as { modelId: string };
+
+      const result = await service.trainModel(tenantId, modelId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // === Scoring Rules ===
+
+  // Get scoring rules
+  fastify.get('/rules', {
+    schema: {
+      description: 'Get all scoring rules',
+      tags: ['ML Scoring - Rules'],
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+
+      const result = await service.getScoringRules(tenantId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Create/update scoring rule
+  fastify.post('/rules', {
+    schema: {
+      description: 'Create or update scoring rule',
+      tags: ['ML Scoring - Rules'],
+      body: toJsonSchema(ScoringRuleSchema),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const rule = request.body as z.infer<typeof ScoringRuleSchema>;
+
+      const result = await service.upsertScoringRule(tenantId, rule);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Delete scoring rule
+  fastify.delete('/rules/:ruleId', {
+    schema: {
+      description: 'Delete scoring rule',
+      tags: ['ML Scoring - Rules'],
+      params: toJsonSchema(z.object({ ruleId: z.string() })),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { ruleId } = request.params as { ruleId: string };
+
+      const result = await service.deleteScoringRule(tenantId, ruleId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(204).send();
+    },
+  });
+
+  // === ICP (Ideal Customer Profile) ===
+
+  // Get ICP profiles
+  fastify.get('/icp', {
+    schema: {
+      description: 'Get all ICP profiles',
+      tags: ['ML Scoring - ICP'],
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+
+      const result = await service.getICPProfiles(tenantId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Create ICP profile
+  fastify.post('/icp', {
+    schema: {
+      description: 'Create ICP profile',
+      tags: ['ML Scoring - ICP'],
+      body: toJsonSchema(ICPProfileSchema),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const profile = request.body as z.infer<typeof ICPProfileSchema>;
+
+      const result = await service.createICPProfile(tenantId, {
+        ...profile,
+        description: profile.description || '',
+        weight: profile.weight || 1,
+        isActive: profile.isActive ?? true,
+        matchThreshold: profile.matchThreshold || 60,
+      });
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(201).send(result.value);
+    },
+  });
+
+  // Match lead to ICP
+  fastify.post('/icp/match', {
+    schema: {
+      description: 'Match lead against ICP profiles',
+      tags: ['ML Scoring - ICP'],
+      body: toJsonSchema(z.object({
+        leadId: z.string().uuid(),
+        features: z.record(z.unknown()).optional(),
+      })),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { leadId, features } = request.body as { leadId: string; features?: Record<string, unknown> };
+
+      const result = await service.matchLeadToICP(tenantId, leadId, features || {});
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // === A/B Testing ===
+
+  // Get A/B tests
+  fastify.get('/ab-tests', {
+    schema: {
+      description: 'Get all A/B tests',
+      tags: ['ML Scoring - A/B Testing'],
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+
+      const result = await service.getABTests(tenantId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Create A/B test
+  fastify.post('/ab-tests', {
+    schema: {
+      description: 'Create A/B test',
+      tags: ['ML Scoring - A/B Testing'],
+      body: toJsonSchema(ABTestSchema),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const test = request.body as z.infer<typeof ABTestSchema>;
+
+      const result = await service.createABTest(tenantId, {
+        ...test,
+        startDate: new Date(test.startDate),
+        endDate: test.endDate ? new Date(test.endDate) : undefined,
+      });
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(201).send(result.value);
+    },
+  });
+
+  // Start A/B test
+  fastify.post('/ab-tests/:testId/start', {
+    schema: {
+      description: 'Start A/B test',
+      tags: ['ML Scoring - A/B Testing'],
+      params: toJsonSchema(z.object({ testId: z.string() })),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { testId } = request.params as { testId: string };
+
+      const result = await service.startABTest(tenantId, testId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+
+  // Stop A/B test
+  fastify.post('/ab-tests/:testId/stop', {
+    schema: {
+      description: 'Stop A/B test and get results',
+      tags: ['ML Scoring - A/B Testing'],
+      params: toJsonSchema(z.object({ testId: z.string() })),
+    },
+    handler: async (request, reply) => {
+      const tenantId = (request.headers['x-tenant-id'] as string) || 'default';
+      const { testId } = request.params as { testId: string };
+
+      const result = await service.stopABTest(tenantId, testId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(200).send(result.value);
+    },
+  });
+};

@@ -227,7 +227,7 @@ export async function createSession(payload: Omit<SessionPayload, 'iat' | 'exp' 
   const now = Math.floor(Date.now() / 1000);
   const expiresAtDate = new Date(Date.now() + SESSION_DURATION_MS);
 
-  console.log('[createSession] Starting session creation for:', payload.email);
+  console.log('[createSession] Starting session creation for:', payload['email']);
 
   const sessionPayload: Omit<SessionPayload, 'iat' | 'exp'> = {
     ...payload,

@@ -1,0 +1,74 @@
+# =============================================================================
+# Google Cloud Ignore - Lead Service
+# Files to exclude when uploading to Cloud Build
+# =============================================================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Dependencies (will be installed in Docker)
+node_modules
+
+# Build outputs (will be built in Docker)
+dist
+build
+.next
+.nuxt
+.cache
+
+# Environment files (secrets managed separately)
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+coverage
+.nyc_output
+*.test.ts
+*.spec.ts
+**/__tests__
+**/__mocks__
+src/test
+
+# Documentation
+*.md
+docs
+!README.md
+
+# CI/CD (not needed in container)
+.github
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+
+# Local development files
+docker-compose*.yml
+*.postman_collection.json
+*.postman_environment.json
+
+# TypeScript config (not needed at runtime)
+tsconfig.tsbuildinfo
+
+# Drizzle migrations (run separately)
+drizzle
+
+# Scripts and utilities
+scripts
+*.sh
+*.py
+*.js
+!dist/**/*.js
+
+# Reports and analysis
+*_REPORT.md
+*_GUIDE.md

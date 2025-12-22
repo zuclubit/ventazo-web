@@ -124,10 +124,12 @@ export function useOpportunityKanban(
             );
             if (oppIndex !== -1) {
               [movedOpportunity] = sourceColumn.opportunities.splice(oppIndex, 1);
-              // Recalculate totals
-              sourceColumn.totalAmount -= movedOpportunity.amount;
-              sourceColumn.totalForecast -=
-                (movedOpportunity.amount * movedOpportunity.probability) / 100;
+              // Recalculate totals (only if opportunity was found)
+              if (movedOpportunity) {
+                sourceColumn.totalAmount -= movedOpportunity.amount;
+                sourceColumn.totalForecast -=
+                  (movedOpportunity.amount * movedOpportunity.probability) / 100;
+              }
             }
           }
 

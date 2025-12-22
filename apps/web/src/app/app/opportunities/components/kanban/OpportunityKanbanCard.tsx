@@ -170,7 +170,8 @@ export function OpportunityKanbanCard({
     transition,
   };
 
-  const priority = priorityConfig[opportunity.priority] || priorityConfig.medium;
+  const defaultPriority = { label: 'Media', className: 'bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300' };
+  const priority = priorityConfig[opportunity.priority] ?? defaultPriority;
   const closeDateInfo = getCloseDateInfo(opportunity.expectedCloseDate);
   const isOpen = opportunity.status === 'open';
 
@@ -239,7 +240,7 @@ export function OpportunityKanbanCard({
         {/* Title & Customer */}
         <div className="flex-1 min-w-0">
           <h3 className="font-medium text-sm leading-tight line-clamp-2 text-foreground">
-            {opportunity.title}
+            {opportunity.name}
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">
             {opportunity.customer?.name || opportunity.lead?.fullName || 'Sin cliente asignado'}

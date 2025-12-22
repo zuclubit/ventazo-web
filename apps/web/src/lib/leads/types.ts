@@ -1,16 +1,20 @@
 // ============================================
-// Lead Types - FASE 5.3
+// Lead Types - FASE 5.3 + Dynamic Stages
 // ============================================
 
-// Lead Status
+// Lead Status - Core states for business logic
+// These represent the actual state of a lead in the sales process
 export enum LeadStatus {
   NEW = 'new',
   CONTACTED = 'contacted',
   QUALIFIED = 'qualified',
-  UNQUALIFIED = 'unqualified',
-  CONVERTED = 'converted',
-  ARCHIVED = 'archived',
+  PROPOSAL = 'proposal',
+  WON = 'won',
+  LOST = 'lost',
 }
+
+// Score Category - returned by backend
+export type ScoreCategory = 'hot' | 'warm' | 'cold';
 
 // Lead Source
 export enum LeadSource {
@@ -23,23 +27,117 @@ export enum LeadSource {
   OTHER = 'other',
 }
 
-// Display Labels
+// Display Labels for Status
 export const STATUS_LABELS: Record<LeadStatus, string> = {
   [LeadStatus.NEW]: 'Nuevo',
   [LeadStatus.CONTACTED]: 'Contactado',
   [LeadStatus.QUALIFIED]: 'Calificado',
-  [LeadStatus.UNQUALIFIED]: 'No Calificado',
-  [LeadStatus.CONVERTED]: 'Convertido',
-  [LeadStatus.ARCHIVED]: 'Archivado',
+  [LeadStatus.PROPOSAL]: 'Propuesta',
+  [LeadStatus.WON]: 'Ganado',
+  [LeadStatus.LOST]: 'Perdido',
 };
 
 export const STATUS_COLORS: Record<LeadStatus, string> = {
   [LeadStatus.NEW]: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
   [LeadStatus.CONTACTED]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-  [LeadStatus.QUALIFIED]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  [LeadStatus.UNQUALIFIED]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-  [LeadStatus.CONVERTED]: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-  [LeadStatus.ARCHIVED]: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300',
+  [LeadStatus.QUALIFIED]: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
+  [LeadStatus.PROPOSAL]: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300',
+  [LeadStatus.WON]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+  [LeadStatus.LOST]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+};
+
+// ============================================
+// Default Pipeline Stages (4 Core Stages)
+// These are the default Kanban columns
+// Users can add custom stages between these
+// ============================================
+
+export interface DefaultStageConfig {
+  id: string;
+  label: string;
+  color: string;
+  order: number;
+  isDefault: boolean;
+  description: string;
+}
+
+export const DEFAULT_PIPELINE_STAGES: DefaultStageConfig[] = [
+  {
+    id: 'stage-new',
+    label: 'Nuevo',
+    color: '#3B82F6', // blue-500
+    order: 0,
+    isDefault: true,
+    description: 'Leads recién ingresados al pipeline',
+  },
+  {
+    id: 'stage-contacted',
+    label: 'Contactado',
+    color: '#F59E0B', // amber-500
+    order: 1,
+    isDefault: true,
+    description: 'Se ha establecido primer contacto',
+  },
+  {
+    id: 'stage-qualified',
+    label: 'Calificado',
+    color: '#10B981', // emerald-500
+    order: 2,
+    isDefault: true,
+    description: 'Lead calificado y listo para propuesta',
+  },
+  {
+    id: 'stage-proposal',
+    label: 'Propuesta',
+    color: '#06B6D4', // cyan-500
+    order: 3,
+    isDefault: true,
+    description: 'Propuesta enviada, esperando respuesta',
+  },
+];
+
+// Terminal stages (shown separately or as filters)
+export const TERMINAL_STAGES: DefaultStageConfig[] = [
+  {
+    id: 'stage-won',
+    label: 'Ganado',
+    color: '#22C55E', // green-500
+    order: 100,
+    isDefault: true,
+    description: 'Lead convertido a cliente',
+  },
+  {
+    id: 'stage-lost',
+    label: 'Perdido',
+    color: '#EF4444', // red-500
+    order: 101,
+    isDefault: true,
+    description: 'Lead perdido o descartado',
+  },
+];
+
+// Stage type for custom stages
+export type StageType = 'open' | 'won' | 'lost';
+
+// Color palette for new stages
+export const STAGE_COLOR_PALETTE = [
+  '#3B82F6', // blue
+  '#F59E0B', // amber
+  '#10B981', // emerald
+  '#06B6D4', // cyan
+  '#8B5CF6', // violet
+  '#EC4899', // pink
+  '#F97316', // orange
+  '#14B8A6', // teal
+  '#6366F1', // indigo
+  '#84CC16', // lime
+];
+
+// Score category colors
+export const SCORE_CATEGORY_COLORS: Record<ScoreCategory, string> = {
+  hot: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+  warm: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+  cold: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
 };
 
 export const SOURCE_LABELS: Record<LeadSource, string> = {
@@ -115,6 +213,7 @@ export interface Lead {
   email: string;
   phone?: string;
   companyName?: string;
+  jobTitle?: string;
   website?: string;
   industry?: string;
   employeeCount?: number;
@@ -122,6 +221,7 @@ export interface Lead {
   status: LeadStatus;
   stageId?: string;
   score: number;
+  scoreCategory: ScoreCategory;
   source: LeadSource;
   ownerId?: string;
   notes?: string;
@@ -131,6 +231,7 @@ export interface Lead {
   updatedAt: string;
   lastActivityAt?: string;
   nextFollowUpAt?: string;
+  isFollowUpOverdue: boolean;
   convertedAt?: string;
   convertedToCustomerId?: string;
 }
@@ -231,6 +332,7 @@ export interface CreateLeadRequest {
   email: string;
   phone?: string;
   companyName?: string;
+  jobTitle?: string;
   source?: LeadSource;
   industry?: string;
   website?: string;
@@ -248,6 +350,7 @@ export interface UpdateLeadRequest {
   email?: string;
   phone?: string;
   companyName?: string;
+  jobTitle?: string;
   industry?: string;
   website?: string;
   employeeCount?: number;

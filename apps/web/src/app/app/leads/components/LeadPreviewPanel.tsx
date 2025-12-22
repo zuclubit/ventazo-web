@@ -79,7 +79,8 @@ export interface LeadPreviewPanelProps {
 // Helpers
 // ============================================
 
-function getInitials(name: string): string {
+function getInitials(name: string | null | undefined): string {
+  if (!name) return '??';
   return name
     .split(' ')
     .map((n) => n[0])
@@ -349,7 +350,7 @@ export function LeadPreviewPanel({
   if (isMobile) {
     return (
       <Sheet open={!!lead} onOpenChange={(open) => !open && onClose()}>
-        <SheetContent side="right" className="w-full sm:w-[400px] p-0">
+        <SheetContent side="right" className="p-0 max-w-sm">
           <SheetHeader className="sr-only">
             <SheetTitle>{lead?.fullName || 'Lead'}</SheetTitle>
           </SheetHeader>

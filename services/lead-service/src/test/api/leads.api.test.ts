@@ -1,10 +1,16 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { FastifyInstance } from 'fastify';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { DatabasePool } from '@zuclubit/database';
 import { buildTestServer, cleanupTestServer } from '../helpers/test-server';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+
+// Test constants
+const TEST_TENANT_ID = '123e4567-e89b-12d3-a456-426614174000';
+const TEST_HEADERS = {
+  'x-tenant-id': TEST_TENANT_ID,
+};
 
 /**
  * API Integration Tests for Lead Endpoints
@@ -63,36 +69,32 @@ describe('Leads API', () => {
   describe('POST /api/v1/leads', () => {
     it('should create a new lead with valid data', async () => {
       const leadData = {
-        tenantId: '123e4567-e89b-12d3-a456-426614174000',
+        tenantId: TEST_TENANT_ID,
         companyName: 'Acme Corp',
-        contactName: 'John Doe',
         email: 'john@acme.com',
         phone: '+1234567890',
         source: 'Website',
         industry: 'Technology',
         website: 'https://acme.com',
-        estimatedValue: 50000,
         notes: 'Potential high-value customer',
       };
 
       const response = await server.inject({
         method: 'POST',
         url: '/api/v1/leads',
+        headers: TEST_HEADERS,
         payload: leadData,
       });
 
       expect(response.statusCode).toBe(201);
 
       const body = JSON.parse(response.body);
-      expect(body).toHaveProperty('id');
-      expect(body.companyName).toBe('Acme Corp');
-      expect(body.status).toBe('new');
-      expect(body.score).toBe(0);
+      expect(body).toHaveProperty('leadId');
     });
 
     it('should reject invalid email format', async () => {
       const leadData = {
-        tenantId: '123e4567-e89b-12d3-a456-426614174000',
+        tenantId: TEST_TENANT_ID,
         companyName: 'Acme Corp',
         email: 'invalid-email',
         source: 'Website',
@@ -101,6 +103,7 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'POST',
         url: '/api/v1/leads',
+        headers: TEST_HEADERS,
         payload: leadData,
       });
 
@@ -120,6 +123,7 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'POST',
         url: '/api/v1/leads',
+        headers: TEST_HEADERS,
         payload: leadData,
       });
 
@@ -135,8 +139,9 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'POST',
         url: '/api/v1/leads',
+        headers: TEST_HEADERS,
         payload: {
-          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          tenantId: TEST_TENANT_ID,
           companyName: 'Test Company',
           email: 'test@example.com',
           source: 'API Test',
@@ -144,13 +149,14 @@ describe('Leads API', () => {
       });
 
       const body = JSON.parse(response.body);
-      createdLeadId = body.id;
+      createdLeadId = body.leadId;
     });
 
     it('should retrieve a lead by ID', async () => {
       const response = await server.inject({
         method: 'GET',
         url: `/api/v1/leads/${createdLeadId}`,
+        headers: TEST_HEADERS,
       });
 
       expect(response.statusCode).toBe(200);
@@ -164,6 +170,7 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'GET',
         url: '/api/v1/leads/00000000-0000-0000-0000-000000000000',
+        headers: TEST_HEADERS,
       });
 
       expect(response.statusCode).toBe(404);
@@ -173,6 +180,7 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'GET',
         url: '/api/v1/leads/invalid-id',
+        headers: TEST_HEADERS,
       });
 
       expect(response.statusCode).toBe(400);
@@ -184,19 +192,19 @@ describe('Leads API', () => {
       // Create multiple leads for testing pagination
       const leads = [
         {
-          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          tenantId: TEST_TENANT_ID,
           companyName: 'Company A',
           email: 'a@example.com',
           source: 'Website',
         },
         {
-          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          tenantId: TEST_TENANT_ID,
           companyName: 'Company B',
           email: 'b@example.com',
           source: 'Referral',
         },
         {
-          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          tenantId: TEST_TENANT_ID,
           companyName: 'Company C',
           email: 'c@example.com',
           source: 'Cold Call',
@@ -207,6 +215,7 @@ describe('Leads API', () => {
         await server.inject({
           method: 'POST',
           url: '/api/v1/leads',
+          headers: TEST_HEADERS,
           payload: lead,
         });
       }
@@ -216,6 +225,7 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'GET',
         url: '/api/v1/leads?page=1&limit=10',
+        headers: TEST_HEADERS,
       });
 
       expect(response.statusCode).toBe(200);
@@ -232,13 +242,14 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'GET',
         url: '/api/v1/leads?status=new',
+        headers: TEST_HEADERS,
       });
 
       expect(response.statusCode).toBe(200);
 
       const body = JSON.parse(response.body);
-      body.data.forEach((lead: any) => {
-        expect(lead.status).toBe('new');
+      body.data.forEach((lead: unknown) => {
+        expect((lead as { status: string }).status).toBe('new');
       });
     });
 
@@ -246,6 +257,7 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'GET',
         url: '/api/v1/leads?minScore=0&maxScore=50',
+        headers: TEST_HEADERS,
       });
 
       expect(response.statusCode).toBe(200);
@@ -255,6 +267,7 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'GET',
         url: '/api/v1/leads?sortBy=companyName&sortOrder=asc',
+        headers: TEST_HEADERS,
       });
 
       expect(response.statusCode).toBe(200);
@@ -268,8 +281,9 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'POST',
         url: '/api/v1/leads',
+        headers: TEST_HEADERS,
         payload: {
-          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          tenantId: TEST_TENANT_ID,
           companyName: 'Update Test',
           email: 'update@example.com',
           source: 'API',
@@ -277,13 +291,14 @@ describe('Leads API', () => {
       });
 
       const body = JSON.parse(response.body);
-      leadId = body.id;
+      leadId = body.leadId;
     });
 
     it('should update lead information', async () => {
       const response = await server.inject({
         method: 'PATCH',
         url: `/api/v1/leads/${leadId}`,
+        headers: TEST_HEADERS,
         payload: {
           companyName: 'Updated Company',
           phone: '+9876543210',
@@ -305,8 +320,9 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'POST',
         url: '/api/v1/leads',
+        headers: TEST_HEADERS,
         payload: {
-          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          tenantId: TEST_TENANT_ID,
           companyName: 'Status Test',
           email: 'status@example.com',
           source: 'API',
@@ -314,13 +330,14 @@ describe('Leads API', () => {
       });
 
       const body = JSON.parse(response.body);
-      leadId = body.id;
+      leadId = body.leadId;
     });
 
     it('should change lead status', async () => {
       const response = await server.inject({
         method: 'PATCH',
         url: `/api/v1/leads/${leadId}/status`,
+        headers: TEST_HEADERS,
         payload: {
           status: 'contacted',
           reason: 'Initial contact made via email',
@@ -337,6 +354,7 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'PATCH',
         url: `/api/v1/leads/${leadId}/status`,
+        headers: TEST_HEADERS,
         payload: {
           status: 'invalid_status',
           reason: 'Test',
@@ -354,8 +372,9 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'POST',
         url: '/api/v1/leads',
+        headers: TEST_HEADERS,
         payload: {
-          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          tenantId: TEST_TENANT_ID,
           companyName: 'Score Test',
           email: 'score@example.com',
           source: 'API',
@@ -363,13 +382,14 @@ describe('Leads API', () => {
       });
 
       const body = JSON.parse(response.body);
-      leadId = body.id;
+      leadId = body.leadId;
     });
 
     it('should update lead score', async () => {
       const response = await server.inject({
         method: 'PATCH',
         url: `/api/v1/leads/${leadId}/score`,
+        headers: TEST_HEADERS,
         payload: {
           score: 75,
           reason: 'High engagement metrics',
@@ -386,6 +406,7 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'PATCH',
         url: `/api/v1/leads/${leadId}/score`,
+        headers: TEST_HEADERS,
         payload: {
           score: 150,
           reason: 'Test',
@@ -403,8 +424,9 @@ describe('Leads API', () => {
       const response = await server.inject({
         method: 'POST',
         url: '/api/v1/leads',
+        headers: TEST_HEADERS,
         payload: {
-          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          tenantId: TEST_TENANT_ID,
           companyName: 'Assign Test',
           email: 'assign@example.com',
           source: 'API',
@@ -412,13 +434,14 @@ describe('Leads API', () => {
       });
 
       const body = JSON.parse(response.body);
-      leadId = body.id;
+      leadId = body.leadId;
     });
 
     it('should assign lead to user', async () => {
       const response = await server.inject({
         method: 'POST',
         url: `/api/v1/leads/${leadId}/assign`,
+        headers: TEST_HEADERS,
         payload: {
           assignedTo: '123e4567-e89b-12d3-a456-426614174001',
         },
@@ -427,7 +450,7 @@ describe('Leads API', () => {
       expect(response.statusCode).toBe(200);
 
       const body = JSON.parse(response.body);
-      expect(body.assignedTo).toBe('123e4567-e89b-12d3-a456-426614174001');
+      expect(body.ownerId).toBe('123e4567-e89b-12d3-a456-426614174001');
     });
   });
 

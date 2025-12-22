@@ -142,15 +142,28 @@ type ErrorInterceptor = (error: ApiError) => Promise<void>;
 
 /**
  * Build URL with query parameters
+ * Properly handles base URL with path prefix (e.g., /api/v1)
  */
 function buildUrl(
   endpoint: string,
   params?: Record<string, string | number | boolean | undefined>
 ): string {
-  // Handle absolute URLs
-  const url = endpoint.startsWith('http')
-    ? new URL(endpoint)
-    : new URL(endpoint, API_BASE_URL);
+  let fullUrl: string;
+
+  if (endpoint.startsWith('http')) {
+    // Absolute URL - use as-is
+    fullUrl = endpoint;
+  } else {
+    // Relative URL - concatenate with base URL properly
+    // Remove trailing slash from base and leading slash from endpoint to avoid double slashes
+    const baseWithoutTrailingSlash = API_BASE_URL.replace(/\/$/, '');
+    const endpointWithLeadingSlash = endpoint.startsWith('/')
+      ? endpoint
+      : `/${endpoint}`;
+    fullUrl = `${baseWithoutTrailingSlash}${endpointWithLeadingSlash}`;
+  }
+
+  const url = new URL(fullUrl);
 
   if (params) {
     Object.entries(params).forEach(([key, value]) => {

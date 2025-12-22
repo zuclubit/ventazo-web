@@ -7,5 +7,8 @@ import { LeadResponseDTO } from '../dtos';
 export class GetOverdueFollowUpsQuery implements IQuery<LeadResponseDTO[]> {
   readonly type = 'GetOverdueFollowUpsQuery';
 
-  constructor(public readonly tenantId: string) {}
+  constructor(
+    public readonly tenantId: string,
+    public readonly ownerId?: string
+  ) {}
 }

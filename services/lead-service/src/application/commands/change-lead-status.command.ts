@@ -10,7 +10,8 @@ export class ChangeLeadStatusCommand implements ICommand {
   constructor(
     public readonly leadId: string,
     public readonly tenantId: string,
-    public readonly userId: string,
-    public readonly newStatus: LeadStatusEnum
+    public readonly newStatus: LeadStatusEnum,
+    public readonly changedBy: string,
+    public readonly ownerPhone?: string
   ) {}
 }

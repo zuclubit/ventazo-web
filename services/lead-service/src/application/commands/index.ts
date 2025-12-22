@@ -25,3 +25,26 @@ export { QualifyLeadHandler } from './qualify-lead.handler';
 // Schedule Follow-up
 export { ScheduleFollowUpCommand } from './schedule-follow-up.command';
 export { ScheduleFollowUpHandler } from './schedule-follow-up.handler';
+
+// Convert Lead to Customer
+export { ConvertLeadCommand } from './convert-lead.command';
+export { ConvertLeadHandler, type ConvertLeadResult } from './convert-lead.handler';
+
+// Bulk Operations
+export { BulkCreateLeadsCommand, type BulkLeadData } from './bulk-create-leads.command';
+export { BulkCreateLeadsHandler, type BulkCreateLeadsResult, type BulkLeadResult } from './bulk-create-leads.handler';
+export {
+  BulkUpdateLeadsCommand,
+  BulkAssignLeadsCommand,
+  BulkChangeStatusCommand,
+  BulkDeleteLeadsCommand,
+  type BulkLeadUpdateData,
+} from './bulk-update-leads.command';
+export {
+  BulkUpdateLeadsHandler,
+  BulkAssignLeadsHandler,
+  BulkChangeStatusHandler,
+  BulkDeleteLeadsHandler,
+  type BulkOperationResult,
+  type BulkOperationSummary,
+} from './bulk-update-leads.handler';

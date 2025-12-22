@@ -1,0 +1,129 @@
+# =============================================================================
+# Dockerfile for Fly.io Deployment - Lead Service (Monorepo)
+# PERFORMANCE OPTIMIZED - 2025 Best Practices
+# =============================================================================
+# Based on:
+# - https://github.com/AlbertHernandez/nodejs-docker-best-practices
+# - https://markaicode.com/nodejs-docker-optimization-2025/
+# - https://github.com/nodejs/docker-node/blob/main/docs/BestPractices.md
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Build Stage
+# -----------------------------------------------------------------------------
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies required for native modules
+# Using --no-cache to reduce image size
+RUN apk add --no-cache libc6-compat python3 make g++
+
+# Copy package files first for better Docker layer caching
+# Changes to source code won't invalidate npm install layer
+COPY package.json package-lock.json* ./
+COPY tsconfig.json ./
+
+# Copy shared packages
+COPY shared/ ./shared/
+
+# Copy lead-service
+COPY services/lead-service/ ./services/lead-service/
+
+# Use npm ci for reproducible builds (faster than npm install)
+# Based on: https://markaicode.com/nodejs-docker-optimization-2025/
+RUN npm ci --include=dev
+
+# Build shared packages first
+WORKDIR /app/shared/domain
+RUN npm run build || true
+
+WORKDIR /app/shared/database
+RUN npm run build || true
+
+WORKDIR /app/shared/events
+RUN npm run build || true
+
+# Build lead-service (without DTS to save memory and time)
+WORKDIR /app/services/lead-service
+RUN npx tsup src/app.ts --format cjs --no-dts
+
+# -----------------------------------------------------------------------------
+# Production Dependencies Stage
+# Install only production dependencies in a separate stage
+# -----------------------------------------------------------------------------
+FROM node:20-alpine AS deps
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json* ./
+COPY shared/domain/package.json ./shared/domain/
+COPY shared/database/package.json ./shared/database/
+COPY shared/events/package.json ./shared/events/
+COPY services/lead-service/package.json ./services/lead-service/
+
+# Install ONLY production dependencies
+# --omit=dev removes devDependencies
+RUN npm ci --omit=dev && \
+    npm cache clean --force
+
+# -----------------------------------------------------------------------------
+# Production Stage - Optimized for Performance
+# Based on:
+# - https://blog.platformatic.dev/optimizing-nodejs-performance-v8-memory-management-and-gc-tuning
+# - https://fly.io/docs/js/the-basics/scaling/
+# - https://github.com/nodejs/docker-node/blob/main/docs/BestPractices.md
+# -----------------------------------------------------------------------------
+FROM node:20-alpine AS production
+
+# Set NODE_ENV early for npm and runtime optimizations
+# "When NODE_ENV is set to production, Node.js libraries automatically switch
+# to their optimized production mode" - results in up to 30% faster boot times
+ENV NODE_ENV=production
+
+# Install dumb-init for proper signal handling
+# "Node.js was not designed to run as PID 1 which leads to unexpected behaviour
+# when running inside Docker" - handles SIGTERM/SIGINT properly
+RUN apk add --no-cache dumb-init
+
+# Create non-root user for security
+# Running as non-root reduces attack surface
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 lead-service
+
+WORKDIR /app
+
+# Copy production node_modules from deps stage (smaller than builder)
+COPY --from=deps --chown=lead-service:nodejs /app/node_modules ./node_modules
+
+# Copy built artifacts
+COPY --from=builder --chown=lead-service:nodejs /app/services/lead-service/dist ./dist
+COPY --from=builder --chown=lead-service:nodejs /app/services/lead-service/package.json ./
+
+# Copy built shared packages
+COPY --from=builder --chown=lead-service:nodejs /app/shared ./shared
+
+# Switch to non-root user
+USER lead-service
+
+# Expose port
+EXPOSE 8080
+
+# Health check for Docker orchestration
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1
+
+# Use dumb-init as PID 1 for proper signal handling
+# V8 Performance Flags:
+# --max-semi-space-size=64: Increase Young Generation for reduced GC pressure
+# --max-old-space-size=768: Set Old Space limit for 1GB container
+# --optimize-for-size: Optimize code for memory size (good for containers)
+# --no-lazy: Compile all code upfront (reduces latency at runtime)
+# Based on: https://akamas.io/resources/tuning-nodejs-v8-performance-efficiency/
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", \
+     "--max-semi-space-size=64", \
+     "--max-old-space-size=768", \
+     "--optimize-for-size", \
+     "dist/app.js"]

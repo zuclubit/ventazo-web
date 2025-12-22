@@ -39,9 +39,17 @@ interface OnboardingData {
   city?: string;
   timezone?: string;
 
-  // Branding
+  // Branding - 4-color semantic palette
   logoUrl?: string;
+  /** Sidebar/navigation background color */
+  sidebarColor?: string;
+  /** Main brand color for buttons, CTAs */
   primaryColor?: string;
+  /** Accent color for highlights, links */
+  accentColor?: string;
+  /** Surface color for cards, dropdowns */
+  surfaceColor?: string;
+  /** @deprecated Use sidebarColor instead */
   secondaryColor?: string;
   companyName?: string;
 
@@ -107,22 +115,29 @@ const DEFAULT_MODULES: CRMModules = {
 };
 
 // ============================================
-// Ventazo Brand Colors (Default)
+// Ventazo Brand Colors (Default) - 4-Color Semantic Palette
 // ============================================
-// Primary: Teal #0D9488 (ventazo-600)
-// Secondary/Accent: Coral #F97316 (coral-500)
-// These are the official Ventazo brand colors
+// Sidebar: Dark teal #003C3B - Navigation background
+// Primary: Teal #0EB58C - Buttons, CTAs, active states
+// Accent: Light teal #5EEAD4 - Highlights, links, hover
+// Surface: Darker teal #052828 - Cards, dropdowns, modals
 
-const VENTAZO_DEFAULT_PRIMARY = '#0D9488';
-const VENTAZO_DEFAULT_SECONDARY = '#F97316';
+const VENTAZO_DEFAULT_SIDEBAR = '#003C3B';
+const VENTAZO_DEFAULT_PRIMARY = '#0EB58C';
+const VENTAZO_DEFAULT_ACCENT = '#5EEAD4';
+const VENTAZO_DEFAULT_SURFACE = '#052828';
 
 // Initial state
 const initialState = {
   currentStep: 'signup' as OnboardingStep,
   completedSteps: [] as OnboardingStep[],
   data: {
+    sidebarColor: VENTAZO_DEFAULT_SIDEBAR,
     primaryColor: VENTAZO_DEFAULT_PRIMARY,
-    secondaryColor: VENTAZO_DEFAULT_SECONDARY,
+    accentColor: VENTAZO_DEFAULT_ACCENT,
+    surfaceColor: VENTAZO_DEFAULT_SURFACE,
+    // Keep secondaryColor for backward compatibility
+    secondaryColor: VENTAZO_DEFAULT_SIDEBAR,
     timezone: 'America/Mexico_City',
     country: 'México',
     modules: DEFAULT_MODULES,
@@ -300,4 +315,9 @@ export const useOnboardingError = () =>
 // Constants Exports
 // ============================================
 
-export { VENTAZO_DEFAULT_PRIMARY, VENTAZO_DEFAULT_SECONDARY };
+export {
+  VENTAZO_DEFAULT_SIDEBAR,
+  VENTAZO_DEFAULT_PRIMARY,
+  VENTAZO_DEFAULT_ACCENT,
+  VENTAZO_DEFAULT_SURFACE,
+};

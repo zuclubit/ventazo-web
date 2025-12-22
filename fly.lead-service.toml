@@ -1,0 +1,49 @@
+# =============================================================================
+# Fly.io Configuration - Lead Service (Staging) - PERFORMANCE OPTIMIZED
+# =============================================================================
+# Deploy: flyctl deploy --config fly.lead-service.toml (from monorepo root)
+# Logs: flyctl logs --app zuclubit-lead-service
+# Status: flyctl status --app zuclubit-lead-service
+# =============================================================================
+
+app = "zuclubit-lead-service"
+primary_region = "dfw"  # Dallas - Low latency for LATAM
+
+[build]
+  dockerfile = "services/lead-service/Dockerfile.flyio"
+  build-target = "production"
+
+[env]
+  NODE_ENV = "staging"
+  PORT = "8080"
+  HOST = "0.0.0.0"
+  LOG_LEVEL = "info"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 500
+    soft_limit = 400
+
+[[http_service.checks]]
+  grace_period = "15s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "10s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory_mb = 1024
+
+[metrics]
+  port = 9091
+  path = "/metrics"

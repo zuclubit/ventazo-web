@@ -1,0 +1,108 @@
+# =============================================================================
+# Hybrid Build: tsup (build) + Bun (runtime)
+# Faster startup with Bun runtime, reliable bundling with tsup
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Dependencies (with Bun for speed)
+# -----------------------------------------------------------------------------
+FROM oven/bun:1.1-alpine AS deps
+
+WORKDIR /app
+
+# Install dependencies required for native modules (sharp/vips)
+RUN apk add --no-cache \
+    libc6-compat \
+    vips-dev \
+    build-base \
+    python3
+
+# Copy package files
+COPY package.json bun.lockb* ./
+
+# Install all dependencies (including devDeps for building)
+RUN bun install --frozen-lockfile || bun install
+
+# -----------------------------------------------------------------------------
+# Stage 2: Builder (Compile TypeScript with tsup)
+# -----------------------------------------------------------------------------
+FROM oven/bun:1.1-alpine AS builder
+
+WORKDIR /app
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy source code and configuration
+COPY . .
+
+# Build TypeScript to JavaScript using tsup (via bun)
+RUN bun run build
+
+# Verify build output
+RUN ls -la dist/
+
+# -----------------------------------------------------------------------------
+# Stage 3: Production Dependencies Only
+# -----------------------------------------------------------------------------
+FROM oven/bun:1.1-alpine AS prod-deps
+
+WORKDIR /app
+
+# Install dependencies for native modules
+RUN apk add --no-cache \
+    libc6-compat \
+    vips-dev \
+    build-base \
+    python3
+
+# Copy package files
+COPY package.json bun.lockb* ./
+
+# Install production dependencies only
+RUN bun install --production --frozen-lockfile || bun install --production
+
+# Clean up build dependencies
+RUN apk del build-base python3
+
+# -----------------------------------------------------------------------------
+# Stage 4: Production (Final lightweight image)
+# -----------------------------------------------------------------------------
+FROM oven/bun:1.1-alpine AS production
+
+# Set environment
+ENV NODE_ENV=production \
+    PORT=8080 \
+    HOST=0.0.0.0
+
+# Install runtime dependencies
+RUN apk add --no-cache libc6-compat vips dumb-init
+
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 lead-service
+
+WORKDIR /app
+
+# Copy production dependencies
+COPY --from=prod-deps --chown=lead-service:nodejs /app/node_modules ./node_modules
+
+# Copy compiled JavaScript from builder
+COPY --from=builder --chown=lead-service:nodejs /app/dist ./dist
+
+# Copy package.json for metadata
+COPY --chown=lead-service:nodejs package.json ./
+
+# Switch to non-root user
+USER lead-service
+
+# Expose port
+EXPOSE 8080
+
+# Health check using Bun
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD bun -e "const r = await fetch('http://localhost:' + (Bun.env.PORT || 8080) + '/health'); process.exit(r.ok ? 0 : 1)"
+
+# Start with dumb-init for proper signal handling
+# Bun runs the bundled JavaScript for maximum compatibility + performance
+CMD ["dumb-init", "bun", "run", "dist/app.js"]

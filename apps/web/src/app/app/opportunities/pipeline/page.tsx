@@ -30,13 +30,12 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { RBACGuard } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import {
   usePipelineManagement,
   type Opportunity,
   type OpportunityPipelineStage,
-  STATUS_LABELS,
   STATUS_COLORS,
-  PRIORITY_LABELS,
   PRIORITY_COLORS,
   formatCurrency,
 } from '@/lib/opportunities';
@@ -65,6 +64,8 @@ function KanbanCard({
   onLost,
   onClick,
 }: KanbanCardProps) {
+  const { t } = useI18n();
+
   return (
     <div
       draggable
@@ -76,7 +77,7 @@ function KanbanCard({
         <div className="flex items-center gap-2">
           <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
           <div className="flex-1">
-            <p className="font-medium text-sm line-clamp-1">{opportunity.title}</p>
+            <p className="font-medium text-sm line-clamp-1">{opportunity.name}</p>
             <p className="text-xs text-muted-foreground line-clamp-1">
               {opportunity.customer?.name || opportunity.lead?.fullName || '-'}
             </p>
@@ -95,7 +96,7 @@ function KanbanCard({
                 onEdit(opportunity);
               }}
             >
-              Editar
+              {t.opportunities.actions.edit}
             </DropdownMenuItem>
             {opportunity.status === 'open' && (
               <>
@@ -108,7 +109,7 @@ function KanbanCard({
                   }}
                 >
                   <Trophy className="mr-2 h-4 w-4" />
-                  Marcar Ganada
+                  {t.opportunities.pipeline.markWon}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-red-600"
@@ -118,7 +119,7 @@ function KanbanCard({
                   }}
                 >
                   <XCircle className="mr-2 h-4 w-4" />
-                  Marcar Perdida
+                  {t.opportunities.pipeline.markLost}
                 </DropdownMenuItem>
               </>
             )}
@@ -131,7 +132,7 @@ function KanbanCard({
           {formatCurrency(opportunity.amount, opportunity.currency)}
         </span>
         <Badge className={`text-xs ${STATUS_COLORS[opportunity.status]}`}>
-          {STATUS_LABELS[opportunity.status]}
+          {t.opportunities.status[opportunity.status as keyof typeof t.opportunities.status]}
         </Badge>
       </div>
 
@@ -152,7 +153,7 @@ function KanbanCard({
           <span className="text-xs text-muted-foreground">{opportunity.probability}%</span>
         </div>
         <Badge className={`text-xs ${PRIORITY_COLORS[opportunity.priority]}`} variant="outline">
-          {PRIORITY_LABELS[opportunity.priority]}
+          {t.opportunities.priority[opportunity.priority as keyof typeof t.opportunities.priority]}
         </Badge>
       </div>
 
@@ -207,6 +208,8 @@ function KanbanColumn({
   onClick,
   isDragOver,
 }: KanbanColumnProps) {
+  const { t } = useI18n();
+
   return (
     <div
       className={`flex flex-col rounded-lg border bg-muted/30 ${
@@ -237,11 +240,11 @@ function KanbanColumn({
       {/* Column Stats */}
       <div className="border-b bg-background px-3 py-2">
         <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">Total:</span>
+          <span className="text-muted-foreground">{t.opportunities.pipeline.total}:</span>
           <span className="font-medium">{formatCurrency(totalAmount)}</span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-muted-foreground">Forecast:</span>
+          <span className="text-muted-foreground">{t.opportunities.pipeline.forecast}:</span>
           <span className="font-medium text-blue-600">{formatCurrency(totalForecast)}</span>
         </div>
       </div>
@@ -262,7 +265,7 @@ function KanbanColumn({
         {opportunities.length === 0 && (
           <div className="flex items-center justify-center py-8 text-center">
             <p className="text-xs text-muted-foreground">
-              Sin oportunidades
+              {t.opportunities.pipeline.noOpportunities}
             </p>
           </div>
         )}
@@ -278,6 +281,7 @@ function KanbanColumn({
 export default function PipelinePage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { t } = useI18n();
 
   // Pipeline data
   const {
@@ -330,8 +334,8 @@ export default function PipelinePage() {
     moveToStage(draggedOpportunity.id, targetStageId);
     const targetStage = stages.find((s) => s.id === targetStageId);
     toast({
-      title: 'Oportunidad movida',
-      description: `"${draggedOpportunity.title}" movida a ${targetStage?.label ?? 'nueva etapa'}.`,
+      title: t.opportunities.pipeline.opportunityMoved,
+      description: `"${draggedOpportunity.name}" ${t.opportunities.pipeline.opportunityMovedTo} ${targetStage?.label ?? ''}.`,
     });
 
     setDraggedOpportunity(null);
@@ -351,21 +355,21 @@ export default function PipelinePage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Pipeline de Oportunidades</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{t.opportunities.pipeline.title}</h1>
             <p className="text-muted-foreground">
-              Arrastra las oportunidades entre etapas para actualizar su estado
+              {t.opportunities.pipeline.subtitle}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => refetchPipeline()}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isMoving ? 'animate-spin' : ''}`} />
-            Actualizar
+            {t.opportunities.pipeline.refresh}
           </Button>
           <RBACGuard fallback={null} minRole="sales_rep">
             <Button size="sm" onClick={() => setIsCreateOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
-              Nueva Oportunidad
+              {t.opportunities.actions.newOpportunity}
             </Button>
           </RBACGuard>
         </div>
@@ -377,44 +381,44 @@ export default function PipelinePage() {
       <div className="grid gap-4 md:grid-cols-4 mb-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pipeline Total</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.opportunities.pipeline.pipelineTotal}</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(totalAmount)}</div>
             <p className="text-xs text-muted-foreground">
-              {totalOpportunities} oportunidades
+              {totalOpportunities} {t.opportunities.pipeline.opportunitiesCount}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Forecast</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.opportunities.pipeline.forecast}</CardTitle>
             <Target className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{formatCurrency(totalForecast)}</div>
-            <p className="text-xs text-muted-foreground">valor ponderado</p>
+            <p className="text-xs text-muted-foreground">{t.opportunities.pipeline.weightedValue}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ganadas</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.opportunities.pipeline.won}</CardTitle>
             <Trophy className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{formatCurrency(wonAmount)}</div>
-            <p className="text-xs text-muted-foreground">cerradas ganadas</p>
+            <p className="text-xs text-muted-foreground">{t.opportunities.pipeline.wonClosed}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Etapas</CardTitle>
+            <CardTitle className="text-sm font-medium">{t.opportunities.pipeline.stages}</CardTitle>
             <Target className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">{stages.length}</div>
-            <p className="text-xs text-muted-foreground">etapas en pipeline</p>
+            <p className="text-xs text-muted-foreground">{t.opportunities.pipeline.stagesInPipeline}</p>
           </CardContent>
         </Card>
       </div>
@@ -427,9 +431,9 @@ export default function PipelinePage() {
       ) : columns.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Target className="h-12 w-12 text-muted-foreground/50" />
-          <p className="mt-4 text-lg font-medium">Sin etapas en el pipeline</p>
+          <p className="mt-4 text-lg font-medium">{t.opportunities.pipeline.noStages}</p>
           <p className="text-sm text-muted-foreground">
-            Configura las etapas del pipeline para comenzar
+            {t.opportunities.pipeline.noStagesDescription}
           </p>
         </div>
       ) : (

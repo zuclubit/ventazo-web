@@ -25,6 +25,7 @@ import {
   Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 // ============================================
@@ -60,6 +61,8 @@ interface PrimaryCTACardProps {
 }
 
 function PrimaryCTACard({ onClick, onViewLeads }: PrimaryCTACardProps) {
+  const { t } = useI18n();
+
   return (
     <div
       className={cn(
@@ -77,7 +80,7 @@ function PrimaryCTACard({ onClick, onViewLeads }: PrimaryCTACardProps) {
       {/* Badge */}
       <div className="inline-flex items-center gap-1.5 mb-4 px-3 py-1 rounded-full border border-primary/30 bg-primary/5">
         <Zap className="h-3.5 w-3.5 text-primary" />
-        <span className="text-xs font-medium text-primary">Recomendado</span>
+        <span className="text-xs font-medium text-primary">{t.opportunities.empty.createFromLead.badge}</span>
       </div>
 
       {/* Icon */}
@@ -86,18 +89,17 @@ function PrimaryCTACard({ onClick, onViewLeads }: PrimaryCTACardProps) {
       </div>
 
       {/* Content */}
-      <h3 className="text-xl font-semibold mb-2">Crear desde Lead</h3>
+      <h3 className="text-xl font-semibold mb-2">{t.opportunities.empty.createFromLead.title}</h3>
       <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-        Convierte tus leads calificados en oportunidades de venta.
-        El mejor camino para cerrar negocios exitosamente.
+        {t.opportunities.empty.createFromLead.description}
       </p>
 
       {/* Features */}
       <div className="flex flex-col gap-2 mb-6">
         {[
-          'Hereda datos del lead automaticamente',
-          'Rastrea el ciclo de venta completo',
-          'Mejora tu tasa de conversion',
+          t.opportunities.empty.createFromLead.feature1,
+          t.opportunities.empty.createFromLead.feature2,
+          t.opportunities.empty.createFromLead.feature3,
         ].map((feature) => (
           <div key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
             <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
@@ -116,7 +118,7 @@ function PrimaryCTACard({ onClick, onViewLeads }: PrimaryCTACardProps) {
           }}
           className="w-full shadow-lg shadow-primary/30"
         >
-          Seleccionar Lead
+          {t.opportunities.empty.createFromLead.selectLead}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
         <Button
@@ -128,7 +130,7 @@ function PrimaryCTACard({ onClick, onViewLeads }: PrimaryCTACardProps) {
           }}
           className="w-full text-muted-foreground"
         >
-          Ver todos los leads
+          {t.opportunities.empty.createFromLead.viewAllLeads}
           <ArrowRight className="ml-2 h-3.5 w-3.5" />
         </Button>
       </div>
@@ -202,6 +204,8 @@ function NoResultsEmpty({
   onClearFilters,
   className,
 }: Pick<OpportunitiesEmptyStateProps, 'searchTerm' | 'onClearFilters' | 'className'>) {
+  const { t } = useI18n();
+
   return (
     <div className={cn('flex flex-col items-center justify-center py-12 px-4', className)}>
       {/* Icon */}
@@ -213,22 +217,16 @@ function NoResultsEmpty({
       </div>
 
       {/* Content */}
-      <h3 className="text-lg font-semibold mb-2">Sin resultados</h3>
+      <h3 className="text-lg font-semibold mb-2">{t.opportunities.empty.noResults}</h3>
       <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
-        No encontramos oportunidades que coincidan con{' '}
-        {searchTerm ? (
-          <span className="font-medium">"{searchTerm}"</span>
-        ) : (
-          'los filtros aplicados'
-        )}
-        . Intenta con otros terminos de busqueda.
+        {searchTerm ? t.opportunities.empty.noResultsSearch : t.opportunities.empty.noResultsFilters}
       </p>
 
       {/* Action */}
       {onClearFilters && (
         <Button variant="outline" onClick={onClearFilters}>
           <Filter className="mr-2 h-4 w-4" />
-          Limpiar filtros
+          {t.opportunities.empty.clearFilters}
         </Button>
       )}
     </div>
@@ -243,16 +241,18 @@ function CompactEmpty({
   onCreateManually,
   className,
 }: Pick<OpportunitiesEmptyStateProps, 'onCreateManually' | 'className'>) {
+  const { t } = useI18n();
+
   return (
     <div className={cn('flex flex-col items-center justify-center py-8 px-4', className)}>
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-3">
         <Target className="h-5 w-5 text-primary" />
       </div>
-      <p className="text-sm text-muted-foreground mb-3">Sin oportunidades</p>
+      <p className="text-sm text-muted-foreground mb-3">{t.opportunities.empty.noOpportunities}</p>
       {onCreateManually && (
         <Button size="sm" onClick={onCreateManually}>
           <Target className="mr-2 h-4 w-4" />
-          Crear Oportunidad
+          {t.opportunities.empty.createManually.button}
         </Button>
       )}
     </div>
@@ -267,6 +267,8 @@ function FilteredEmpty({
   onClearFilters,
   className,
 }: Pick<OpportunitiesEmptyStateProps, 'onClearFilters' | 'className'>) {
+  const { t } = useI18n();
+
   return (
     <div className={cn('flex flex-col items-center justify-center py-12 px-4', className)}>
       <div className="relative mb-5">
@@ -275,14 +277,14 @@ function FilteredEmpty({
         </div>
       </div>
 
-      <h3 className="text-lg font-semibold mb-2">Sin oportunidades en este estado</h3>
+      <h3 className="text-lg font-semibold mb-2">{t.opportunities.empty.noOpportunitiesInState}</h3>
       <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
-        No hay oportunidades que coincidan con el filtro seleccionado.
+        {t.opportunities.empty.noOpportunitiesMatchFilter}
       </p>
 
       {onClearFilters && (
         <Button variant="outline" onClick={onClearFilters}>
-          Ver todas las oportunidades
+          {t.opportunities.empty.viewAll}
         </Button>
       )}
     </div>
@@ -303,6 +305,8 @@ export function OpportunitiesEmptyState({
   onClearFilters,
   className,
 }: OpportunitiesEmptyStateProps) {
+  const { t } = useI18n();
+
   // No results variant
   if (variant === 'search' || searchTerm) {
     return (
@@ -337,16 +341,15 @@ export function OpportunitiesEmptyState({
         {/* Motivational Badge */}
         <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5">
           <Rocket className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium text-primary">¡Es hora de cerrar ventas!</span>
+          <span className="text-sm font-medium text-primary">{t.opportunities.empty.badge}</span>
         </div>
 
         {/* Title */}
         <h2 className="text-2xl font-bold mb-3">
-          Tu pipeline esta listo
+          {t.opportunities.empty.title}
         </h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Crea tu primera oportunidad y empieza a rastrear tu ciclo de ventas.
-          Te recomendamos convertir leads calificados para mejores resultados.
+          {t.opportunities.empty.description}
         </p>
       </div>
 
@@ -356,7 +359,7 @@ export function OpportunitiesEmptyState({
       {/* Divider */}
       <div className="flex items-center gap-4 my-6 w-full max-w-md">
         <div className="flex-1 h-px bg-border" />
-        <span className="text-xs text-muted-foreground uppercase tracking-wider">o tambien</span>
+        <span className="text-xs text-muted-foreground uppercase tracking-wider">{t.opportunities.empty.divider}</span>
         <div className="flex-1 h-px bg-border" />
       </div>
 
@@ -365,18 +368,18 @@ export function OpportunitiesEmptyState({
         {/* Create Manually */}
         <SecondaryCTACard
           icon={<UserPlus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />}
-          title="Crear Manualmente"
-          description="Registra una oportunidad con datos personalizados"
-          buttonLabel="Crear"
+          title={t.opportunities.empty.createManually.title}
+          description={t.opportunities.empty.createManually.description}
+          buttonLabel={t.opportunities.empty.createManually.button}
           onClick={onCreateManually}
         />
 
         {/* Import */}
         <SecondaryCTACard
           icon={<Upload className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />}
-          title="Importar desde Excel"
-          description="Sube multiples oportunidades en formato CSV"
-          buttonLabel="Importar"
+          title={t.opportunities.empty.importExcel.title}
+          description={t.opportunities.empty.importExcel.description}
+          buttonLabel={t.opportunities.empty.importExcel.button}
           onClick={onImport}
         />
       </div>

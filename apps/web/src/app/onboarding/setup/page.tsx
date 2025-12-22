@@ -162,11 +162,13 @@ export default function SetupPage() {
     recoverSession();
   }, [data.tenantId, updateData, router]);
 
-  // Form states - Ventazo brand colors as defaults
-  // Primary: Teal #0D9488 | Secondary/Accent: Coral #F97316
+  // Form states - 4-color semantic brand palette
+  // Sidebar: Dark navigation | Primary: CTA/active | Accent: highlights | Surface: cards/dropdowns
   const [logoUrl, setLogoUrl] = React.useState<string | null>(data.logoUrl || null);
-  const [primaryColor, setPrimaryColor] = React.useState(data.primaryColor || '#0D9488');
-  const [secondaryColor, setSecondaryColor] = React.useState(data.secondaryColor || '#F97316');
+  const [sidebarColor, setSidebarColor] = React.useState(data.sidebarColor || '#003C3B');
+  const [primaryColor, setPrimaryColor] = React.useState(data.primaryColor || '#0EB58C');
+  const [accentColor, setAccentColor] = React.useState(data.accentColor || '#5EEAD4');
+  const [surfaceColor, setSurfaceColor] = React.useState(data.surfaceColor || '#052828');
   const [companyName, setCompanyName] = React.useState(data.companyName || data.businessName || '');
 
   const [modules, setModules] = React.useState<CRMModules>(
@@ -223,8 +225,10 @@ export default function SetupPage() {
     try {
       const result = await updateTenantBrandingAction(data.tenantId, {
         logoUrl: logoUrl ?? undefined,
+        sidebarColor,
         primaryColor,
-        secondaryColor,
+        accentColor,
+        surfaceColor,
         companyEmail: data.email,
       });
 
@@ -234,7 +238,14 @@ export default function SetupPage() {
       }
 
       // Update store and move to next step
-      updateData({ logoUrl: logoUrl ?? undefined, primaryColor, secondaryColor, companyName });
+      updateData({
+        logoUrl: logoUrl ?? undefined,
+        sidebarColor,
+        primaryColor,
+        accentColor,
+        surfaceColor,
+        companyName,
+      });
       completeStep('branding');
       setStep('modules');
       setCurrentSubStep('modules');
@@ -437,13 +448,17 @@ export default function SetupPage() {
             companyName={companyName}
             logoUrl={logoUrl}
             isLoading={isSubmitting}
+            sidebarColor={sidebarColor}
             primaryColor={primaryColor}
-            secondaryColor={secondaryColor}
+            accentColor={accentColor}
+            surfaceColor={surfaceColor}
             translations={t}
             onCompanyNameChange={setCompanyName}
             onLogoChange={setLogoUrl}
+            onSidebarColorChange={setSidebarColor}
             onPrimaryColorChange={setPrimaryColor}
-            onSecondaryColorChange={setSecondaryColor}
+            onAccentColorChange={setAccentColor}
+            onSurfaceColorChange={setSurfaceColor}
           />
         )}
 
@@ -476,32 +491,40 @@ export default function SetupPage() {
 }
 
 // ============================================
-// Branding Form Component - Smart with color extraction
+// Branding Form Component - Smart with 4-color extraction
 // ============================================
 
 interface BrandingFormProps {
   logoUrl: string | null;
+  sidebarColor: string;
   primaryColor: string;
-  secondaryColor: string;
+  accentColor: string;
+  surfaceColor: string;
   companyName: string;
   isLoading: boolean;
   translations: ReturnType<typeof getTranslations>;
   onLogoChange: (url: string | null) => void;
+  onSidebarColorChange: (color: string) => void;
   onPrimaryColorChange: (color: string) => void;
-  onSecondaryColorChange: (color: string) => void;
+  onAccentColorChange: (color: string) => void;
+  onSurfaceColorChange: (color: string) => void;
   onCompanyNameChange: (name: string) => void;
 }
 
 function BrandingForm({
   logoUrl,
+  sidebarColor,
   primaryColor,
-  secondaryColor,
+  accentColor,
+  surfaceColor,
   companyName,
   isLoading,
   translations: t,
   onLogoChange,
+  onSidebarColorChange,
   onPrimaryColorChange,
-  onSecondaryColorChange,
+  onAccentColorChange,
+  onSurfaceColorChange,
   onCompanyNameChange,
 }: BrandingFormProps) {
   return (
@@ -510,17 +533,23 @@ function BrandingForm({
       onCompanyNameChange={onCompanyNameChange}
       logoUrl={logoUrl}
       onLogoChange={onLogoChange}
+      sidebarColor={sidebarColor}
+      onSidebarColorChange={onSidebarColorChange}
       primaryColor={primaryColor}
       onPrimaryColorChange={onPrimaryColorChange}
-      secondaryColor={secondaryColor}
-      onSecondaryColorChange={onSecondaryColorChange}
+      accentColor={accentColor}
+      onAccentColorChange={onAccentColorChange}
+      surfaceColor={surfaceColor}
+      onSurfaceColorChange={onSurfaceColorChange}
       isLoading={isLoading}
       translations={{
         companyName: t.branding.fields.companyName,
         companyNamePlaceholder: t.branding.fields.companyNamePlaceholder,
         uploadLogo: t.branding.dragDrop,
+        sidebarColor: 'Sidebar',
         primaryColor: t.branding.fields.primaryColor,
-        secondaryColor: t.branding.fields.secondaryColor,
+        accentColor: 'Acento',
+        surfaceColor: 'Superficie',
         preview: t.branding.preview,
       }}
     />

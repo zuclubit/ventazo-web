@@ -1,0 +1,21 @@
+export { TaskService } from './task.service';
+export {
+  TaskType,
+  TaskPriority,
+  TaskStatus,
+  TaskEntityType,
+  RecurrenceFrequency,
+  type TaskDTO,
+  type CreateTaskRequest,
+  type UpdateTaskRequest,
+  type CompleteTaskRequest,
+  type TaskFilterOptions,
+  type TaskSortOptions,
+  type TaskStatistics,
+  type UpcomingTasksResponse,
+  type BulkTaskOperation,
+  type BulkTaskResult,
+  type RecurrenceRule,
+  type TaskReminder,
+  type TaskActivityEntry,
+} from './types';

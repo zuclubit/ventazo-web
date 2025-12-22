@@ -1,17 +1,20 @@
-import { injectable } from 'tsyringe';
+import { injectable, inject } from 'tsyringe';
 import { Result } from '@zuclubit/domain';
 import { ICommandHandler } from '../common';
 import { UpdateLeadScoreCommand } from './update-lead-score.command';
 import { ILeadRepository } from '../../domain/repositories';
+import { Lead } from '../../domain/aggregates';
 
 /**
  * Handler for UpdateLeadScoreCommand
  */
 @injectable()
-export class UpdateLeadScoreHandler implements ICommandHandler<UpdateLeadScoreCommand, void> {
-  constructor(private readonly leadRepository: ILeadRepository) {}
+export class UpdateLeadScoreHandler implements ICommandHandler<UpdateLeadScoreCommand, Lead> {
+  constructor(
+    @inject('ILeadRepository') private readonly leadRepository: ILeadRepository
+  ) {}
 
-  async execute(command: UpdateLeadScoreCommand): Promise<Result<void>> {
+  async execute(command: UpdateLeadScoreCommand): Promise<Result<Lead>> {
     // Find lead
     const leadResult = await this.leadRepository.findById(command.leadId, command.tenantId);
     if (leadResult.isFailure) {
@@ -30,6 +33,11 @@ export class UpdateLeadScoreHandler implements ICommandHandler<UpdateLeadScoreCo
     }
 
     // Save lead
-    return this.leadRepository.save(lead);
+    const saveResult = await this.leadRepository.save(lead);
+    if (saveResult.isFailure) {
+      return Result.fail(saveResult.error as string);
+    }
+
+    return Result.ok(lead);
   }
 }

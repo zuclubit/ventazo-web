@@ -4,7 +4,7 @@ import * as React from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { es, enUS, ptBR } from 'date-fns/locale';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -29,6 +29,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { useI18n } from '@/lib/i18n';
 import {
   Popover,
   PopoverContent,
@@ -50,28 +51,29 @@ import {
   usePipelineStages,
   type Opportunity,
   OPPORTUNITY_PRIORITY,
-  PRIORITY_LABELS,
+  OPPORTUNITY_SOURCE,
 } from '@/lib/opportunities';
 import { sanitizeOpportunityData, sanitizeTags } from '@/lib/security/form-sanitizer';
 import { cn } from '@/lib/utils';
 
 // ============================================
-// Form Schema
+// Form Schema Factory
 // ============================================
 
-const opportunityFormSchema = z.object({
-  title: z.string().min(2, 'El titulo debe tener al menos 2 caracteres'),
+const createOpportunityFormSchema = (t: ReturnType<typeof useI18n>['t']) => z.object({
+  name: z.string().min(2, t.opportunities.form.validation.nameMin),
   description: z.string().optional(),
-  stageId: z.string().optional(),
+  stageId: z.string().min(1, t.opportunities.form.validation.stageRequired),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
-  amount: z.coerce.number().min(0, 'El monto debe ser positivo'),
+  amount: z.coerce.number().min(0, t.opportunities.form.validation.amountPositive),
   currency: z.string().default('USD'),
   probability: z.number().min(0).max(100),
   expectedCloseDate: z.date().optional().nullable(),
-  tags: z.string().optional(), // Comma-separated
+  tags: z.string().optional(),
+  source: z.enum(['lead_conversion', 'direct', 'referral', 'upsell', 'cross_sell', '']).optional(),
 });
 
-type OpportunityFormValues = z.infer<typeof opportunityFormSchema>;
+type OpportunityFormValues = z.infer<ReturnType<typeof createOpportunityFormSchema>>;
 
 // ============================================
 // Props
@@ -87,13 +89,34 @@ interface OpportunityFormDialogProps {
 // Component
 // ============================================
 
+// Date locale mapping
+const dateLocales: Record<string, typeof es> = {
+  'es-MX': es,
+  'es-CO': es,
+  'es-AR': es,
+  'es-CL': es,
+  'es-PE': es,
+  'pt-BR': ptBR,
+  'en-US': enUS,
+};
+
 export function OpportunityFormDialog({
   opportunity,
   open,
   onClose,
 }: OpportunityFormDialogProps) {
   const { toast } = useToast();
+  const { t, locale } = useI18n();
   const isEditing = !!opportunity;
+
+  // Create schema with translations
+  const opportunityFormSchema = React.useMemo(
+    () => createOpportunityFormSchema(t),
+    [t]
+  );
+
+  // Get date locale
+  const dateLocale = dateLocales[locale] || es;
 
   // Mutations
   const createOpportunity = useCreateOpportunity();
@@ -106,7 +129,7 @@ export function OpportunityFormDialog({
   const form = useForm<OpportunityFormValues>({
     resolver: zodResolver(opportunityFormSchema),
     defaultValues: {
-      title: '',
+      name: '',
       description: '',
       stageId: '',
       priority: 'medium',
@@ -115,6 +138,7 @@ export function OpportunityFormDialog({
       probability: 50,
       expectedCloseDate: null,
       tags: '',
+      source: '',
     },
   });
 
@@ -122,7 +146,7 @@ export function OpportunityFormDialog({
   React.useEffect(() => {
     if (opportunity) {
       form.reset({
-        title: opportunity.title,
+        name: opportunity.name,
         description: opportunity.description ?? '',
         stageId: opportunity.stageId ?? '',
         priority: opportunity.priority,
@@ -133,10 +157,11 @@ export function OpportunityFormDialog({
           ? new Date(opportunity.expectedCloseDate)
           : null,
         tags: opportunity.tags.join(', '),
+        source: (opportunity.source as '' | 'lead_conversion' | 'direct' | 'referral' | 'upsell' | 'cross_sell') ?? '',
       });
     } else {
       form.reset({
-        title: '',
+        name: '',
         description: '',
         stageId: stages?.[0]?.id ?? '',
         priority: 'medium',
@@ -145,6 +170,7 @@ export function OpportunityFormDialog({
         probability: stages?.[0]?.probability ?? 50,
         expectedCloseDate: null,
         tags: '',
+        source: '',
       });
     }
   }, [opportunity, form, stages]);
@@ -167,15 +193,28 @@ export function OpportunityFormDialog({
       : [];
     const sanitizedTagsArray = sanitizeTags(rawTags);
 
+    // Get the stage label from the selected stageId
+    // Backend requires 'stage' (label) not 'stageId' (uuid) for create/update
+    const selectedStage = stages?.find((s) => s.id === sanitizedValues.stageId);
+    if (!selectedStage) {
+      toast({
+        title: t.opportunities.form.errors.createFailed,
+        description: t.opportunities.form.validation.stageRequired,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const payload = {
-      title: sanitizedValues.title,
+      name: sanitizedValues.name,
       description: sanitizedValues.description || undefined,
-      stageId: sanitizedValues.stageId || undefined,
+      stage: selectedStage.label, // Backend requires stage label, not stageId
       priority: sanitizedValues.priority,
       amount: sanitizedValues.amount,
       currency: sanitizedValues.currency,
       probability: sanitizedValues.probability,
       expectedCloseDate: sanitizedValues.expectedCloseDate?.toISOString(),
+      source: sanitizedValues.source || undefined,
       tags: sanitizedTagsArray,
     };
 
@@ -186,23 +225,26 @@ export function OpportunityFormDialog({
           data: payload,
         });
         toast({
-          title: 'Oportunidad actualizada',
-          description: 'La oportunidad ha sido actualizada exitosamente.',
+          title: t.opportunities.form.success.updated,
+          description: t.opportunities.form.success.updatedDescription,
         });
       } else {
         await createOpportunity.mutateAsync(payload);
         toast({
-          title: 'Oportunidad creada',
-          description: 'La nueva oportunidad ha sido creada exitosamente.',
+          title: t.opportunities.form.success.created,
+          description: t.opportunities.form.success.createdDescription,
         });
       }
       onClose();
-    } catch {
+    } catch (error) {
+      // Extract error message from API response
+      const errorMessage = error instanceof Error
+        ? error.message
+        : t.opportunities.form.errors.loadFailed;
+
       toast({
-        title: 'Error',
-        description: isEditing
-          ? 'No se pudo actualizar la oportunidad.'
-          : 'No se pudo crear la oportunidad.',
+        title: isEditing ? t.opportunities.form.errors.updateFailed : t.opportunities.form.errors.createFailed,
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -215,26 +257,26 @@ export function OpportunityFormDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {isEditing ? 'Editar Oportunidad' : 'Nueva Oportunidad'}
+            {isEditing ? t.opportunities.editOpportunity : t.opportunities.newOpportunity}
           </DialogTitle>
           <DialogDescription>
             {isEditing
-              ? 'Actualiza la informacion de la oportunidad.'
-              : 'Crea una nueva oportunidad de venta.'}
+              ? t.opportunities.form.sections.basic.description
+              : t.opportunities.form.sections.basic.description}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
-            {/* Title */}
+            {/* Name */}
             <FormField
               control={form.control}
-              name="title"
+              name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Titulo *</FormLabel>
+                  <FormLabel>{t.opportunities.form.fields.name.label} *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ej: Implementacion CRM Empresa X" {...field} />
+                    <Input placeholder={t.opportunities.form.fields.name.placeholder} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -247,11 +289,11 @@ export function OpportunityFormDialog({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Descripcion</FormLabel>
+                  <FormLabel>{t.opportunities.form.fields.description.label}</FormLabel>
                   <FormControl>
                     <Textarea
                       className="resize-none"
-                      placeholder="Descripcion de la oportunidad..."
+                      placeholder={t.opportunities.form.fields.description.placeholder}
                       rows={3}
                       {...field}
                     />
@@ -268,11 +310,11 @@ export function OpportunityFormDialog({
                 name="stageId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Etapa del Pipeline</FormLabel>
+                    <FormLabel>{t.opportunities.form.fields.stage.label}</FormLabel>
                     <Select value={field.value} onValueChange={handleStageChange}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar etapa" />
+                          <SelectValue placeholder={t.opportunities.form.fields.stage.placeholder} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -299,17 +341,17 @@ export function OpportunityFormDialog({
                 name="priority"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Prioridad</FormLabel>
+                    <FormLabel>{t.opportunities.form.fields.priority.label}</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar prioridad" />
+                          <SelectValue placeholder={t.opportunities.form.fields.priority.placeholder} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {OPPORTUNITY_PRIORITY.map((priority) => (
                           <SelectItem key={priority} value={priority}>
-                            {PRIORITY_LABELS[priority]}
+                            {t.opportunities.priority[priority as keyof typeof t.opportunities.priority]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -327,11 +369,11 @@ export function OpportunityFormDialog({
                 name="amount"
                 render={({ field }) => (
                   <FormItem className="col-span-2">
-                    <FormLabel>Monto *</FormLabel>
+                    <FormLabel>{t.opportunities.form.fields.amount.label} *</FormLabel>
                     <FormControl>
                       <Input
                         min={0}
-                        placeholder="0"
+                        placeholder={t.opportunities.form.fields.amount.placeholder}
                         step={100}
                         type="number"
                         {...field}
@@ -347,7 +389,7 @@ export function OpportunityFormDialog({
                 name="currency"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Moneda</FormLabel>
+                    <FormLabel>{t.opportunities.form.fields.currency.label}</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
@@ -372,7 +414,7 @@ export function OpportunityFormDialog({
               name="probability"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Probabilidad de Cierre: {field.value}%</FormLabel>
+                  <FormLabel>{t.opportunities.form.fields.probability.label}: {field.value}%</FormLabel>
                   <FormControl>
                     <Slider
                       className="py-4"
@@ -383,7 +425,7 @@ export function OpportunityFormDialog({
                     />
                   </FormControl>
                   <FormDescription>
-                    Forecast: ${((form.watch('amount') * field.value) / 100).toLocaleString()}
+                    {t.opportunities.probability.forecast}: ${((form.watch('amount') * field.value) / 100).toLocaleString()}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -396,7 +438,7 @@ export function OpportunityFormDialog({
               name="expectedCloseDate"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Fecha de Cierre Esperada</FormLabel>
+                  <FormLabel>{t.opportunities.form.fields.expectedCloseDate.label}</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -408,9 +450,9 @@ export function OpportunityFormDialog({
                           variant="outline"
                         >
                           {field.value ? (
-                            format(field.value, "d 'de' MMMM 'de' yyyy", { locale: es })
+                            format(field.value, 'PPP', { locale: dateLocale })
                           ) : (
-                            <span>Seleccionar fecha</span>
+                            <span>{t.opportunities.form.fields.expectedCloseDate.placeholder}</span>
                           )}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button>
@@ -422,6 +464,7 @@ export function OpportunityFormDialog({
                         disabled={(date) =>
                           date < new Date(new Date().setHours(0, 0, 0, 0))
                         }
+                        locale={dateLocale}
                         mode="single"
                         selected={field.value ?? undefined}
                         onSelect={field.onChange}
@@ -433,21 +476,48 @@ export function OpportunityFormDialog({
               )}
             />
 
+            {/* Source */}
+            <FormField
+              control={form.control}
+              name="source"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t.opportunities.form.fields.source.label}</FormLabel>
+                  <Select value={field.value || ''} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t.opportunities.form.fields.source.placeholder} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">{t.opportunities.source.unspecified}</SelectItem>
+                      {OPPORTUNITY_SOURCE.map((source) => (
+                        <SelectItem key={source} value={source}>
+                          {t.opportunities.source[source as keyof typeof t.opportunities.source] || source}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Tags */}
             <FormField
               control={form.control}
               name="tags"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Etiquetas</FormLabel>
+                  <FormLabel>{t.opportunities.form.fields.tags.label}</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Ej: enterprise, crm, urgente (separadas por coma)"
+                      placeholder={t.opportunities.form.fields.tags.placeholder}
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>
-                    Separa las etiquetas con comas
+                    {t.opportunities.form.fields.tags.hint}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -456,11 +526,11 @@ export function OpportunityFormDialog({
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
-                Cancelar
+                {t.opportunities.form.actions.cancel}
               </Button>
               <Button disabled={isPending} type="submit">
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditing ? 'Guardar Cambios' : 'Crear Oportunidad'}
+                {isEditing ? t.opportunities.form.actions.save : t.opportunities.form.actions.create}
               </Button>
             </DialogFooter>
           </form>

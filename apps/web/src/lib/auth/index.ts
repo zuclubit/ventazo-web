@@ -44,6 +44,7 @@ export {
   requestPasswordReset,
   resendConfirmationEmail,
   updatePassword,
+  fetchTenantDetails,
 } from './auth-service';
 
 // Auth Hooks

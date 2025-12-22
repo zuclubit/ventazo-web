@@ -17,7 +17,10 @@ import {
   logout as authLogout,
   restoreSession,
   switchTenant as authSwitchTenant,
+  fetchTenantDetails,
 } from '@/lib/auth';
+
+import { useTenantStore } from './tenant.store';
 
 // ============================================
 // Types
@@ -95,6 +98,22 @@ export const useAuthStore = create<AuthState>()(
           state.error = null;
         });
 
+        // Fetch full tenant details including branding and update tenant store
+        if (result.user.tenantId && result.tokens.accessToken) {
+          try {
+            const tenantDetails = await fetchTenantDetails(
+              result.tokens.accessToken,
+              result.user.tenantId
+            );
+            if (tenantDetails) {
+              useTenantStore.getState().setTenant(tenantDetails);
+            }
+          } catch (tenantError) {
+            console.warn('Failed to fetch tenant details:', tenantError);
+            // Non-critical, continue without branding
+          }
+        }
+
         return true;
       } catch (error) {
         const message =
@@ -159,6 +178,22 @@ export const useAuthStore = create<AuthState>()(
             state.currentTenantId = result.user.tenantId;
             state.isAuthenticated = true;
           });
+
+          // Fetch full tenant details including branding and update tenant store
+          if (result.user.tenantId && result.tokens.accessToken) {
+            try {
+              const tenantDetails = await fetchTenantDetails(
+                result.tokens.accessToken,
+                result.user.tenantId
+              );
+              if (tenantDetails) {
+                useTenantStore.getState().setTenant(tenantDetails);
+              }
+            } catch (tenantError) {
+              console.warn('Failed to fetch tenant details:', tenantError);
+              // Non-critical, continue without branding
+            }
+          }
         }
       } catch (error) {
         console.warn('Auth initialization failed:', error);
@@ -205,6 +240,20 @@ export const useAuthStore = create<AuthState>()(
           state.currentTenantId = tenantId;
           state.isLoading = false;
         });
+
+        // Fetch full tenant details including branding for the new tenant
+        try {
+          const tenantDetails = await fetchTenantDetails(
+            tokens.accessToken,
+            tenantId
+          );
+          if (tenantDetails) {
+            useTenantStore.getState().setTenant(tenantDetails);
+          }
+        } catch (tenantError) {
+          console.warn('Failed to fetch tenant details:', tenantError);
+          // Non-critical, continue without branding
+        }
 
         return true;
       } catch (error) {

@@ -1,4 +1,4 @@
-import { injectable } from 'tsyringe';
+import { injectable, inject } from 'tsyringe';
 import { PoolClient } from 'pg';
 import { BaseRepository, DatabasePool } from '@zuclubit/database';
 import { Result } from '@zuclubit/domain';
@@ -10,7 +10,35 @@ import {
   PaginatedResult,
 } from '../../domain/repositories';
 import { LeadStatusEnum } from '../../domain/value-objects';
-import { LeadRow } from '../database';
+
+/**
+ * Raw SQL row type - matches actual PostgreSQL column names (snake_case)
+ */
+interface LeadSqlRow {
+  id: string;
+  tenant_id: string;
+  full_name: string;
+  company_name: string | null;
+  job_title: string | null;
+  email: string;
+  phone: string | null;
+  website: string | null;
+  industry: string | null;
+  employee_count: number | null;
+  annual_revenue: number | null;
+  status: string;
+  stage_id: string | null;
+  score: number;
+  source: string;
+  owner_id: string | null;
+  notes: string | null;
+  tags: string[];
+  custom_fields: Record<string, unknown>;
+  created_at: Date;
+  updated_at: Date;
+  last_activity_at: Date | null;
+  next_follow_up_at: Date | null;
+}
 
 /**
  * PostgreSQL implementation of Lead Repository
@@ -19,14 +47,14 @@ import { LeadRow } from '../database';
 @injectable()
 export class LeadRepository extends BaseRepository implements ILeadRepository {
   constructor(
-    pool: DatabasePool,
-    private readonly eventPublisher: IEventPublisher
+    @inject(DatabasePool) pool: DatabasePool,
+    @inject('IEventPublisher') private readonly eventPublisher: IEventPublisher
   ) {
     super(pool);
   }
 
   async findById(id: string, tenantId: string): Promise<Result<Lead | null>> {
-    const result = await this.queryOne<LeadRow>(
+    const result = await this.queryOne<LeadSqlRow>(
       `SELECT * FROM leads WHERE id = $1 AND tenant_id = $2`,
       [id, tenantId]
     );
@@ -112,7 +140,7 @@ export class LeadRepository extends BaseRepository implements ILeadRepository {
     const total = countResult.getValue();
 
     // Get paginated results
-    const dataResult = await this.query<LeadRow>(
+    const dataResult = await this.query<LeadSqlRow>(
       `SELECT * FROM leads WHERE ${whereClause} ${orderByClause} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
       [...params, limit, offset]
     );
@@ -145,7 +173,7 @@ export class LeadRepository extends BaseRepository implements ILeadRepository {
   }
 
   async findByOwner(ownerId: string, tenantId: string): Promise<Result<Lead[]>> {
-    const result = await this.query<LeadRow>(
+    const result = await this.query<LeadSqlRow>(
       `SELECT * FROM leads WHERE owner_id = $1 AND tenant_id = $2 ORDER BY created_at DESC`,
       [ownerId, tenantId]
     );
@@ -159,7 +187,7 @@ export class LeadRepository extends BaseRepository implements ILeadRepository {
   }
 
   async findByStatus(status: LeadStatusEnum, tenantId: string): Promise<Result<Lead[]>> {
-    const result = await this.query<LeadRow>(
+    const result = await this.query<LeadSqlRow>(
       `SELECT * FROM leads WHERE status = $1 AND tenant_id = $2 ORDER BY created_at DESC`,
       [status, tenantId]
     );
@@ -173,7 +201,7 @@ export class LeadRepository extends BaseRepository implements ILeadRepository {
   }
 
   async findOverdueFollowUps(tenantId: string): Promise<Result<Lead[]>> {
-    const result = await this.query<LeadRow>(
+    const result = await this.query<LeadSqlRow>(
       `SELECT * FROM leads
        WHERE tenant_id = $1
          AND next_follow_up_at IS NOT NULL
@@ -291,12 +319,14 @@ export class LeadRepository extends BaseRepository implements ILeadRepository {
     try {
       await client.query(
         `INSERT INTO leads (
-          id, tenant_id, company_name, email, phone, website, industry,
-          employee_count, annual_revenue, status, score, source, owner_id,
-          notes, custom_fields, created_at, updated_at, last_activity_at, next_follow_up_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+          id, tenant_id, full_name, company_name, job_title, email, phone, website, industry,
+          employee_count, annual_revenue, status, stage_id, score, source, owner_id,
+          notes, tags, custom_fields, created_at, updated_at, last_activity_at, next_follow_up_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
         ON CONFLICT (id) DO UPDATE SET
+          full_name = EXCLUDED.full_name,
           company_name = EXCLUDED.company_name,
+          job_title = EXCLUDED.job_title,
           email = EXCLUDED.email,
           phone = EXCLUDED.phone,
           website = EXCLUDED.website,
@@ -304,9 +334,11 @@ export class LeadRepository extends BaseRepository implements ILeadRepository {
           employee_count = EXCLUDED.employee_count,
           annual_revenue = EXCLUDED.annual_revenue,
           status = EXCLUDED.status,
+          stage_id = EXCLUDED.stage_id,
           score = EXCLUDED.score,
           owner_id = EXCLUDED.owner_id,
           notes = EXCLUDED.notes,
+          tags = EXCLUDED.tags,
           custom_fields = EXCLUDED.custom_fields,
           updated_at = EXCLUDED.updated_at,
           last_activity_at = EXCLUDED.last_activity_at,
@@ -314,7 +346,9 @@ export class LeadRepository extends BaseRepository implements ILeadRepository {
         [
           lead.id,
           lead.tenantId,
+          lead.getFullName(),
           lead.getCompanyName(),
+          lead.getJobTitle(),
           lead.getEmail().value,
           lead.getPhone(),
           lead.getWebsite(),
@@ -322,10 +356,12 @@ export class LeadRepository extends BaseRepository implements ILeadRepository {
           lead.getEmployeeCount(),
           lead.getAnnualRevenue(),
           lead.getStatus().value,
+          lead.getStageId(),
           lead.getScore().value,
           lead.getSource(),
           lead.getOwnerId(),
           lead.getNotes(),
+          JSON.stringify(lead.getTags()),
           JSON.stringify(lead.getCustomFields()),
           lead.createdAt,
           lead.getUpdatedAt(),
@@ -363,31 +399,35 @@ export class LeadRepository extends BaseRepository implements ILeadRepository {
     }
   }
 
-  private mapRowToLead(row: LeadRow): Result<Lead> {
+  private mapRowToLead(row: LeadSqlRow): Result<Lead> {
     return Lead.reconstitute({
       id: row.id,
-      tenantId: row.tenantId,
-      companyName: row.companyName,
+      tenantId: row.tenant_id,
+      fullName: row.full_name,
+      companyName: row.company_name,
+      jobTitle: row.job_title,
       email: row.email,
       phone: row.phone,
       website: row.website,
       industry: row.industry,
-      employeeCount: row.employeeCount,
-      annualRevenue: row.annualRevenue,
+      employeeCount: row.employee_count,
+      annualRevenue: row.annual_revenue,
       status: row.status,
+      stageId: row.stage_id,
       score: row.score,
       source: row.source,
-      ownerId: row.ownerId,
+      ownerId: row.owner_id,
       notes: row.notes,
-      customFields: (row.customFields as Record<string, unknown>) || {},
-      createdAt: new Date(row.createdAt),
-      updatedAt: new Date(row.updatedAt),
-      lastActivityAt: row.lastActivityAt ? new Date(row.lastActivityAt) : null,
-      nextFollowUpAt: row.nextFollowUpAt ? new Date(row.nextFollowUpAt) : null,
+      tags: (row.tags as string[]) || [],
+      customFields: (row.custom_fields as Record<string, unknown>) || {},
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      lastActivityAt: row.last_activity_at ? new Date(row.last_activity_at) : null,
+      nextFollowUpAt: row.next_follow_up_at ? new Date(row.next_follow_up_at) : null,
     });
   }
 
-  private async mapRowsToLeads(rows: LeadRow[]): Promise<Result<Lead[]>> {
+  private async mapRowsToLeads(rows: LeadSqlRow[]): Promise<Result<Lead[]>> {
     const leads: Lead[] = [];
 
     for (const row of rows) {

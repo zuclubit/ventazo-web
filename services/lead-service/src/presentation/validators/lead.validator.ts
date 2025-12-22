@@ -1,33 +1,56 @@
 import { z } from 'zod';
+import {
+  phoneSchema,
+  websiteSchema,
+  emailSchema,
+  optionalEmailSchema,
+  companyNameSchema,
+  industrySchema,
+  employeeCountSchema,
+  currencyAmountSchema,
+  optionalUuidSchema,
+  notesSchema,
+  customFieldsSchema,
+  addressSchema,
+  socialLinksSchema,
+  tagsSchema,
+} from './validation-utils';
 
 /**
  * Zod schemas for request validation
  * TypeScript types are automatically inferred from these schemas
+ * Uses advanced validation utilities for robust field validation
  */
 
 export const createLeadSchema = z.object({
-  companyName: z.string().min(1, 'Company name is required').max(255),
-  email: z.string().email('Invalid email format'),
-  phone: z.string().optional(),
-  website: z.string().url('Invalid URL format').optional().or(z.literal('')),
-  industry: z.string().max(100).optional(),
-  employeeCount: z.number().int().positive().optional(),
-  annualRevenue: z.number().positive().optional(),
+  companyName: companyNameSchema,
+  email: emailSchema,
+  phone: phoneSchema,
+  website: websiteSchema,
+  industry: industrySchema,
+  employeeCount: employeeCountSchema,
+  annualRevenue: currencyAmountSchema,
   source: z.string().min(1, 'Source is required').max(100),
-  ownerId: z.string().uuid('Invalid owner ID').optional(),
-  notes: z.string().optional(),
-  customFields: z.record(z.unknown()).optional(),
+  ownerId: optionalUuidSchema,
+  notes: notesSchema,
+  customFields: customFieldsSchema,
+  address: addressSchema,
+  socialLinks: socialLinksSchema,
+  tags: tagsSchema,
 });
 
 export const updateLeadSchema = z.object({
-  companyName: z.string().min(1).max(255).optional(),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  website: z.string().url().optional().or(z.literal('')),
-  industry: z.string().max(100).optional(),
-  employeeCount: z.number().int().positive().optional(),
-  annualRevenue: z.number().positive().optional(),
-  notes: z.string().optional(),
+  companyName: companyNameSchema.optional(),
+  email: optionalEmailSchema,
+  phone: phoneSchema,
+  website: websiteSchema,
+  industry: industrySchema,
+  employeeCount: employeeCountSchema,
+  annualRevenue: currencyAmountSchema,
+  notes: notesSchema,
+  address: addressSchema,
+  socialLinks: socialLinksSchema,
+  tags: tagsSchema,
 });
 
 export const listLeadsQuerySchema = z.object({
@@ -37,10 +60,8 @@ export const listLeadsQuerySchema = z.object({
       'contacted',
       'qualified',
       'proposal',
-      'negotiation',
       'won',
       'lost',
-      'unqualified',
     ])
     .optional(),
   ownerId: z.string().uuid().optional(),

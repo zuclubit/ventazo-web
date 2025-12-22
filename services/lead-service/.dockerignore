@@ -53,7 +53,6 @@ azure-pipelines.yml
 .editorconfig
 .prettierrc
 .eslintrc
-tsconfig.json
 vitest.config.ts
 vitest.integration.config.ts
 drizzle.config.ts

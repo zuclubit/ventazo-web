@@ -38,8 +38,10 @@ export interface PaginatedResult<T> {
 export interface ILeadRepository {
   /**
    * Find lead by ID
+   * @param id Lead ID
+   * @param tenantId Optional tenant ID for multi-tenant filtering
    */
-  findById(id: string, tenantId: string): Promise<Result<Lead | null>>;
+  findById(id: string, tenantId?: string): Promise<Result<Lead | null>>;
 
   /**
    * Find all leads matching query

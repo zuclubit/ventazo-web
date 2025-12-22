@@ -1,0 +1,18 @@
+# Bun configuration for Lead Service
+# https://bun.sh/docs/runtime/bunfig
+
+[install]
+# Use exact versions for reproducibility
+exact = true
+
+[install.lockfile]
+# Save lockfile
+save = true
+
+[test]
+# Test configuration
+coverage = true
+
+[run]
+# Runtime configuration
+# Bun natively supports TypeScript path aliases from tsconfig.json

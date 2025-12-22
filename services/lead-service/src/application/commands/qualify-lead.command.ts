@@ -9,6 +9,9 @@ export class QualifyLeadCommand implements ICommand {
   constructor(
     public readonly leadId: string,
     public readonly tenantId: string,
-    public readonly userId: string
+    public readonly qualifiedBy: string,
+    // Email notification fields
+    public readonly ownerEmail?: string,
+    public readonly ownerName?: string
   ) {}
 }

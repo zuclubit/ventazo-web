@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useI18n } from '@/lib/i18n';
 import {
   useMarkOpportunityWon,
   useMarkOpportunityLost,
@@ -34,19 +35,19 @@ import {
 } from '@/lib/opportunities';
 
 // ============================================
-// Form Schemas
+// Form Schema Factories
 // ============================================
 
 const winFormSchema = z.object({
   notes: z.string().optional(),
 });
 
-const lostFormSchema = z.object({
-  reason: z.string().min(5, 'Por favor indica el motivo de perdida'),
+const createLostFormSchema = (reasonMessage: string) => z.object({
+  reason: z.string().min(5, reasonMessage),
 });
 
 type WinFormValues = z.infer<typeof winFormSchema>;
-type LostFormValues = z.infer<typeof lostFormSchema>;
+type LostFormValues = z.infer<ReturnType<typeof createLostFormSchema>>;
 
 // ============================================
 // Props
@@ -70,7 +71,14 @@ export function WinLostDialog({
   onClose,
 }: WinLostDialogProps) {
   const { toast } = useToast();
+  const { t } = useI18n();
   const isWin = action === 'win';
+
+  // Create schema with translations
+  const lostFormSchema = React.useMemo(
+    () => createLostFormSchema(t.opportunities.winLostDialog.lost.reasonRequired),
+    [t]
+  );
 
   // Mutations
   const markWon = useMarkOpportunityWon();
@@ -112,14 +120,14 @@ export function WinLostDialog({
         },
       });
       toast({
-        title: 'Oportunidad ganada',
-        description: 'La oportunidad ha sido marcada como ganada exitosamente.',
+        title: t.opportunities.winLostDialog.success.won,
+        description: t.opportunities.winLostDialog.success.wonDescription,
       });
       onClose();
     } catch {
       toast({
-        title: 'Error',
-        description: 'No se pudo marcar la oportunidad como ganada.',
+        title: t.opportunities.form.errors.updateFailed,
+        description: t.opportunities.winLostDialog.errors.wonFailed,
         variant: 'destructive',
       });
     }
@@ -137,14 +145,14 @@ export function WinLostDialog({
         },
       });
       toast({
-        title: 'Oportunidad perdida',
-        description: 'La oportunidad ha sido marcada como perdida.',
+        title: t.opportunities.winLostDialog.success.lost,
+        description: t.opportunities.winLostDialog.success.lostDescription,
       });
       onClose();
     } catch {
       toast({
-        title: 'Error',
-        description: 'No se pudo marcar la oportunidad como perdida.',
+        title: t.opportunities.form.errors.updateFailed,
+        description: t.opportunities.winLostDialog.errors.lostFailed,
         variant: 'destructive',
       });
     }
@@ -162,31 +170,31 @@ export function WinLostDialog({
             {isWin ? (
               <>
                 <Trophy className="h-5 w-5 text-green-500" />
-                Marcar como Ganada
+                {t.opportunities.winLostDialog.win.title}
               </>
             ) : (
               <>
                 <XCircle className="h-5 w-5 text-red-500" />
-                Marcar como Perdida
+                {t.opportunities.winLostDialog.lost.title}
               </>
             )}
           </DialogTitle>
           <DialogDescription>
             {isWin
-              ? 'Felicidades! Registra la oportunidad como ganada.'
-              : 'Registra el motivo por el cual se perdio esta oportunidad.'}
+              ? t.opportunities.winLostDialog.win.description
+              : t.opportunities.winLostDialog.lost.description}
           </DialogDescription>
         </DialogHeader>
 
         {/* Opportunity Info */}
         <div className="rounded-md bg-muted p-4">
-          <p className="font-medium">{opportunity.title}</p>
+          <p className="font-medium">{opportunity.name}</p>
           <p className="text-sm text-muted-foreground">
             {formatCurrency(opportunity.amount, opportunity.currency)}
           </p>
           {opportunity.customer?.name && (
             <p className="text-sm text-muted-foreground">
-              Cliente: {opportunity.customer.name}
+              {t.opportunities.preview.client}: {opportunity.customer.name}
             </p>
           )}
         </div>
@@ -200,11 +208,11 @@ export function WinLostDialog({
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notas de cierre (opcional)</FormLabel>
+                    <FormLabel>{t.opportunities.winLostDialog.win.notesLabel}</FormLabel>
                     <FormControl>
                       <Textarea
                         className="resize-none"
-                        placeholder="Ej: Contrato firmado, inicio de implementacion en enero..."
+                        placeholder={t.opportunities.winLostDialog.win.notesPlaceholder}
                         rows={3}
                         {...field}
                       />
@@ -216,7 +224,7 @@ export function WinLostDialog({
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={onClose}>
-                  Cancelar
+                  {t.opportunities.actions.cancel}
                 </Button>
                 <Button
                   className="bg-green-600 hover:bg-green-700"
@@ -225,7 +233,7 @@ export function WinLostDialog({
                 >
                   {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   <Trophy className="mr-2 h-4 w-4" />
-                  Confirmar Ganada
+                  {t.opportunities.winLostDialog.win.confirm}
                 </Button>
               </DialogFooter>
             </form>
@@ -239,11 +247,11 @@ export function WinLostDialog({
                 name="reason"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Motivo de perdida *</FormLabel>
+                    <FormLabel>{t.opportunities.winLostDialog.lost.reasonLabel} *</FormLabel>
                     <FormControl>
                       <Textarea
                         className="resize-none"
-                        placeholder="Ej: Presupuesto insuficiente, eligieron competencia, proyecto cancelado..."
+                        placeholder={t.opportunities.winLostDialog.lost.reasonPlaceholder}
                         rows={3}
                         {...field}
                       />
@@ -255,7 +263,7 @@ export function WinLostDialog({
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={onClose}>
-                  Cancelar
+                  {t.opportunities.actions.cancel}
                 </Button>
                 <Button
                   className="bg-red-600 hover:bg-red-700"
@@ -264,7 +272,7 @@ export function WinLostDialog({
                 >
                   {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   <XCircle className="mr-2 h-4 w-4" />
-                  Confirmar Perdida
+                  {t.opportunities.winLostDialog.lost.confirm}
                 </Button>
               </DialogFooter>
             </form>

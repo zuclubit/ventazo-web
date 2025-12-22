@@ -16,6 +16,15 @@ const config: Config = {
   			'2xl': '1400px'
   		}
   	},
+  	// Custom breakpoints including xs for very small mobile devices
+  	screens: {
+  		'xs': '375px',   // iPhone SE/Mini and similar small devices
+  		'sm': '640px',   // Standard Tailwind breakpoint
+  		'md': '768px',   // Tablets
+  		'lg': '1024px',  // Small laptops
+  		'xl': '1280px',  // Desktops
+  		'2xl': '1536px', // Large screens
+  	},
   	extend: {
   		colors: {
   			/* Ventazo Brand Colors - Teal Palette */
@@ -242,6 +251,127 @@ const config: Config = {
   					opacity: '1',
   					transform: 'translateY(0)'
   				}
+  			},
+  			/* VENTAZO PREMIUM ANIMATIONS 2025 */
+  			'flame-flicker': {
+  				'0%, 100%': {
+  					opacity: '0.8',
+  					transform: 'scale(1) rotate(0deg)'
+  				},
+  				'25%': {
+  					opacity: '1',
+  					transform: 'scale(1.05) rotate(1deg)'
+  				},
+  				'50%': {
+  					opacity: '0.9',
+  					transform: 'scale(0.98) rotate(-1deg)'
+  				},
+  				'75%': {
+  					opacity: '1',
+  					transform: 'scale(1.02) rotate(0.5deg)'
+  				}
+  			},
+  			'glow-breathe': {
+  				'0%, 100%': {
+  					boxShadow: '0 0 20px rgba(14, 181, 140, 0.2)'
+  				},
+  				'50%': {
+  					boxShadow: '0 0 35px rgba(14, 181, 140, 0.4)'
+  				}
+  			},
+  			'glow-hot-breathe': {
+  				'0%, 100%': {
+  					boxShadow: '0 0 15px rgba(255, 107, 53, 0.25)'
+  				},
+  				'50%': {
+  					boxShadow: '0 0 28px rgba(255, 107, 53, 0.45)'
+  				}
+  			},
+  			'border-shimmer': {
+  				'0%': {
+  					backgroundPosition: '200% 0'
+  				},
+  				'100%': {
+  					backgroundPosition: '-200% 0'
+  				}
+  			},
+  			'scale-in': {
+  				'0%': {
+  					opacity: '0',
+  					transform: 'scale(0.95)'
+  				},
+  				'100%': {
+  					opacity: '1',
+  					transform: 'scale(1)'
+  				}
+  			},
+  			'slide-up-fade': {
+  				'0%': {
+  					opacity: '0',
+  					transform: 'translateY(8px)'
+  				},
+  				'100%': {
+  					opacity: '1',
+  					transform: 'translateY(0)'
+  				}
+  			},
+  			'card-hover-lift': {
+  				'0%': {
+  					transform: 'translateY(0)'
+  				},
+  				'100%': {
+  					transform: 'translateY(-4px)'
+  				}
+  			},
+  			'ripple': {
+  				'0%': {
+  					transform: 'scale(0)',
+  					opacity: '0.5'
+  				},
+  				'100%': {
+  					transform: 'scale(4)',
+  					opacity: '0'
+  				}
+  			},
+  			'score-pop': {
+  				'0%': {
+  					transform: 'scale(0.8)',
+  					opacity: '0'
+  				},
+  				'50%': {
+  					transform: 'scale(1.1)'
+  				},
+  				'100%': {
+  					transform: 'scale(1)',
+  					opacity: '1'
+  				}
+  			},
+  			'badge-bounce': {
+  				'0%, 100%': {
+  					transform: 'translateY(0)'
+  				},
+  				'50%': {
+  					transform: 'translateY(-2px)'
+  				}
+  			},
+  			/* VENTAZO KANBAN CARD ANIMATIONS */
+  			'card-enter': {
+  				'0%': {
+  					opacity: '0',
+  					transform: 'translateY(8px) scale(0.98)'
+  				},
+  				'100%': {
+  					opacity: '1',
+  					transform: 'translateY(0) scale(1)'
+  				}
+  			},
+  			'pulse-soft': {
+  				'0%, 100%': {
+  					opacity: '1'
+  				},
+  				'50%': {
+  					opacity: '0.92'
+  				}
   			}
   		},
   		animation: {
@@ -256,7 +386,21 @@ const config: Config = {
   			float: 'float 4s ease-in-out infinite',
   			'float-slow': 'float-slow 5s ease-in-out infinite',
   			'glow-pulse': 'glow-pulse 3s ease-in-out infinite',
-  			'fade-in-up': 'fade-in-up 0.4s ease-out forwards'
+  			'fade-in-up': 'fade-in-up 0.4s ease-out forwards',
+  			/* VENTAZO PREMIUM ANIMATIONS */
+  			'flame-flicker': 'flame-flicker 2s ease-in-out infinite',
+  			'glow-breathe': 'glow-breathe 3s ease-in-out infinite',
+  			'glow-hot-breathe': 'glow-hot-breathe 2.5s ease-in-out infinite',
+  			'border-shimmer': 'border-shimmer 3s linear infinite',
+  			'scale-in': 'scale-in 0.2s ease-out',
+  			'slide-up-fade': 'slide-up-fade 0.3s ease-out',
+  			'card-hover-lift': 'card-hover-lift 0.2s ease-out forwards',
+  			'ripple': 'ripple 0.6s ease-out',
+  			'score-pop': 'score-pop 0.3s ease-out forwards',
+  			'badge-bounce': 'badge-bounce 0.5s ease-in-out',
+  			/* VENTAZO KANBAN CARD ANIMATIONS */
+  			'card-enter': 'card-enter 0.25s ease-out forwards',
+  			'pulse-soft': 'pulse-soft 3s ease-in-out infinite'
   		},
   		boxShadow: {
   			'inner-sm': 'inset 0 1px 2px 0 rgb(0 0 0 / 0.05)'

@@ -32,6 +32,10 @@ const buttonVariants = cva(
           'bg-gradient-to-r from-[#FB923C] via-[#F97316] to-[#EA580C] text-white shadow-[0_8px_30px_-6px_rgba(249,115,22,0.5)] hover:-translate-y-0.5 hover:shadow-[0_12px_40px_-6px_rgba(249,115,22,0.6)]',
         elevated:
           'bg-card border border-border shadow-md hover:shadow-lg hover:border-primary/30 hover:-translate-y-0.5',
+        // VENTAZO 2025 CTA Variant
+        cta: 'btn-cta-glow',
+        'cta-outline':
+          'border-2 border-primary/80 bg-transparent text-primary hover:bg-primary/10 hover:border-primary hover:-translate-y-0.5 transition-all',
       },
       size: {
         default: 'h-10 px-4 py-2',

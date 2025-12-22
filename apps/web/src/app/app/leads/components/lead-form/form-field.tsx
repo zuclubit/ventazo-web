@@ -1,29 +1,23 @@
 'use client';
 
 /**
- * Enhanced Form Field Component
+ * Form Field Components - v3.0 (2025 World-Class)
  *
- * A refined, accessible form field with:
- * - Icon support
- * - Validation states
- * - Character counter
- * - Animated error messages
- * - Responsive design
+ * Mobile-first form components with consistent sizing.
  *
- * Best Practices:
- * - Minimum 44px touch targets on mobile (WCAG 2.1 AAA)
- * - Clear focus indicators
- * - Proper label association
- * - Screen reader support
+ * Design Principles:
+ * - Consistent sizing: 44px height for all inputs (Material/Apple standard)
+ * - 16px font prevents iOS zoom on focus
+ * - Labels always above fields
+ * - WCAG 2.1 AAA compliant
+ * - No dynamic sizing based on device detection
  *
  * @module leads/components/lead-form/form-field
  */
 
 import * as React from 'react';
-
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, Check, type LucideIcon } from 'lucide-react';
-
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -42,15 +36,13 @@ export interface FormFieldProps {
   error?: string;
   /** Whether field is required */
   required?: boolean;
-  /** Hint text (e.g., "Optional") */
+  /** Hint text */
   hint?: string;
-  /** Icon to show in the input */
-  icon?: LucideIcon;
   /** Show character count */
   showCharCount?: boolean;
-  /** Max characters (for char count) */
+  /** Max characters */
   maxLength?: number;
-  /** Current value length (for char count) */
+  /** Current value length */
   currentLength?: number;
   /** Whether the field is valid */
   isValid?: boolean;
@@ -61,7 +53,18 @@ export interface FormFieldProps {
 }
 
 // ============================================
-// Component
+// Error Animation
+// ============================================
+
+const errorAnimation = {
+  initial: { opacity: 0, y: -4, height: 0 },
+  animate: { opacity: 1, y: 0, height: 'auto' },
+  exit: { opacity: 0, y: -4, height: 0 },
+  transition: { duration: 0.15 },
+};
+
+// ============================================
+// Form Field Component
 // ============================================
 
 export function FormField({
@@ -70,7 +73,6 @@ export function FormField({
   error,
   required,
   hint,
-  icon: Icon,
   showCharCount,
   maxLength,
   currentLength = 0,
@@ -80,77 +82,96 @@ export function FormField({
 }: FormFieldProps) {
   const hasError = !!error;
   const showValidState = isValid && !hasError;
+  const errorId = `${id}-error`;
+  const hintId = `${id}-hint`;
+
+  // Clone children to add aria-describedby
+  const enhancedChildren = React.Children.map(children, (child) => {
+    if (React.isValidElement(child)) {
+      const describedBy = [hasError ? errorId : null, hint ? hintId : null]
+        .filter(Boolean)
+        .join(' ');
+
+      return React.cloneElement(
+        child as React.ReactElement<{ 'aria-describedby'?: string }>,
+        { 'aria-describedby': describedBy || undefined }
+      );
+    }
+    return child;
+  });
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('w-full min-w-0 space-y-1.5', className)}>
       {/* Label Row */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 min-w-0">
         <Label
           htmlFor={id}
           className={cn(
-            // Typography
-            'text-sm font-medium',
-            // Transitions
-            'transition-colors',
-            // Error state
+            'text-sm font-medium leading-none shrink-0',
             hasError && 'text-destructive'
           )}
         >
           {label}
           {required && (
-            <span className="text-destructive ml-1" aria-hidden="true">
+            <span className="text-destructive ml-0.5" aria-hidden="true">
               *
             </span>
           )}
+          {required && <span className="sr-only">(requerido)</span>}
         </Label>
 
+        {/* Right side indicators */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Hint text */}
           {hint && !showCharCount && (
-            <span className="text-xs text-muted-foreground">{hint}</span>
+            <span id={hintId} className="text-xs text-muted-foreground">
+              {hint}
+            </span>
           )}
+
+          {/* Character counter */}
           {showCharCount && maxLength && (
             <span
               className={cn(
-                'text-xs tabular-nums transition-colors',
+                'text-xs tabular-nums',
                 currentLength > maxLength * 0.9
-                  ? 'text-amber-500'
+                  ? 'text-amber-500 font-medium'
                   : 'text-muted-foreground',
-                currentLength >= maxLength && 'text-destructive'
+                currentLength >= maxLength && 'text-destructive font-medium'
               )}
               aria-live="polite"
             >
               {currentLength}/{maxLength}
             </span>
           )}
+
+          {/* Valid indicator */}
           {showValidState && (
             <motion.span
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               className="text-primary"
-              aria-label="Campo valido"
+              aria-label="Campo válido"
             >
-              <Check className="h-3.5 w-3.5" />
+              <Check className="h-4 w-4" />
             </motion.span>
           )}
         </div>
       </div>
 
       {/* Input */}
-      {children}
+      <div className="w-full">{enhancedChildren}</div>
 
       {/* Error Message */}
       <AnimatePresence mode="wait">
         {hasError && (
           <motion.p
-            initial={{ opacity: 0, y: -4, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: -4, height: 0 }}
-            transition={{ duration: 0.15 }}
-            className="text-xs text-destructive flex items-center gap-1.5"
+            id={errorId}
             role="alert"
-            id={`${id}-error`}
+            {...errorAnimation}
+            className="flex items-start gap-1.5 text-xs text-destructive"
           >
-            <AlertCircle className="h-3 w-3 shrink-0" />
+            <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
             <span>{error}</span>
           </motion.p>
         )}
@@ -167,48 +188,50 @@ export interface InputWithIconProps
   extends React.InputHTMLAttributes<HTMLInputElement> {
   icon?: LucideIcon;
   error?: boolean;
-  inputClassName?: string;
 }
 
 export const InputWithIcon = React.forwardRef<
   HTMLInputElement,
   InputWithIconProps
->(({ icon: Icon, error, className, inputClassName, ...props }, ref) => {
+>(({ icon: Icon, error, className, ...props }, ref) => {
   return (
-    <div className={cn('relative w-full', className)}>
+    <div className="relative w-full">
       <Input
         ref={ref}
         className={cn(
-          // Full width to prevent overflow
+          // Full width
           'w-full',
-          // Responsive height - larger on mobile for touch targets
-          'h-12 sm:h-11',
-          // Transitions
-          'transition-all duration-200',
-          // Icon padding - optimized for mobile (40px instead of 44px)
-          Icon && 'pl-10 sm:pl-10',
+          // Consistent height - 44px (touch-friendly)
+          'h-11',
+          // 16px font prevents iOS zoom
+          'text-base',
+          // Padding with icon
+          Icon ? 'pl-10 pr-3' : 'px-3',
+          // Border radius
+          'rounded-lg',
+          // Background
+          'bg-background/80',
+          // Border
+          'border-input/60',
+          // Focus state
+          'focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary',
           // Error state
           error && 'border-destructive focus-visible:ring-destructive/20',
-          // Focus state
-          'focus-visible:ring-2 focus-visible:ring-primary/20',
-          inputClassName
+          // Disabled
+          'disabled:opacity-50 disabled:bg-muted/30',
+          className
         )}
-        aria-invalid={error ? 'true' : undefined}
+        aria-invalid={error}
         {...props}
       />
       {Icon && (
         <Icon
           className={cn(
-            // Position - adjusted for smaller padding
             'absolute left-3 top-1/2 -translate-y-1/2',
-            // Size - consistent across devices
             'h-4 w-4',
-            // Color
             'text-muted-foreground pointer-events-none',
-            // Error state
             error && 'text-destructive'
           )}
-          aria-hidden="true"
         />
       )}
     </div>
@@ -234,21 +257,31 @@ export const TextareaWithCounter = React.forwardRef<
     <Textarea
       ref={ref}
       className={cn(
-        // Responsive sizing
-        'min-h-[120px] sm:min-h-[100px]',
-        // Responsive padding - larger on mobile
-        'p-3.5 sm:p-3',
-        // Disable resize for consistent UX
+        // Full width
+        'w-full',
+        // Height
+        'min-h-[100px]',
+        // 16px font prevents iOS zoom
+        'text-base',
+        // Padding
+        'p-3',
+        // Border radius
+        'rounded-lg',
+        // Background
+        'bg-background/80',
+        // Border
+        'border-input/60',
+        // No resize for consistent UX
         'resize-none',
-        // Transitions
-        'transition-all duration-200',
+        // Focus state
+        'focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary',
         // Error state
         error && 'border-destructive focus-visible:ring-destructive/20',
-        // Focus state
-        'focus-visible:ring-2 focus-visible:ring-primary/20',
+        // Disabled
+        'disabled:opacity-50 disabled:bg-muted/30',
         className
       )}
-      aria-invalid={error ? 'true' : undefined}
+      aria-invalid={error}
       {...props}
     />
   );

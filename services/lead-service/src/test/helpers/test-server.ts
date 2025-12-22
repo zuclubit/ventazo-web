@@ -3,6 +3,7 @@ import { FastifyInstance } from 'fastify';
 import { container } from 'tsyringe';
 import { DatabasePool } from '@zuclubit/database';
 import { IEventPublisher } from '@zuclubit/events';
+import { Result, DomainEvent } from '@zuclubit/domain';
 import { createServer, ServerConfig } from '../../presentation/server';
 import { errorHandler } from '../../presentation/middlewares/error-handler.middleware';
 import { leadRoutes } from '../../presentation/routes/lead.routes';
@@ -29,35 +30,35 @@ import { LeadRepository } from '../../infrastructure/repositories/lead.repositor
  * Implements IEventPublisher without requiring NATS connection
  */
 class MockEventPublisher implements IEventPublisher {
-  private events: unknown[] = [];
+  private events: DomainEvent[] = [];
 
-  async connect() {
-    return { isSuccess: true, isFailure: false, getValue: () => undefined, error: null } as const;
+  async connect(): Promise<Result<void>> {
+    return Result.ok();
   }
 
-  async disconnect() {
+  async disconnect(): Promise<void> {
     return Promise.resolve();
   }
 
-  isConnected() {
+  isConnected(): boolean {
     return true;
   }
 
-  async publish(event: unknown) {
+  async publish(event: DomainEvent): Promise<Result<void>> {
     this.events.push(event);
-    return { isSuccess: true, isFailure: false, getValue: () => undefined, error: null } as const;
+    return Result.ok();
   }
 
-  async publishBatch(events: unknown[]) {
+  async publishBatch(events: DomainEvent[]): Promise<Result<void>> {
     this.events.push(...events);
-    return { isSuccess: true, isFailure: false, getValue: () => undefined, error: null } as const;
+    return Result.ok();
   }
 
-  getPublishedEvents() {
+  getPublishedEvents(): DomainEvent[] {
     return this.events;
   }
 
-  clearEvents() {
+  clearEvents(): void {
     this.events = [];
   }
 }

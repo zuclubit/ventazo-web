@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import { useI18n } from '@/lib/i18n';
 import { RBACGuard } from '@/lib/auth';
 import {
   usePipelineStages,
@@ -42,8 +43,6 @@ import {
   type OpportunityPriority,
   OPPORTUNITY_STATUS,
   OPPORTUNITY_PRIORITY,
-  STATUS_LABELS,
-  PRIORITY_LABELS,
 } from '@/lib/opportunities';
 import { cn } from '@/lib/utils';
 
@@ -72,6 +71,8 @@ interface ViewToggleProps {
 }
 
 function ViewToggle({ mode, onChange }: ViewToggleProps) {
+  const { t } = useI18n();
+
   return (
     <div className="flex items-center border rounded-lg p-1 bg-muted/30">
       <Button
@@ -96,7 +97,7 @@ function ViewToggle({ mode, onChange }: ViewToggleProps) {
         onClick={() => onChange('list')}
       >
         <List className="h-4 w-4 mr-1.5" />
-        <span className="hidden sm:inline">Lista</span>
+        <span className="hidden sm:inline">{t.opportunities.kanban.viewToggle.list}</span>
       </Button>
     </div>
   );
@@ -129,6 +130,7 @@ function FilterChips({
   onClearSearch,
   onClearAll,
 }: FilterChipsProps) {
+  const { t } = useI18n();
   const hasFilters =
     statusFilter !== 'all' ||
     priorityFilter !== 'all' ||
@@ -139,11 +141,11 @@ function FilterChips({
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-xs text-muted-foreground">Filtros:</span>
+      <span className="text-xs text-muted-foreground">{t.opportunities.filters.label}:</span>
 
       {searchTerm.trim() && (
         <Badge variant="secondary" className="gap-1 pr-1">
-          Busqueda: "{searchTerm}"
+          {t.opportunities.filters.search}: "{searchTerm}"
           <button
             className="ml-1 hover:bg-muted rounded-full p-0.5"
             onClick={onClearSearch}
@@ -155,7 +157,7 @@ function FilterChips({
 
       {statusFilter !== 'all' && (
         <Badge variant="secondary" className="gap-1 pr-1">
-          Estado: {STATUS_LABELS[statusFilter]}
+          {t.opportunities.status.label}: {t.opportunities.status[statusFilter as keyof typeof t.opportunities.status]}
           <button
             className="ml-1 hover:bg-muted rounded-full p-0.5"
             onClick={onClearStatus}
@@ -167,7 +169,7 @@ function FilterChips({
 
       {priorityFilter !== 'all' && (
         <Badge variant="secondary" className="gap-1 pr-1">
-          Prioridad: {PRIORITY_LABELS[priorityFilter]}
+          {t.opportunities.priority.label}: {t.opportunities.priority[priorityFilter as keyof typeof t.opportunities.priority]}
           <button
             className="ml-1 hover:bg-muted rounded-full p-0.5"
             onClick={onClearPriority}
@@ -179,7 +181,7 @@ function FilterChips({
 
       {stageFilter !== 'all' && (
         <Badge variant="secondary" className="gap-1 pr-1">
-          Etapa activa
+          {t.opportunities.filters.activeStage}
           <button
             className="ml-1 hover:bg-muted rounded-full p-0.5"
             onClick={onClearStage}
@@ -195,7 +197,7 @@ function FilterChips({
         className="h-6 text-xs text-muted-foreground hover:text-foreground"
         onClick={onClearAll}
       >
-        Limpiar todo
+        {t.opportunities.filters.clearAll}
       </Button>
     </div>
   );
@@ -207,6 +209,7 @@ function FilterChips({
 
 export default function OpportunitiesPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const isMobile = useMediaQuery('(max-width: 1023px)');
 
   // ============================================
@@ -347,9 +350,9 @@ export default function OpportunitiesPage() {
         <div className="flex-shrink-0 px-4 py-4 md:px-6 border-b bg-card/50 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Oportunidades</h1>
+              <h1 className="text-2xl font-bold tracking-tight">{t.opportunities.title}</h1>
               <p className="text-sm text-muted-foreground">
-                Gestiona tus oportunidades de venta
+                {t.opportunities.subtitle}
               </p>
             </div>
           </div>
@@ -386,9 +389,9 @@ export default function OpportunitiesPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           {/* Title */}
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Oportunidades</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{t.opportunities.title}</h1>
             <p className="text-sm text-muted-foreground">
-              {totalOpportunities} oportunidades en pipeline
+              {totalOpportunities} {t.opportunities.pipelineSubtitle}
             </p>
           </div>
 
@@ -403,13 +406,13 @@ export default function OpportunitiesPage() {
               disabled={isMoving}
             >
               <RefreshCw className={cn('h-4 w-4', isMoving && 'animate-spin')} />
-              <span className="ml-2 hidden sm:inline">Actualizar</span>
+              <span className="ml-2 hidden sm:inline">{t.opportunities.actions.refresh}</span>
             </Button>
 
             <RBACGuard fallback={null} minRole="sales_rep">
               <Button size="sm" onClick={() => setIsCreateOpen(true)}>
                 <Plus className="h-4 w-4" />
-                <span className="ml-2 hidden sm:inline">Nueva Oportunidad</span>
+                <span className="ml-2 hidden sm:inline">{t.opportunities.newOpportunity}</span>
               </Button>
             </RBACGuard>
           </div>
@@ -438,7 +441,7 @@ export default function OpportunitiesPage() {
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar oportunidades..."
+              placeholder={t.opportunities.filters.searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 h-9"
@@ -452,13 +455,13 @@ export default function OpportunitiesPage() {
               onValueChange={(v) => setStatusFilter(v as OpportunityStatus | 'all')}
             >
               <SelectTrigger className="h-9 w-[140px]">
-                <SelectValue placeholder="Estado" />
+                <SelectValue placeholder={t.opportunities.status.label} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">{t.opportunities.status.all}</SelectItem>
                 {OPPORTUNITY_STATUS.map((status) => (
                   <SelectItem key={status} value={status}>
-                    {STATUS_LABELS[status]}
+                    {t.opportunities.status[status as keyof typeof t.opportunities.status]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -469,13 +472,13 @@ export default function OpportunitiesPage() {
               onValueChange={(v) => setPriorityFilter(v as OpportunityPriority | 'all')}
             >
               <SelectTrigger className="h-9 w-[140px]">
-                <SelectValue placeholder="Prioridad" />
+                <SelectValue placeholder={t.opportunities.priority.label} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="all">{t.opportunities.priority.all}</SelectItem>
                 {OPPORTUNITY_PRIORITY.map((priority) => (
                   <SelectItem key={priority} value={priority}>
-                    {PRIORITY_LABELS[priority]}
+                    {t.opportunities.priority[priority as keyof typeof t.opportunities.priority]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -487,10 +490,10 @@ export default function OpportunitiesPage() {
                 onValueChange={setStageFilter}
               >
                 <SelectTrigger className="h-9 w-[160px]">
-                  <SelectValue placeholder="Etapa" />
+                  <SelectValue placeholder={t.opportunities.filters.stage} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas las etapas</SelectItem>
+                  <SelectItem value="all">{t.opportunities.filters.allStages}</SelectItem>
                   {stages.map((stage) => (
                     <SelectItem key={stage.id} value={stage.id}>
                       <div className="flex items-center gap-2">
@@ -548,17 +551,17 @@ export default function OpportunitiesPage() {
               onAddOpportunity={handleAddOpportunity}
             />
           ) : (
-            // List view - redirect to old list
+            // List view - coming soon
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <p className="text-muted-foreground mb-4">
-                  Vista de lista en desarrollo
+                  {t.opportunities.kanban.listViewInProgress}
                 </p>
                 <Button
                   variant="outline"
                   onClick={() => setViewMode('kanban')}
                 >
-                  Volver a Kanban
+                  {t.opportunities.kanban.backToKanban}
                 </Button>
               </div>
             </div>

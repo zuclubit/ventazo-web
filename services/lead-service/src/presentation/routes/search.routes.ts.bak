@@ -1,0 +1,310 @@
+/**
+ * Search Routes
+ * Provides API endpoints for full-text search functionality
+ */
+
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { z } from 'zod';
+import { container } from 'tsyringe';
+import { SearchService, SearchEntityType } from '../../infrastructure/search';
+import { LeadStatusEnum } from '../../domain/value-objects';
+
+// Validation Schemas
+const searchQuerySchema = z.object({
+  q: z.string().min(1).max(500),
+  entityTypes: z
+    .string()
+    .transform((val) => val.split(',') as SearchEntityType[])
+    .optional(),
+  status: z
+    .string()
+    .transform((val) => val.split(',') as LeadStatusEnum[])
+    .optional(),
+  ownerId: z.string().uuid().optional(),
+  source: z
+    .string()
+    .transform((val) => val.split(','))
+    .optional(),
+  industry: z
+    .string()
+    .transform((val) => val.split(','))
+    .optional(),
+  tags: z
+    .string()
+    .transform((val) => val.split(','))
+    .optional(),
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional(),
+  minScore: z.coerce.number().int().min(0).max(100).optional(),
+  maxScore: z.coerce.number().int().min(0).max(100).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  sortBy: z.enum(['relevance', 'createdAt', 'updatedAt', 'score']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
+  fuzzy: z
+    .string()
+    .transform((val) => val === 'true')
+    .optional(),
+});
+
+const autocompleteQuerySchema = z.object({
+  q: z.string().min(2).max(100),
+  entityTypes: z
+    .string()
+    .transform((val) => val.split(',') as SearchEntityType[])
+    .optional(),
+  limit: z.coerce.number().int().positive().max(20).optional(),
+});
+
+const saveSearchSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  options: z.object({
+    query: z.string().min(1),
+    entityTypes: z.array(z.nativeEnum(SearchEntityType)).optional(),
+    status: z.array(z.nativeEnum(LeadStatusEnum)).optional(),
+    ownerId: z.string().uuid().optional(),
+    source: z.array(z.string()).optional(),
+    industry: z.array(z.string()).optional(),
+    tags: z.array(z.string()).optional(),
+    minScore: z.number().optional(),
+    maxScore: z.number().optional(),
+  }),
+  isPublic: z.boolean().optional(),
+});
+
+export async function searchRoutes(fastify: FastifyInstance) {
+  const searchService = container.resolve(SearchService);
+
+  /**
+   * GET /search
+   * Perform full-text search
+   */
+  fastify.get(
+    '/',
+    {
+      schema: {
+        description: 'Perform full-text search across leads, contacts, and communications',
+        tags: ['Search'],
+        querystring: searchQuerySchema,
+      },
+    },
+    async (
+      request: FastifyRequest<{ Querystring: z.infer<typeof searchQuerySchema> }>,
+      reply: FastifyReply
+    ) => {
+      const tenantId = request.headers['x-tenant-id'] as string;
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'Tenant ID required' });
+      }
+
+      const result = await searchService.search({
+        query: request.query.q,
+        tenantId,
+        entityTypes: request.query.entityTypes,
+        status: request.query.status,
+        ownerId: request.query.ownerId,
+        source: request.query.source,
+        industry: request.query.industry,
+        tags: request.query.tags,
+        dateFrom: request.query.dateFrom,
+        dateTo: request.query.dateTo,
+        minScore: request.query.minScore,
+        maxScore: request.query.maxScore,
+        page: request.query.page,
+        limit: request.query.limit,
+        sortBy: request.query.sortBy,
+        sortOrder: request.query.sortOrder,
+        fuzzy: request.query.fuzzy,
+      });
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.send(result.getValue());
+    }
+  );
+
+  /**
+   * GET /search/autocomplete
+   * Get autocomplete suggestions
+   */
+  fastify.get(
+    '/autocomplete',
+    {
+      schema: {
+        description: 'Get autocomplete suggestions for search',
+        tags: ['Search'],
+        querystring: autocompleteQuerySchema,
+      },
+    },
+    async (
+      request: FastifyRequest<{ Querystring: z.infer<typeof autocompleteQuerySchema> }>,
+      reply: FastifyReply
+    ) => {
+      const tenantId = request.headers['x-tenant-id'] as string;
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'Tenant ID required' });
+      }
+
+      const result = await searchService.getAutocompleteSuggestions(
+        tenantId,
+        request.query.q,
+        request.query.entityTypes,
+        request.query.limit
+      );
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.send({
+        suggestions: result.getValue(),
+        query: request.query.q,
+      });
+    }
+  );
+
+  /**
+   * GET /search/recent
+   * Get recent searches
+   */
+  fastify.get(
+    '/recent',
+    {
+      schema: {
+        description: 'Get recent searches for the current user',
+        tags: ['Search'],
+        querystring: z.object({
+          limit: z.coerce.number().int().positive().max(20).optional(),
+        }),
+      },
+    },
+    async (
+      request: FastifyRequest<{ Querystring: { limit?: number } }>,
+      reply: FastifyReply
+    ) => {
+      const tenantId = request.headers['x-tenant-id'] as string;
+      const userId = request.headers['x-user-id'] as string;
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'Tenant ID required' });
+      }
+
+      const result = await searchService.getRecentSearches(
+        tenantId,
+        userId || 'anonymous',
+        request.query.limit
+      );
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.send({
+        searches: result.getValue(),
+        count: result.getValue().length,
+      });
+    }
+  );
+
+  /**
+   * POST /search/saved
+   * Save a search for later use
+   */
+  fastify.post(
+    '/saved',
+    {
+      schema: {
+        description: 'Save a search for later use',
+        tags: ['Search'],
+        body: saveSearchSchema,
+      },
+    },
+    async (
+      request: FastifyRequest<{ Body: z.infer<typeof saveSearchSchema> }>,
+      reply: FastifyReply
+    ) => {
+      const tenantId = request.headers['x-tenant-id'] as string;
+      const userId = request.headers['x-user-id'] as string;
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'Tenant ID required' });
+      }
+
+      const result = await searchService.saveSearch(
+        tenantId,
+        userId || 'anonymous',
+        request.body.name,
+        {
+          ...request.body.options,
+          tenantId,
+        },
+        request.body.isPublic
+      );
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.status(201).send(result.getValue());
+    }
+  );
+
+  /**
+   * GET /search/status
+   * Get search index status
+   */
+  fastify.get(
+    '/status',
+    {
+      schema: {
+        description: 'Get search index status',
+        tags: ['Search'],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const tenantId = request.headers['x-tenant-id'] as string;
+
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'Tenant ID required' });
+      }
+
+      const result = await searchService.getIndexStatus(tenantId);
+
+      if (result.isFailure) {
+        return reply.status(400).send({ error: result.error });
+      }
+
+      return reply.send(result.getValue());
+    }
+  );
+
+  /**
+   * GET /search/config
+   * Get search configuration options
+   */
+  fastify.get(
+    '/config',
+    {
+      schema: {
+        description: 'Get available search configuration options',
+        tags: ['Search'],
+      },
+    },
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      return reply.send({
+        entityTypes: Object.values(SearchEntityType),
+        sortOptions: ['relevance', 'createdAt', 'updatedAt', 'score'],
+        maxQueryLength: 500,
+        maxResultsPerPage: 100,
+        defaultResultsPerPage: 20,
+        supportsFuzzySearch: true,
+        supportsHighlighting: true,
+      });
+    }
+  );
+}

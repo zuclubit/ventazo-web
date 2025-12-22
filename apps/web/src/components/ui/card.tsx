@@ -22,6 +22,12 @@ const cardVariants = cva(
           'bg-gradient-to-br from-card via-card to-muted/50 border-white/10 shadow-lg',
         outline: 'bg-transparent border-border',
         ghost: 'bg-transparent border-transparent shadow-none',
+        // VENTAZO 2025 Premium Variants
+        ventazo: 'card-ventazo',
+        'ventazo-light': 'card-glass-light',
+        'ventazo-gradient': 'card-gradient',
+        'ventazo-hot': 'card-hot-lead',
+        kanban: 'kanban-column-premium',
       },
       padding: {
         default: '',

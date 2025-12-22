@@ -627,3 +627,143 @@ export function suggestBrandColors(extractedColors: ExtractedColor[]): {
 
   return { primary, secondary };
 }
+
+/**
+ * Semantic 4-color palette for CRM branding
+ */
+export interface SemanticBrandPalette {
+  /** Sidebar/navigation background (dark, professional) */
+  sidebarColor: string;
+  /** Main brand color for buttons, CTAs, active states */
+  primaryColor: string;
+  /** Accent color for highlights, links, hover effects */
+  accentColor: string;
+  /** Surface color for cards, dropdowns, secondary backgrounds */
+  surfaceColor: string;
+}
+
+/**
+ * Generate a complete 4-color semantic brand palette from extracted colors
+ *
+ * Algorithm:
+ * 1. Find the most saturated dark color for sidebar (L < 30)
+ * 2. Find the most vibrant mid-tone for primary (L 30-70)
+ * 3. Generate lighter accent from primary
+ * 4. Generate darker surface from sidebar
+ */
+export function suggest4ColorPalette(extractedColors: ExtractedColor[]): SemanticBrandPalette {
+  // Default Ventazo palette
+  const defaults: SemanticBrandPalette = {
+    sidebarColor: '#003C3B',
+    primaryColor: '#0EB58C',
+    accentColor: '#5EEAD4',
+    surfaceColor: '#052828',
+  };
+
+  if (extractedColors.length === 0) {
+    return defaults;
+  }
+
+  // Analyze all colors
+  const analyzed = extractedColors.map(c => ({
+    ...c,
+    hsl: rgbToHsl(c.rgb),
+  }));
+
+  // 1. Find dark color for sidebar (prefer saturated darks)
+  const darkColors = analyzed.filter(c => c.hsl.l <= 35 && c.hsl.s > 10);
+  const sidebar = darkColors.length > 0
+    ? darkColors.sort((a, b) => (b.hsl.s * 0.5 + (35 - b.hsl.l)) - (a.hsl.s * 0.5 + (35 - a.hsl.l)))[0]
+    : null;
+
+  // 2. Find vibrant color for primary (mid-tone, high saturation)
+  const midTones = analyzed.filter(c => c.hsl.l >= 30 && c.hsl.l <= 70 && c.hsl.s > 25);
+  const primary = midTones.length > 0
+    ? midTones.sort((a, b) => (b.hsl.s * b.percentage) - (a.hsl.s * a.percentage))[0]
+    : null;
+
+  // Calculate the palette
+  const sidebarHex = sidebar?.hex || (primary ? darken(primary.hex, 30) : defaults.sidebarColor);
+  const primaryHex = primary?.hex || (sidebar ? lighten(sidebar.hex, 25) : defaults.primaryColor);
+
+  // 3. Accent: lighter, more vibrant version of primary
+  const accentHex = (() => {
+    const rgb = hexToRgb(primaryHex);
+    if (!rgb) return defaults.accentColor;
+    const hsl = rgbToHsl(rgb);
+    // Make it lighter and more saturated
+    const newHsl = {
+      h: hsl.h,
+      s: Math.min(100, hsl.s + 15),
+      l: Math.min(85, hsl.l + 25),
+    };
+    return rgbToHex(hslToRgb(newHsl));
+  })();
+
+  // 4. Surface: darker version of sidebar
+  const surfaceHex = (() => {
+    const rgb = hexToRgb(sidebarHex);
+    if (!rgb) return defaults.surfaceColor;
+    const hsl = rgbToHsl(rgb);
+    // Make it darker
+    const newHsl = {
+      h: hsl.h,
+      s: hsl.s,
+      l: Math.max(5, hsl.l - 8),
+    };
+    return rgbToHex(hslToRgb(newHsl));
+  })();
+
+  return {
+    sidebarColor: normalizeHex(sidebarHex),
+    primaryColor: normalizeHex(primaryHex),
+    accentColor: normalizeHex(accentHex),
+    surfaceColor: normalizeHex(surfaceHex),
+  };
+}
+
+/**
+ * Generate derived colors from a single user-selected primary
+ * Useful when user only picks one color and we need to derive the rest
+ */
+export function deriveFullPaletteFromPrimary(primaryHex: string): SemanticBrandPalette {
+  const rgb = hexToRgb(primaryHex);
+  if (!rgb) {
+    return {
+      sidebarColor: '#003C3B',
+      primaryColor: primaryHex,
+      accentColor: '#5EEAD4',
+      surfaceColor: '#052828',
+    };
+  }
+
+  const hsl = rgbToHsl(rgb);
+
+  // Sidebar: same hue, dark
+  const sidebarHsl = {
+    h: hsl.h,
+    s: Math.min(100, hsl.s + 10),
+    l: Math.max(12, Math.min(25, hsl.l - 30)),
+  };
+
+  // Accent: same hue, lighter and more vibrant
+  const accentHsl = {
+    h: hsl.h,
+    s: Math.min(100, hsl.s + 15),
+    l: Math.min(85, hsl.l + 25),
+  };
+
+  // Surface: same hue, very dark
+  const surfaceHsl = {
+    h: hsl.h,
+    s: Math.min(100, hsl.s + 5),
+    l: Math.max(5, sidebarHsl.l - 8),
+  };
+
+  return {
+    sidebarColor: normalizeHex(rgbToHex(hslToRgb(sidebarHsl))),
+    primaryColor: normalizeHex(primaryHex),
+    accentColor: normalizeHex(rgbToHex(hslToRgb(accentHsl))),
+    surfaceColor: normalizeHex(rgbToHex(hslToRgb(surfaceHsl))),
+  };
+}

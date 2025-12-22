@@ -21,6 +21,7 @@ import {
   type LoginResponse,
   type RegisterCredentials,
   type TenantMembership,
+  type Tenant,
   type Permission,
   type UserRole,
   AuthError,
@@ -110,6 +111,46 @@ async function fetchUserProfile(
 
   const data = await response.json();
   return data.data || data;
+}
+
+/**
+ * Fetch full tenant details including branding
+ */
+export async function fetchTenantDetails(
+  accessToken: string,
+  tenantId: string
+): Promise<Tenant | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/tenant`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'x-tenant-id': tenantId,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.warn('Failed to fetch tenant details:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Map backend response to Tenant type
+    return {
+      id: data.id,
+      name: data.name,
+      slug: data.slug,
+      plan: data.plan || 'free',
+      isActive: data.isActive ?? true,
+      settings: data.settings,
+      metadata: data.metadata,
+      createdAt: data.createdAt,
+    };
+  } catch (error) {
+    console.warn('Error fetching tenant details:', error);
+    return null;
+  }
 }
 
 /**

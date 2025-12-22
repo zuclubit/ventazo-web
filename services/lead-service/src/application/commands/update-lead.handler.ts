@@ -1,17 +1,20 @@
-import { injectable } from 'tsyringe';
+import { injectable, inject } from 'tsyringe';
 import { Result } from '@zuclubit/domain';
 import { ICommandHandler } from '../common';
 import { UpdateLeadCommand } from './update-lead.command';
 import { ILeadRepository } from '../../domain/repositories';
+import { Lead } from '../../domain/aggregates';
 
 /**
  * Handler for UpdateLeadCommand
  */
 @injectable()
-export class UpdateLeadHandler implements ICommandHandler<UpdateLeadCommand, void> {
-  constructor(private readonly leadRepository: ILeadRepository) {}
+export class UpdateLeadHandler implements ICommandHandler<UpdateLeadCommand, Lead> {
+  constructor(
+    @inject('ILeadRepository') private readonly leadRepository: ILeadRepository
+  ) {}
 
-  async execute(command: UpdateLeadCommand): Promise<Result<void>> {
+  async execute(command: UpdateLeadCommand): Promise<Result<Lead>> {
     // Find lead
     const leadResult = await this.leadRepository.findById(command.leadId, command.tenantId);
     if (leadResult.isFailure) {
@@ -23,24 +26,32 @@ export class UpdateLeadHandler implements ICommandHandler<UpdateLeadCommand, voi
       return Result.fail(`Lead not found: ${command.leadId}`);
     }
 
-    // Update lead
-    const updateData: Record<string, unknown> = {};
-    if (command.companyName !== undefined) updateData.companyName = command.companyName;
-    if (command.email !== undefined) updateData.email = command.email;
-    if (command.phone !== undefined) updateData.phone = command.phone;
-    if (command.website !== undefined) updateData.website = command.website;
-    if (command.industry !== undefined) updateData.industry = command.industry;
-    if (command.employeeCount !== undefined) updateData.employeeCount = command.employeeCount;
-    if (command.annualRevenue !== undefined) updateData.annualRevenue = command.annualRevenue;
-    if (command.notes !== undefined) updateData.notes = command.notes;
-    if (command.customFields !== undefined) updateData.customFields = command.customFields;
+    // Update lead using the aggregate's update method
+    const updateResult = lead.update({
+      fullName: command.fullName,
+      companyName: command.companyName,
+      jobTitle: command.jobTitle,
+      email: command.email,
+      phone: command.phone,
+      website: command.website,
+      industry: command.industry,
+      employeeCount: command.employeeCount,
+      annualRevenue: command.annualRevenue,
+      stageId: command.stageId,
+      notes: command.notes,
+      tags: command.tags,
+    });
 
-    const result = lead.updateInfo(updateData);
-    if (result.isFailure) {
-      return Result.fail(result.error as string);
+    if (updateResult.isFailure) {
+      return Result.fail(updateResult.error as string);
     }
 
     // Save lead
-    return this.leadRepository.save(lead);
+    const saveResult = await this.leadRepository.save(lead);
+    if (saveResult.isFailure) {
+      return Result.fail(saveResult.error as string);
+    }
+
+    return Result.ok(lead);
   }
 }

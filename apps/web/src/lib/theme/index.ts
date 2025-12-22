@@ -19,7 +19,7 @@ export type {
 } from './types';
 
 // Image color extraction types
-export type { ExtractedColor } from './color-utils';
+export type { ExtractedColor, SemanticBrandPalette } from './color-utils';
 
 // Constants
 export { DEFAULT_BRANDING, BORDER_RADIUS_MAP } from './types';
@@ -68,6 +68,10 @@ export {
   // Image Color Extraction
   extractColorsFromImage,
   suggestBrandColors,
+
+  // 4-Color Semantic Palette
+  suggest4ColorPalette,
+  deriveFullPaletteFromPrimary,
 } from './color-utils';
 
 // Provider & Hooks

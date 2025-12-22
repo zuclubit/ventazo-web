@@ -20,22 +20,36 @@ const badgeVariants = cva(
           'border-transparent bg-success text-success-foreground hover:bg-success/80',
         warning:
           'border-transparent bg-warning text-warning-foreground hover:bg-warning/80',
-        // Lead status variants
-        hot: 'border-transparent bg-red-500 text-white',
-        warm: 'border-transparent bg-orange-500 text-white',
-        cold: 'border-transparent bg-blue-500 text-white',
-        // Lead stage variants
-        new: 'border-transparent bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+        // Lead score variants - Using CSS Variables
+        hot: 'border-transparent bg-[var(--score-hot-bg)] text-[var(--score-hot)] dark:bg-emerald-900/50 dark:text-emerald-300',
+        warm: 'border-transparent bg-[var(--score-warm-bg)] text-[var(--score-warm)] dark:bg-amber-900/50 dark:text-amber-300',
+        cold: 'border-transparent bg-[var(--score-cold-bg)] text-[var(--score-cold)] dark:bg-red-900/50 dark:text-red-300',
+        // Lead stage variants - Using CSS Variables
+        new: 'border-transparent bg-[var(--stage-new)]/15 text-[var(--stage-new)] dark:bg-blue-900/30 dark:text-blue-300',
         contacted:
-          'border-transparent bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+          'border-transparent bg-[var(--stage-contacted)]/15 text-[var(--stage-contacted)] dark:bg-amber-900/30 dark:text-amber-300',
         qualified:
-          'border-transparent bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+          'border-transparent bg-[var(--stage-qualified)]/15 text-[var(--stage-qualified)] dark:bg-purple-900/30 dark:text-purple-300',
         proposal:
-          'border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+          'border-transparent bg-[var(--stage-proposal)]/15 text-[var(--stage-proposal)] dark:bg-teal-900/30 dark:text-teal-300',
         negotiation:
-          'border-transparent bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-        won: 'border-transparent bg-emerald-500 text-white',
-        lost: 'border-transparent bg-gray-500 text-white',
+          'border-transparent bg-[var(--brand-orange)]/15 text-[var(--brand-orange)] dark:bg-orange-900/30 dark:text-orange-300',
+        won: 'border-transparent bg-[var(--stage-won)] text-white',
+        lost: 'border-transparent bg-[var(--stage-lost)]/80 text-white',
+        // VENTAZO 2025 Premium Variants
+        'hot-glow': 'border-[var(--hot-orange-border)] bg-[var(--hot-orange)]/15 text-[var(--hot-orange)] shadow-[0_0_12px_var(--hot-orange-glow)]',
+        'score-hot': 'score-indicator hot',
+        'score-warm': 'score-indicator warm',
+        'score-cold': 'score-indicator cold',
+        glass: 'backdrop-blur-md bg-white/10 border-white/20 text-white/90',
+        'glass-dark': 'backdrop-blur-md bg-black/20 border-white/10 text-white/80',
+        // Source badges
+        whatsapp: 'source-badge whatsapp',
+        website: 'source-badge website',
+        referral: 'source-badge referral',
+        social: 'source-badge social',
+        email: 'source-badge email',
+        phone: 'source-badge phone',
       },
     },
     defaultVariants: {

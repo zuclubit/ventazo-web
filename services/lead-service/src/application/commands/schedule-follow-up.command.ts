@@ -9,7 +9,7 @@ export class ScheduleFollowUpCommand implements ICommand {
   constructor(
     public readonly leadId: string,
     public readonly tenantId: string,
-    public readonly userId: string,
-    public readonly followUpDate: Date
+    public readonly followUpDate: Date,
+    public readonly scheduledBy: string
   ) {}
 }

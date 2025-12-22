@@ -133,6 +133,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 plan: tenantDetails.plan as PlanTier,
                 isActive: tenantDetails.isActive,
                 settings: tenantDetails.settings,
+                // Pass metadata with branding for dynamic colors/logo
+                metadata: tenantDetails.branding
+                  ? { branding: tenantDetails.branding }
+                  : undefined,
                 createdAt: tenantDetails.createdAt,
               });
             }
