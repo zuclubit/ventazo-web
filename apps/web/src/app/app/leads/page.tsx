@@ -41,8 +41,6 @@ import {
   LeadDetailSheet,
   DeleteLeadDialog,
   ConvertLeadDialog,
-  LeadsKPIBar,
-  type KPIFilterType,
 } from './components';
 
 // Hooks
@@ -74,44 +72,10 @@ export default function LeadsPage() {
   const [convertLead, setConvertLead] = React.useState<Lead | null>(null);
   const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
 
-  // KPI filter state
-  const [kpiFilter, setKpiFilter] = React.useState<KPIFilterType | null>(null);
-
   // Derived values
   const columns = pipelineData?.stages ?? [];
   const totalLeads = pipelineData?.totalLeads ?? 0;
   const isEmpty = columns.length === 0 || columns.every((c) => c.leads.length === 0);
-
-  // Filtered columns based on KPI filter
-  const filteredColumns = React.useMemo(() => {
-    if (!kpiFilter || kpiFilter === 'all') return columns;
-
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-
-    return columns.map((col) => ({
-      ...col,
-      leads: col.leads.filter((lead) => {
-        switch (kpiFilter) {
-          case 'new': {
-            const createdAt = lead.createdAt ? new Date(lead.createdAt) : null;
-            return createdAt && createdAt >= oneWeekAgo;
-          }
-          case 'hot':
-            return lead.score >= 70;
-          case 'follow-up': {
-            if (!lead.nextFollowUpAt) return false;
-            const followUpDate = new Date(lead.nextFollowUpAt);
-            return followUpDate <= today;
-          }
-          default:
-            return true;
-        }
-      }),
-    }));
-  }, [columns, kpiFilter]);
 
   // Handlers
   const handleLeadClick = (lead: Lead) => setSelectedLead(lead);
@@ -178,17 +142,6 @@ export default function LeadsPage() {
         </PageContainer.HeaderRow>
       </PageContainer.Header>
 
-      {/* KPI Dashboard - Above Kanban */}
-      {!isLoading && !error && columns.length > 0 && (
-        <div className="shrink-0 py-3 border-b border-border/50 bg-background/50 backdrop-blur-sm">
-          <LeadsKPIBar
-            columns={columns}
-            activeFilter={kpiFilter}
-            onFilterChange={setKpiFilter}
-          />
-        </div>
-      )}
-
       {/* Body: Content + Optional Sidebar */}
       <PageContainer.Body>
         {/*
@@ -219,7 +172,7 @@ export default function LeadsPage() {
             </div>
           ) : (
             <KanbanBoard
-              columns={filteredColumns}
+              columns={columns}
               onLeadClick={handleLeadClick}
               onLeadEdit={handleLeadEdit}
               onLeadDelete={handleLeadDelete}
