@@ -57,9 +57,13 @@ export interface KanbanCardProps {
 }
 
 // ============================================
-// Design Tokens
+// Design Tokens - Dynamic Theming v3.0
 // ============================================
 
+/**
+ * Status styles using CSS variables for dynamic theming
+ * These can be customized per-tenant via CSS variables
+ */
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   new: {
     bg: 'bg-blue-500/15 dark:bg-blue-500/20',
@@ -77,14 +81,21 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
     border: 'border-violet-200 dark:border-violet-500/30'
   },
   proposal: {
-    bg: 'bg-teal-500/15 dark:bg-teal-500/20',
-    text: 'text-teal-600 dark:text-teal-400',
-    border: 'border-teal-200 dark:border-teal-500/30'
+    // Use tenant primary color for proposal stage
+    bg: 'bg-[var(--tenant-primary)]/15 dark:bg-[var(--tenant-primary)]/20',
+    text: 'text-[var(--tenant-primary)] dark:text-[var(--tenant-primary-light)]',
+    border: 'border-[var(--tenant-primary-light)] dark:border-[var(--tenant-primary)]/30'
+  },
+  negotiation: {
+    bg: 'bg-pink-500/15 dark:bg-pink-500/20',
+    text: 'text-pink-600 dark:text-pink-400',
+    border: 'border-pink-200 dark:border-pink-500/30'
   },
   won: {
-    bg: 'bg-emerald-500/15 dark:bg-emerald-500/20',
+    // Use tenant accent for won deals
+    bg: 'bg-[var(--tenant-accent)]/15 dark:bg-[var(--tenant-accent)]/20',
     text: 'text-emerald-600 dark:text-emerald-400',
-    border: 'border-emerald-200 dark:border-emerald-500/30'
+    border: 'border-[var(--tenant-accent-light)] dark:border-[var(--tenant-accent)]/30'
   },
   lost: {
     bg: 'bg-red-500/15 dark:bg-red-500/20',
@@ -131,28 +142,33 @@ function getScoreLevel(score: number): 'hot' | 'warm' | 'cold' {
 // Score Badge
 // ============================================
 
+/**
+ * ScoreBadge - Dynamic temperature-based score indicator v3.0
+ * Uses CSS variables for dynamic theming
+ */
 function ScoreBadge({ score }: { score: number }) {
   const level = getScoreLevel(score);
   const isHot = score >= 70;
 
-  const styles = {
-    hot: 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-orange-500/30',
-    warm: 'bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-900 shadow-amber-400/25',
-    cold: 'bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-200',
+  // Use CSS classes that reference CSS variables for dynamic theming
+  const levelClasses = {
+    hot: 'score-badge-premium hot',
+    warm: 'score-badge-premium warm',
+    cold: 'score-badge-premium cold',
   };
 
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-0.5',
-        'px-2 py-0.5 rounded-full',
+        'inline-flex items-center justify-center gap-0.5',
+        'min-w-[2rem] h-6 px-2 rounded-full',
         'text-xs font-bold tabular-nums',
-        'shadow-sm',
-        styles[level]
+        'transition-all duration-200',
+        levelClasses[level]
       )}
     >
       {score}
-      {isHot && <Flame className="h-3 w-3" />}
+      {isHot && <Flame className="h-3 w-3 animate-pulse" />}
     </span>
   );
 }

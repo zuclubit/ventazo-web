@@ -224,7 +224,8 @@ function useDynamicFavicon(config: FaviconConfig): void {
 
     // Validate URLs
     const validHref = isValidFaviconUrl(href) ? href : DEFAULT_FAVICON;
-    const validAppleIcon = isValidFaviconUrl(appleTouchIcon)
+    // appleTouchIcon is guaranteed to be string when isValidFaviconUrl returns true
+    const validAppleIcon = (isValidFaviconUrl(appleTouchIcon) && appleTouchIcon)
       ? appleTouchIcon
       : DEFAULT_APPLE_ICON;
 

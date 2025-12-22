@@ -28,14 +28,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, LayoutList, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { PageContainer } from '@/components/layout';
-import { useMediaQuery } from '@/hooks/use-media-query';
 import { RBACGuard } from '@/lib/auth';
 import { usePipelineView, type Lead } from '@/lib/leads';
 
@@ -45,12 +38,15 @@ import {
   KanbanSkeleton,
   LeadsEmptyState,
   LeadFormSheet,
+  LeadDetailSheet,
   DeleteLeadDialog,
   ConvertLeadDialog,
-  LeadPreviewPanel,
   LeadsKPIBar,
   type KPIFilterType,
 } from './components';
+
+// Hooks
+import { useKanbanTheme } from './hooks';
 
 // ============================================
 // Leads Page Component - Kanban View
@@ -58,7 +54,9 @@ import {
 
 export default function LeadsPage() {
   const router = useRouter();
-  const isMobile = useMediaQuery('(max-width: 1023px)');
+
+  // Initialize dynamic Kanban theming (applies CSS variables)
+  useKanbanTheme();
 
   // Fetch pipeline data
   const {
@@ -230,52 +228,26 @@ export default function LeadsPage() {
           )}
         </PageContainer.Content>
 
-        {/* Preview Sidebar - Desktop only */}
-        {!isMobile && selectedLead && (
-          <PageContainer.Sidebar position="right" width="md">
-            <LeadPreviewPanel
-              lead={selectedLead}
-              onClose={handleClosePreview}
-              onEdit={() => handleLeadEdit(selectedLead)}
-              onDelete={() => handleLeadDelete(selectedLead)}
-              onConvert={() => handleLeadConvert(selectedLead)}
-              isMobile={false}
-            />
-          </PageContainer.Sidebar>
-        )}
       </PageContainer.Body>
 
-      {/* Mobile Preview Sheet */}
-      {isMobile && (
-        <Sheet open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
-          <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl px-0">
-            <SheetHeader className="px-4 pb-2 border-b">
-              <SheetTitle className="text-left">Detalle del Lead</SheetTitle>
-            </SheetHeader>
-            <div className="overflow-y-auto h-[calc(100%-3rem)] pb-safe">
-              {selectedLead && (
-                <LeadPreviewPanel
-                  lead={selectedLead}
-                  onClose={handleClosePreview}
-                  onEdit={() => {
-                    handleLeadEdit(selectedLead);
-                    setSelectedLead(null);
-                  }}
-                  onDelete={() => {
-                    handleLeadDelete(selectedLead);
-                    setSelectedLead(null);
-                  }}
-                  onConvert={() => {
-                    handleLeadConvert(selectedLead);
-                    setSelectedLead(null);
-                  }}
-                  isMobile={true}
-                />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-      )}
+      {/* Lead Detail Sheet - Unified View/Edit */}
+      <LeadDetailSheet
+        lead={selectedLead}
+        open={!!selectedLead}
+        onClose={handleClosePreview}
+        onSuccess={() => {
+          refetch();
+          setSelectedLead(null);
+        }}
+        onDelete={() => {
+          if (selectedLead) handleLeadDelete(selectedLead);
+          setSelectedLead(null);
+        }}
+        onConvert={() => {
+          if (selectedLead) handleLeadConvert(selectedLead);
+          setSelectedLead(null);
+        }}
+      />
 
       {/* Mobile FAB - Visible only on mobile/tablet */}
       <RBACGuard fallback={null} minRole="sales_rep">

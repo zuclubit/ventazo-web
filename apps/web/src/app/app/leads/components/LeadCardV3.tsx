@@ -401,8 +401,42 @@ const ScoreIndicator = React.memo<ScoreIndicatorProps>(function ScoreIndicator({
 });
 
 /**
- * Status Badge - Lead status indicator
- * Supports showing pipeline stage name with custom color
+ * Compute stage badge style with luminance-aware contrast
+ * Uses sophisticated color calculations for proper dark/light mode support
+ */
+function computeStageBadgeStyle(stageColor: string): React.CSSProperties {
+  // Parse hex color
+  const hex = stageColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  // Calculate relative luminance
+  const toLinear = (c: number) => {
+    const sRGB = c / 255;
+    return sRGB <= 0.03928 ? sRGB / 12.92 : Math.pow((sRGB + 0.055) / 1.055, 2.4);
+  };
+  const luminance = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+
+  // Adjust text color based on luminance for proper contrast
+  const isDarkColor = luminance < 0.4;
+  const textColor = isDarkColor
+    ? stageColor // Keep original for dark colors
+    : `rgb(${Math.max(0, r - 60)}, ${Math.max(0, g - 60)}, ${Math.max(0, b - 60)})`; // Darken for light colors
+
+  return {
+    backgroundColor: `rgba(${r}, ${g}, ${b}, 0.12)`,
+    borderColor: `rgba(${r}, ${g}, ${b}, 0.35)`,
+    color: textColor,
+    // Subtle inner highlight for depth
+    boxShadow: `inset 0 1px 0 rgba(${r}, ${g}, ${b}, 0.1)`,
+  };
+}
+
+/**
+ * Status Badge - Lead status indicator v3.0
+ * Supports dynamic pipeline stage colors with luminance-aware contrast
+ * Integrates with tenant theming system
  */
 const StatusBadge = React.memo<StatusBadgeProps>(function StatusBadge({
   status,
@@ -415,7 +449,7 @@ const StatusBadge = React.memo<StatusBadgeProps>(function StatusBadge({
     border: 'border-slate-200 dark:border-slate-600/50',
   };
 
-  // If stageName is provided (Kanban view), use custom styling based on stageColor
+  // If stageName is provided (Kanban view), use dynamic styling based on stageColor
   const useCustomStyle = Boolean(stageName && stageColor);
 
   // Calculate styles based on stage color or status
@@ -426,12 +460,10 @@ const StatusBadge = React.memo<StatusBadgeProps>(function StatusBadge({
   // Display stage name if provided, otherwise fall back to status label
   const label = stageName || STATUS_LABELS[status] || status;
 
-  // Custom inline style for stage color (converts hex to themed badge)
-  const customStyle: React.CSSProperties = useCustomStyle && stageColor ? {
-    backgroundColor: `${stageColor}15`,
-    borderColor: `${stageColor}40`,
-    color: stageColor,
-  } : {};
+  // Dynamic style with luminance-aware contrast
+  const customStyle: React.CSSProperties = useCustomStyle && stageColor
+    ? computeStageBadgeStyle(stageColor)
+    : {};
 
   return (
     <span
@@ -443,6 +475,7 @@ const StatusBadge = React.memo<StatusBadgeProps>(function StatusBadge({
         'rounded-md border',
         'text-[11px] font-semibold',
         'select-none',
+        'transition-colors duration-150',
         !useCustomStyle && styles.bg,
         !useCustomStyle && styles.text,
         !useCustomStyle && styles.border

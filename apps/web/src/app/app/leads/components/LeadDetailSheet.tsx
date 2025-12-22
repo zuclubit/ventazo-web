@@ -172,7 +172,7 @@ const modeTransition = {
   initial: { opacity: 0, x: 20 },
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: -20 },
-  transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] },
+  transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] as const },
 };
 
 const fadeIn = {
@@ -436,10 +436,13 @@ function ViewMode({ lead, onEdit, onDelete, onConvert, onClose, aiInsight }: Vie
       {/* Quick Actions */}
       <div className="shrink-0 px-4 py-3 border-b border-border/40 bg-muted/30">
         <QuickActionsBar
-          phone={lead.phone}
-          email={lead.email}
-          website={lead.website}
-          variant="compact"
+          lead={{
+            phone: lead.phone,
+            email: lead.email,
+            fullName: lead.fullName,
+          }}
+          variant="icons-only"
+          size="sm"
         />
       </div>
 

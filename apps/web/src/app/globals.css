@@ -170,6 +170,28 @@
     --tenant-surface-border: #1A5D5C;
 
     /* ============================================
+       KANBAN DYNAMIC THEMING SYSTEM v3.0
+       Set dynamically by useKanbanTheme hook
+       ============================================ */
+
+    /* Card states - tenant-derived */
+    --kanban-card-border-hover: rgba(14, 181, 140, 0.25);
+    --kanban-card-border-selected: var(--tenant-primary);
+    --kanban-card-shadow-hover: 0 4px 12px rgba(14, 181, 140, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
+    --kanban-card-shadow-dragging: 0 8px 32px rgba(14, 181, 140, 0.2), 0 4px 16px rgba(0, 0, 0, 0.12);
+
+    /* Drop zone - tenant-derived */
+    --kanban-drop-border: rgba(14, 181, 140, 0.5);
+    --kanban-drop-shadow: 0 0 0 3px rgba(14, 181, 140, 0.15), 0 0 30px rgba(14, 181, 140, 0.2);
+    --kanban-drop-bg: rgba(14, 181, 140, 0.05);
+
+    /* Action buttons - tenant-derived */
+    --action-call-bg: rgba(14, 181, 140, 0.12);
+    --action-call-text: var(--tenant-primary);
+    --action-primary-bg: rgba(14, 181, 140, 0.12);
+    --action-primary-text: var(--tenant-primary);
+
+    /* ============================================
        VENTAZO 2025 BRAND ALIGNMENT
        Landing page color palette
        ============================================ */
@@ -341,7 +363,8 @@
     --text-bright: #1C1C1E;
     --text-secondary: #4A4A4C;
     --text-muted: #8E8E93;
-    --text-accent: #0EB58C;
+    --text-accent: var(--tenant-primary);
+    --text-accent-hover: var(--tenant-primary-hover);
 
     /* Score Colors - Lead Temperature */
     --score-hot: #059669;           /* emerald-600 */
@@ -547,11 +570,12 @@
     --gradient-dark-mid: #002828;
     --gradient-dark-end: #003C3B;
 
-    /* Premium Text Colors */
+    /* Premium Text Colors - Dark Mode */
     --text-bright: #FFFFFF;
     --text-secondary: #B8C4C4;
     --text-muted: #7A8F8F;
-    --text-accent: #0EB58C;
+    --text-accent: var(--tenant-primary);
+    --text-accent-hover: var(--tenant-primary-hover);
 
     /* Ventazo Brand Variables (Dark) */
     --ventazo-green: #0EB58C;
@@ -1065,10 +1089,16 @@
   }
 
   .kanban-card-ventazo.is-selected {
-    border-color: var(--card-border-active);
+    border-color: var(--tenant-primary);
     box-shadow:
       var(--card-shadow-hover),
-      0 0 0 2px rgba(14, 181, 140, 0.2);
+      0 0 0 2px var(--tenant-primary-glow);
+  }
+
+  .kanban-card-ventazo:focus-visible {
+    @apply outline-none;
+    border-color: var(--tenant-primary);
+    box-shadow: 0 0 0 3px var(--tenant-primary-glow);
   }
 
   /* Score Indicator - Premium Large */
@@ -1176,9 +1206,9 @@
   }
 
   .action-btn-premium.call:hover {
-    background: rgba(139, 92, 246, 0.12);
-    color: #8B5CF6;
-    border-color: rgba(139, 92, 246, 0.25);
+    background: var(--action-call-bg);
+    color: var(--action-call-text);
+    border-color: var(--tenant-primary-glow);
   }
 
   .action-btn-premium.email:hover {
@@ -1233,13 +1263,13 @@
     border-color: rgba(255, 255, 255, 0.05);
   }
 
-  /* Drop Zone Active State */
+  /* Drop Zone Active State - Dynamic v3.0 */
   .drop-zone-active {
-    border-color: rgba(14, 181, 140, 0.5) !important;
-    box-shadow:
-      0 0 0 3px rgba(14, 181, 140, 0.15),
-      0 0 30px rgba(14, 181, 140, 0.2);
+    border-color: var(--kanban-drop-border) !important;
+    box-shadow: var(--kanban-drop-shadow);
+    background-color: var(--kanban-drop-bg);
     transform: scale(1.005);
+    transition: all 200ms ease-out;
   }
 
   /* Meta Info Row */
@@ -1738,41 +1768,88 @@
     transform: translateY(0);
   }
 
-  /* Ventazo Primary Button */
+  /* ============================================
+     Ventazo Primary Button - Dynamic Theming v3.0
+     Uses tenant CSS variables for colors
+     ============================================ */
   .ventazo-button {
     @apply relative overflow-hidden;
     @apply rounded-xl px-6 py-3;
-    @apply font-semibold text-white;
+    @apply font-semibold;
     @apply transition-all duration-300;
-    background-color: #0EB58C;
-    box-shadow: 0 4px 14px -3px rgba(14, 181, 140, 0.4);
+    background-color: var(--tenant-primary);
+    color: var(--tenant-primary-foreground);
+    box-shadow: 0 4px 14px -3px var(--tenant-primary-glow);
   }
 
   .ventazo-button:hover {
     transform: translateY(-1px);
-    background-color: #0CA57D;
-    box-shadow: 0 6px 20px -3px rgba(14, 181, 140, 0.5);
+    background-color: var(--tenant-primary-hover);
+    box-shadow: 0 6px 20px -3px var(--tenant-primary-glow);
   }
 
   .ventazo-button:active {
     transform: translateY(0);
   }
 
-  /* Ventazo Outline Button */
+  .ventazo-button:focus-visible {
+    @apply outline-none ring-2;
+    ring-color: var(--tenant-primary-glow);
+    ring-offset-color: var(--tenant-surface);
+    ring-offset-width: 2px;
+  }
+
+  /* Ventazo Outline Button - Dynamic Theming */
   .ventazo-button-outline {
     @apply relative overflow-hidden;
     @apply rounded-xl px-6 py-3;
     @apply font-medium;
     @apply transition-all duration-300;
     background-color: transparent;
-    border: 1.5px solid #0EB58C;
-    color: #0EB58C;
+    border: 1.5px solid var(--tenant-primary);
+    color: var(--tenant-primary);
   }
 
   .ventazo-button-outline:hover {
-    background-color: rgba(14, 181, 140, 0.1);
-    border-color: #0CA57D;
-    color: #0CA57D;
+    background-color: var(--tenant-primary-glow);
+    border-color: var(--tenant-primary-hover);
+    color: var(--tenant-primary-hover);
+  }
+
+  .ventazo-button-outline:focus-visible {
+    @apply outline-none ring-2;
+    ring-color: var(--tenant-primary-glow);
+  }
+
+  /* Ventazo Accent Button - Uses accent color */
+  .ventazo-button-accent {
+    @apply relative overflow-hidden;
+    @apply rounded-xl px-6 py-3;
+    @apply font-semibold;
+    @apply transition-all duration-300;
+    background-color: var(--tenant-accent);
+    color: var(--tenant-accent-foreground);
+    box-shadow: 0 4px 14px -3px var(--tenant-accent-glow);
+  }
+
+  .ventazo-button-accent:hover {
+    transform: translateY(-1px);
+    background-color: var(--tenant-accent-hover);
+    box-shadow: 0 6px 20px -3px var(--tenant-accent-glow);
+  }
+
+  /* Ventazo Ghost Button - Subtle interactions */
+  .ventazo-button-ghost {
+    @apply relative overflow-hidden;
+    @apply rounded-xl px-6 py-3;
+    @apply font-medium;
+    @apply transition-all duration-200;
+    background-color: transparent;
+    color: var(--tenant-primary);
+  }
+
+  .ventazo-button-ghost:hover {
+    background-color: var(--tenant-primary-glow);
   }
 
   /* Premium Background Gradient */
@@ -1837,10 +1914,47 @@
     color: var(--text-accent);
   }
 
-  /* Gradient Text - Premium */
+  /* ============================================
+     Tenant-Aware Text Utilities v3.0
+     ============================================ */
+  .text-tenant-primary {
+    color: var(--tenant-primary);
+  }
+
+  .text-tenant-accent {
+    color: var(--tenant-accent);
+  }
+
+  .text-tenant-primary-hover:hover {
+    color: var(--tenant-primary-hover);
+  }
+
+  /* Interactive Link Styles - Dynamic */
+  .link-tenant {
+    color: var(--tenant-primary);
+    @apply transition-colors duration-200;
+  }
+
+  .link-tenant:hover {
+    color: var(--tenant-primary-hover);
+    text-decoration-color: var(--tenant-primary-glow);
+  }
+
+  .link-tenant:focus-visible {
+    @apply outline-none;
+    text-decoration: underline;
+    text-decoration-color: var(--tenant-primary);
+  }
+
+  /* Gradient Text - Premium (Dynamic) */
   .text-gradient-premium {
     @apply bg-clip-text text-transparent;
-    background: linear-gradient(135deg, #0D9488 0%, #14B8A6 50%, #2DD4BF 100%);
+    background: linear-gradient(
+      135deg,
+      var(--tenant-primary-hover) 0%,
+      var(--tenant-primary) 50%,
+      var(--tenant-accent) 100%
+    );
   }
 
   .text-gradient-accent {
@@ -1848,13 +1962,13 @@
     background: linear-gradient(135deg, #FB923C 0%, #F97316 50%, #EA580C 100%);
   }
 
-  /* Glow Ring on Focus */
+  /* Glow Ring on Focus - Dynamic */
   .glow-ring-primary:focus-within {
-    box-shadow: 0 0 0 3px var(--glow-primary-intense);
+    box-shadow: 0 0 0 3px var(--tenant-primary-glow);
   }
 
   .glow-ring-accent:focus-within {
-    box-shadow: 0 0 0 3px var(--glow-accent-intense);
+    box-shadow: 0 0 0 3px var(--tenant-accent-glow);
   }
 
   /* Premium Divider */
@@ -2031,7 +2145,10 @@
      Modern glassmorphism with theme support
      ============================================ */
 
-  /* Kanban Card - Premium Glass Effect */
+  /* ============================================
+     Kanban Card - Premium Glass Effect v3.0
+     Dynamic theming with tenant colors
+     ============================================ */
   .kanban-card-premium {
     @apply rounded-2xl border backdrop-blur-sm;
     @apply transition-all duration-300 ease-out;
@@ -2041,14 +2158,25 @@
     @apply hover:-translate-y-1 hover:shadow-lg;
   }
 
+  .kanban-card-premium:hover {
+    border-color: var(--tenant-primary-light);
+    box-shadow: 0 8px 28px -8px var(--tenant-primary-glow);
+  }
+
+  .kanban-card-premium:focus-visible {
+    @apply outline-none;
+    border-color: var(--tenant-primary);
+    box-shadow: 0 0 0 3px var(--tenant-primary-glow);
+  }
+
   .dark .kanban-card-premium {
     @apply bg-white/[0.04] border-white/[0.06];
     @apply shadow-[0_4px_20px_-8px_rgba(0,0,0,0.3)];
   }
 
   .dark .kanban-card-premium:hover {
-    @apply border-[#0EB58C]/20;
-    box-shadow: 0 8px 28px -8px rgba(14, 181, 140, 0.15);
+    border-color: color-mix(in srgb, var(--tenant-primary) 20%, transparent);
+    box-shadow: 0 8px 28px -8px var(--tenant-primary-glow);
   }
 
   /* Kanban Column - Glass Container */

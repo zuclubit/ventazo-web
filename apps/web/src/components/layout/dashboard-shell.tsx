@@ -1,10 +1,16 @@
 'use client';
 
 /**
- * Dashboard Shell Component - v2.0
+ * Dashboard Shell Component - v3.0
  *
  * Premium 2025 layout wrapper using CSS Grid architecture.
  * Provides bulletproof containment for all internal CRM pages.
+ *
+ * v3.0 Changes:
+ * - Dynamic theming using tenant CSS variables
+ * - GPU-accelerated background with will-change optimization
+ * - Color-derived gradients from --tenant-* variables
+ * - Memoized for performance
  *
  * Architecture:
  * - CSS Grid for main layout (sidebar + content area)
@@ -38,28 +44,53 @@ import { MobileBottomBar } from './mobile-bottom-bar';
 import { SidebarProvider, useSidebar } from './sidebar-context';
 
 // ============================================
-// Premium Background Component
+// Premium Background Component - Dynamic Theming v3.0
 // ============================================
 
-function PremiumDashboardBackground() {
+/**
+ * Dynamic background that responds to tenant branding colors.
+ * Uses CSS variables set by TenantThemeProvider:
+ * - --tenant-sidebar: Base dark color for gradient
+ * - --tenant-surface: Mid-tone for gradient
+ * - --tenant-primary: Accent for atmospheric glows
+ *
+ * Memoized to prevent unnecessary re-renders.
+ */
+const PremiumDashboardBackground = React.memo(function PremiumDashboardBackground() {
   return (
-    <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-      {/* Base Gradient */}
+    <div className="premium-dashboard-bg fixed inset-0 -z-10 overflow-hidden pointer-events-none will-change-[background]">
+      {/* Base Gradient - Uses tenant CSS variables */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 transition-[background] duration-500"
         style={{
-          background:
-            'linear-gradient(165deg, #041A1A 0%, #052828 25%, #063030 50%, #052828 75%, #041A1A 100%)',
+          background: `linear-gradient(
+            165deg,
+            color-mix(in srgb, var(--tenant-sidebar) 100%, black 15%) 0%,
+            var(--tenant-sidebar) 25%,
+            var(--tenant-surface) 50%,
+            var(--tenant-sidebar) 75%,
+            color-mix(in srgb, var(--tenant-sidebar) 100%, black 15%) 100%
+          )`,
         }}
       />
 
-      {/* Subtle Atmospheric Glows */}
+      {/* Subtle Atmospheric Glows - Derived from tenant primary */}
       <div className="absolute inset-0">
-        <div className="absolute -right-60 -top-60 h-[500px] w-[500px] rounded-full bg-[#0D9488]/8 blur-[150px]" />
-        <div className="absolute -bottom-40 -left-40 h-[400px] w-[400px] rounded-full bg-[#14B8A6]/6 blur-[120px]" />
+        <div
+          className="absolute -right-60 -top-60 h-[500px] w-[500px] rounded-full blur-[150px] transition-[background] duration-500"
+          style={{
+            background: 'color-mix(in srgb, var(--tenant-primary) 8%, transparent)',
+          }}
+        />
+        <div
+          className="absolute -bottom-40 -left-40 h-[400px] w-[400px] rounded-full blur-[120px] transition-[background] duration-500"
+          style={{
+            background: 'color-mix(in srgb, var(--tenant-accent) 6%, transparent)',
+          }}
+        />
       </div>
 
-      {/* Noise Texture */}
+      {/* Noise Texture - Adds subtle depth */}
       <div
         className="absolute inset-0 opacity-[0.012]"
         style={{
@@ -68,7 +99,9 @@ function PremiumDashboardBackground() {
       />
     </div>
   );
-}
+});
+
+PremiumDashboardBackground.displayName = 'PremiumDashboardBackground';
 
 // ============================================
 // Main Content Area Component
