@@ -141,6 +141,35 @@
     --ventazo-carbon: #1C1C1E;
 
     /* ============================================
+       TENANT DYNAMIC COLORS - 4-Color Semantic Palette
+       These are set dynamically by TenantThemeProvider
+       Fallbacks to Ventazo defaults
+       ============================================ */
+    --tenant-primary: var(--ventazo-green);
+    --tenant-accent: #5EEAD4;
+    --tenant-sidebar: var(--ventazo-dark);
+    --tenant-surface: #052828;
+
+    /* Computed foregrounds (set by provider) */
+    --tenant-primary-foreground: #FFFFFF;
+    --tenant-accent-foreground: #1C1C1E;
+
+    /* Primary variations */
+    --tenant-primary-hover: #0A9D79;
+    --tenant-primary-light: #A7F3D0;
+    --tenant-primary-lighter: #D1FAE5;
+    --tenant-primary-glow: rgba(14, 181, 140, 0.25);
+
+    /* Accent variations */
+    --tenant-accent-hover: #2DD4BF;
+    --tenant-accent-light: #CCFBF1;
+    --tenant-accent-glow: rgba(94, 234, 212, 0.25);
+
+    /* Surface variations */
+    --tenant-surface-light: #0A3D3C;
+    --tenant-surface-border: #1A5D5C;
+
+    /* ============================================
        VENTAZO 2025 BRAND ALIGNMENT
        Landing page color palette
        ============================================ */
@@ -2053,12 +2082,17 @@
     box-shadow: inset 3px 0 12px -4px rgba(249, 115, 22, 0.25);
   }
 
-  /* Score Temperature Badges */
+  /* Score Temperature Badges - Uses tenant primary for hot leads */
   .score-badge-hot {
-    @apply bg-emerald-100 text-emerald-700 border border-emerald-200/50;
+    background-color: var(--tenant-primary-lighter);
+    color: var(--tenant-primary);
+    @apply border;
+    border-color: color-mix(in srgb, var(--tenant-primary) 30%, transparent);
   }
   .dark .score-badge-hot {
-    @apply bg-emerald-500/15 text-emerald-400 border-emerald-500/20;
+    background-color: color-mix(in srgb, var(--tenant-primary) 15%, transparent);
+    color: var(--tenant-primary);
+    border-color: color-mix(in srgb, var(--tenant-primary) 20%, transparent);
   }
 
   .score-badge-warm {
@@ -2075,9 +2109,11 @@
     @apply bg-slate-500/15 text-slate-400 border-slate-500/20;
   }
 
-  /* Drop Zone Highlight */
+  /* Drop Zone Highlight - Uses tenant primary */
   .drop-zone-active {
-    @apply ring-2 ring-[#0EB58C]/40 bg-[#0EB58C]/5;
+    @apply ring-2;
+    --tw-ring-color: var(--tenant-primary-glow);
+    background-color: color-mix(in srgb, var(--tenant-primary) 5%, transparent);
     animation: drop-zone-pulse 1.5s ease-in-out infinite;
   }
 
@@ -3290,16 +3326,16 @@
   }
 
   .glass-kpi.active {
-    border-color: rgba(14, 181, 140, 0.4);
+    border-color: var(--tenant-primary-glow);
     background: linear-gradient(
       180deg,
-      rgba(14, 181, 140, 0.08) 0%,
+      var(--tenant-primary-glow) 0%,
       rgba(255, 255, 255, 0.95) 30%,
       rgba(250, 250, 250, 0.90) 100%
     );
     box-shadow:
-      0 0 0 1px rgba(14, 181, 140, 0.15),
-      0 2px 4px rgba(14, 181, 140, 0.08),
+      0 0 0 1px var(--tenant-primary-glow),
+      0 2px 4px var(--tenant-primary-glow),
       0 4px 10px rgba(0, 0, 0, 0.04),
       inset 0 1px 1px rgba(255, 255, 255, 0.7);
   }
@@ -3307,7 +3343,7 @@
   .dark .glass-kpi.active {
     background: linear-gradient(
       180deg,
-      rgba(14, 181, 140, 0.15) 0%,
+      var(--tenant-primary-glow) 0%,
       rgba(35, 35, 40, 0.95) 30%,
       rgba(30, 30, 35, 0.90) 100%
     );
@@ -3342,10 +3378,10 @@
   .glass-kpi-icon.primary {
     background: linear-gradient(
       135deg,
-      rgba(14, 181, 140, 0.15) 0%,
-      rgba(14, 181, 140, 0.08) 100%
+      var(--tenant-primary-glow) 0%,
+      color-mix(in srgb, var(--tenant-primary) 8%, transparent) 100%
     );
-    color: #0EB58C;
+    color: var(--tenant-primary);
   }
 
   .glass-kpi-icon.hot {
@@ -3360,10 +3396,10 @@
   .glass-kpi-icon.success {
     background: linear-gradient(
       135deg,
-      rgba(16, 185, 129, 0.15) 0%,
-      rgba(16, 185, 129, 0.08) 100%
+      var(--tenant-accent-glow) 0%,
+      color-mix(in srgb, var(--tenant-accent) 8%, transparent) 100%
     );
-    color: #10B981;
+    color: var(--tenant-accent);
   }
 
   .glass-kpi-icon.warning {

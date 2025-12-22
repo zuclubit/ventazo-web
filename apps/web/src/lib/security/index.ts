@@ -124,6 +124,15 @@ export function sanitizeText(text: string): string {
 }
 
 /**
+ * Sanitize text for safe display in UI
+ * Use this when rendering user-generated content
+ */
+export function sanitizeForDisplay(text: string | undefined | null): string {
+  if (!text || typeof text !== 'string') return '';
+  return escapeHtml(sanitizeText(text));
+}
+
+/**
  * Sanitize URL
  */
 export function sanitizeUrl(url: string): string {

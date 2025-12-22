@@ -388,14 +388,14 @@ export function KanbanCard({
               onClick={handleWhatsApp}
               disabled={!hasPhone}
               label="WhatsApp"
-              className="hover:bg-emerald-500/15 dark:hover:bg-emerald-500/20 hover:text-emerald-600 dark:hover:text-emerald-400"
+              className="hover:bg-[var(--whatsapp)]/15 dark:hover:bg-[var(--whatsapp)]/20 hover:text-[var(--whatsapp)]"
             />
             <ActionButton
               icon={Phone}
               onClick={handleCall}
               disabled={!hasPhone}
               label="Llamar"
-              className="hover:bg-violet-500/15 dark:hover:bg-violet-500/20 hover:text-violet-600 dark:hover:text-violet-400"
+              className="hover:bg-[var(--tenant-accent)]/15 dark:hover:bg-[var(--tenant-accent)]/20 hover:text-[var(--tenant-accent)]"
             />
 
             {/* More Options */}
@@ -410,7 +410,7 @@ export function KanbanCard({
                   Editar
                 </DropdownMenuItem>
                 {lead.status === LeadStatus.QUALIFIED && onConvert && (
-                  <DropdownMenuItem onClick={onConvert} className="py-2 text-emerald-600 dark:text-emerald-400">
+                  <DropdownMenuItem onClick={onConvert} className="py-2 text-[var(--tenant-primary)]">
                     Convertir
                   </DropdownMenuItem>
                 )}

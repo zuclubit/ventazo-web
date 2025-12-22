@@ -7,6 +7,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 
 import { AuthProvider } from '@/components/auth';
+import { DynamicBrandingSync } from '@/components/branding';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { registerTenantGetter } from '@/lib/api';
 import { I18nProvider } from '@/lib/i18n/context';
@@ -98,6 +99,7 @@ export function Providers({ children }: ProvidersProps) {
                   attribute="class"
                   defaultTheme="system"
                 >
+                  <DynamicBrandingSync />
                   <TooltipProvider delayDuration={0}>
                     {children}
                   </TooltipProvider>

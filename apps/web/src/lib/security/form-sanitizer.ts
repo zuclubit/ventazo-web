@@ -3,7 +3,7 @@
 // Applies security sanitization to form submissions
 // ============================================
 
-import { sanitizeText, sanitizeUrl, sanitizeRichText, escapeHtml } from './index';
+import { sanitizeText, sanitizeUrl, sanitizeRichText, escapeHtml, sanitizeForDisplay } from './index';
 
 /**
  * Field types for different sanitization strategies
@@ -277,4 +277,4 @@ export function sanitizeTags(tags: unknown): string[] {
 /**
  * Escape HTML for display (use when rendering user input)
  */
-export { escapeHtml };
+export { escapeHtml, sanitizeForDisplay };

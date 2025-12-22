@@ -1,5 +1,5 @@
 /**
- * useTenantBranding Hook
+ * useTenantBranding Hook - v2.0
  *
  * Enterprise-grade dynamic tenant branding system.
  * Provides secure, validated, and optimized branding configuration.
@@ -10,6 +10,7 @@
  * - Performance optimized with shallow comparisons
  * - Multi-device responsive (CSS variables)
  * - WCAG 2.1 AA color contrast aware
+ * - Unified CSS variable system (--tenant-* and --sidebar-*)
  *
  * @module hooks/use-tenant-branding
  */
@@ -56,15 +57,35 @@ const DEFAULT_ASSETS = {
   FAVICON: '/favicon.ico',
 } as const;
 
-/** CSS variable names for branding */
+/** CSS variable names for branding - Unified system */
 const CSS_VARS = {
-  // Brand colors (semantic)
-  SIDEBAR: '--brand-sidebar',
-  PRIMARY: '--brand-primary',
-  ACCENT: '--brand-accent',
-  SURFACE: '--brand-surface',
-  // Legacy (backward compatibility)
-  SECONDARY: '--brand-secondary',
+  // ============================================
+  // Tenant semantic colors (primary system)
+  // ============================================
+  TENANT_PRIMARY: '--tenant-primary',
+  TENANT_ACCENT: '--tenant-accent',
+  TENANT_SIDEBAR: '--tenant-sidebar',
+  TENANT_SURFACE: '--tenant-surface',
+  TENANT_PRIMARY_FOREGROUND: '--tenant-primary-foreground',
+  TENANT_ACCENT_FOREGROUND: '--tenant-accent-foreground',
+  // Tenant color variations
+  TENANT_PRIMARY_HOVER: '--tenant-primary-hover',
+  TENANT_PRIMARY_LIGHT: '--tenant-primary-light',
+  TENANT_PRIMARY_LIGHTER: '--tenant-primary-lighter',
+  TENANT_PRIMARY_GLOW: '--tenant-primary-glow',
+  TENANT_ACCENT_HOVER: '--tenant-accent-hover',
+  TENANT_ACCENT_LIGHT: '--tenant-accent-light',
+  TENANT_ACCENT_GLOW: '--tenant-accent-glow',
+  TENANT_SURFACE_LIGHT: '--tenant-surface-light',
+  TENANT_SURFACE_BORDER: '--tenant-surface-border',
+  // ============================================
+  // Legacy brand colors (backward compatibility)
+  // ============================================
+  BRAND_SIDEBAR: '--brand-sidebar',
+  BRAND_PRIMARY: '--brand-primary',
+  BRAND_ACCENT: '--brand-accent',
+  BRAND_SURFACE: '--brand-surface',
+  BRAND_SECONDARY: '--brand-secondary',
   // HSL components for advanced styling
   PRIMARY_H: '--brand-primary-h',
   PRIMARY_S: '--brand-primary-s',
@@ -72,12 +93,18 @@ const CSS_VARS = {
   SIDEBAR_H: '--brand-sidebar-h',
   SIDEBAR_S: '--brand-sidebar-s',
   SIDEBAR_L: '--brand-sidebar-l',
+  // ============================================
   // Sidebar UI colors (derived from brand colors)
+  // ============================================
   SIDEBAR_GLASS_BG: '--sidebar-glass-bg',
+  SIDEBAR_TEXT_PRIMARY: '--sidebar-text-primary',
+  SIDEBAR_TEXT_SECONDARY: '--sidebar-text-secondary',
+  SIDEBAR_TEXT_MUTED: '--sidebar-text-muted',
   SIDEBAR_TEXT_ACCENT: '--sidebar-text-accent',
   SIDEBAR_ACTIVE_BG: '--sidebar-active-bg',
   SIDEBAR_ACTIVE_BORDER: '--sidebar-active-border',
   SIDEBAR_HOVER_BG: '--sidebar-hover-bg',
+  SIDEBAR_DIVIDER: '--sidebar-divider',
   SIDEBAR_ITEM_SHADOW_ACTIVE: '--sidebar-item-shadow-active',
 } as const;
 
@@ -95,8 +122,10 @@ const CSS_VARS = {
  * - surfaceColor: Cards, dropdowns, secondary backgrounds
  */
 export interface ComputedBranding {
-  /** Company/Business name */
+  /** Company/Business name (legal name) */
   name: string;
+  /** App/Brand name displayed in UI (can differ from company name) */
+  appName: string;
   /** Validated logo URL */
   logoUrl: string;
   /** Sidebar/navigation background color */
@@ -107,6 +136,10 @@ export interface ComputedBranding {
   accentColor: string;
   /** Surface color for cards, dropdowns, menus */
   surfaceColor: string;
+  /** Optimal foreground color for primary */
+  primaryForeground: string;
+  /** Optimal foreground color for accent */
+  accentForeground: string;
   /** @deprecated Use sidebarColor - kept for backward compatibility */
   secondaryColor: string;
   /** Dark mode variant of primary */
@@ -248,18 +281,65 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/**
+ * Calculate optimal foreground color for WCAG contrast
+ * Uses relative luminance to determine black or white text
+ */
+function getOptimalForeground(hex: string): string {
+  const { r, g, b } = hexToRgb(hex);
+
+  // Calculate relative luminance (WCAG formula)
+  const toLinear = (c: number) => {
+    const sRGB = c / 255;
+    return sRGB <= 0.03928 ? sRGB / 12.92 : Math.pow((sRGB + 0.055) / 1.055, 2.4);
+  };
+
+  const luminance = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+
+  // Return white for dark backgrounds, dark for light backgrounds
+  return luminance > 0.179 ? '#1C1C1E' : '#FFFFFF';
+}
+
+/**
+ * Darken a hex color by percentage
+ */
+function darkenColor(hex: string, percent: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  const factor = 1 - percent / 100;
+  const newR = Math.round(r * factor);
+  const newG = Math.round(g * factor);
+  const newB = Math.round(b * factor);
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * Lighten a hex color by percentage
+ */
+function lightenColor(hex: string, percent: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  const factor = percent / 100;
+  const newR = Math.round(r + (255 - r) * factor);
+  const newG = Math.round(g + (255 - g) * factor);
+  const newB = Math.round(b + (255 - b) * factor);
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+}
+
 // ============================================
 // Default Branding (Immutable)
 // ============================================
 
 const DEFAULT_BRANDING: ComputedBranding = Object.freeze({
   name: 'Ventazo',
+  appName: 'Ventazo',
   logoUrl: DEFAULT_ASSETS.LOGO,
   // 4-color semantic system
   sidebarColor: VENTAZO_COLORS.SIDEBAR,
   primaryColor: VENTAZO_COLORS.PRIMARY,
   accentColor: VENTAZO_COLORS.ACCENT,
   surfaceColor: VENTAZO_COLORS.SURFACE,
+  // Foreground colors for WCAG compliance
+  primaryForeground: getOptimalForeground(VENTAZO_COLORS.PRIMARY),
+  accentForeground: getOptimalForeground(VENTAZO_COLORS.ACCENT),
   // Legacy (backward compatibility)
   secondaryColor: VENTAZO_COLORS.SIDEBAR,
   // Dark mode variants
@@ -423,10 +503,16 @@ export function useTenantBranding(): ComputedBranding {
     let hasCustomBranding = false;
 
     if (currentTenant) {
-      // Apply tenant name and plan
+      // Apply tenant name, appName, and plan
+      // appName can be set separately in metadata.branding or defaults to name
+      const metadataBrandingRaw = currentTenant.metadata?.branding as Record<string, unknown> | undefined;
+      const appName = (metadataBrandingRaw?.['appName'] as string) ||
+                      (metadataBrandingRaw?.['brandName'] as string) ||
+                      currentTenant.name || branding.appName;
       branding = {
         ...branding,
         name: currentTenant.name || branding.name,
+        appName: appName,
         plan: currentTenant.plan || 'free',
       };
 
@@ -484,9 +570,15 @@ export function useTenantBranding(): ComputedBranding {
     const hsl = hexToHsl(branding.primaryColor);
     const sidebarHsl = hexToHsl(branding.sidebarColor);
 
+    // Compute foreground colors for WCAG compliance
+    const primaryForeground = getOptimalForeground(branding.primaryColor);
+    const accentForeground = getOptimalForeground(branding.accentColor);
+
     // Return frozen object for immutability
     return Object.freeze({
       ...branding,
+      primaryForeground,
+      accentForeground,
       isCustomBranding: hasCustomBranding,
       hsl: Object.freeze(hsl),
       sidebarHsl: Object.freeze(sidebarHsl),
@@ -558,13 +650,35 @@ export function useBrandingCSSVars(): void {
 
     // Batch DOM updates with all CSS variables
     requestAnimationFrame(() => {
-      // Brand colors (4-color semantic system)
-      root.style.setProperty(CSS_VARS.SIDEBAR, branding.sidebarColor);
-      root.style.setProperty(CSS_VARS.PRIMARY, branding.primaryColor);
-      root.style.setProperty(CSS_VARS.ACCENT, branding.accentColor);
-      root.style.setProperty(CSS_VARS.SURFACE, branding.surfaceColor);
-      // Legacy compatibility
-      root.style.setProperty(CSS_VARS.SECONDARY, branding.sidebarColor);
+      // ============================================
+      // Tenant semantic colors (primary system)
+      // ============================================
+      root.style.setProperty(CSS_VARS.TENANT_PRIMARY, branding.primaryColor);
+      root.style.setProperty(CSS_VARS.TENANT_ACCENT, branding.accentColor);
+      root.style.setProperty(CSS_VARS.TENANT_SIDEBAR, branding.sidebarColor);
+      root.style.setProperty(CSS_VARS.TENANT_SURFACE, branding.surfaceColor);
+      root.style.setProperty(CSS_VARS.TENANT_PRIMARY_FOREGROUND, branding.primaryForeground);
+      root.style.setProperty(CSS_VARS.TENANT_ACCENT_FOREGROUND, branding.accentForeground);
+
+      // Tenant color variations
+      root.style.setProperty(CSS_VARS.TENANT_PRIMARY_HOVER, darkenColor(branding.primaryColor, 10));
+      root.style.setProperty(CSS_VARS.TENANT_PRIMARY_LIGHT, lightenColor(branding.primaryColor, 35));
+      root.style.setProperty(CSS_VARS.TENANT_PRIMARY_LIGHTER, lightenColor(branding.primaryColor, 45));
+      root.style.setProperty(CSS_VARS.TENANT_PRIMARY_GLOW, `${branding.primaryColor}40`);
+      root.style.setProperty(CSS_VARS.TENANT_ACCENT_HOVER, darkenColor(branding.accentColor, 10));
+      root.style.setProperty(CSS_VARS.TENANT_ACCENT_LIGHT, lightenColor(branding.accentColor, 35));
+      root.style.setProperty(CSS_VARS.TENANT_ACCENT_GLOW, `${branding.accentColor}40`);
+      root.style.setProperty(CSS_VARS.TENANT_SURFACE_LIGHT, lightenColor(branding.surfaceColor, 5));
+      root.style.setProperty(CSS_VARS.TENANT_SURFACE_BORDER, lightenColor(branding.surfaceColor, 15));
+
+      // ============================================
+      // Legacy brand colors (backward compatibility)
+      // ============================================
+      root.style.setProperty(CSS_VARS.BRAND_SIDEBAR, branding.sidebarColor);
+      root.style.setProperty(CSS_VARS.BRAND_PRIMARY, branding.primaryColor);
+      root.style.setProperty(CSS_VARS.BRAND_ACCENT, branding.accentColor);
+      root.style.setProperty(CSS_VARS.BRAND_SURFACE, branding.surfaceColor);
+      root.style.setProperty(CSS_VARS.BRAND_SECONDARY, branding.sidebarColor);
 
       // HSL components for primary color
       root.style.setProperty(CSS_VARS.PRIMARY_H, String(branding.hsl.h));
@@ -575,13 +689,18 @@ export function useBrandingCSSVars(): void {
       root.style.setProperty(CSS_VARS.SIDEBAR_S, `${branding.sidebarHsl.s}%`);
       root.style.setProperty(CSS_VARS.SIDEBAR_L, `${branding.sidebarHsl.l}%`);
 
+      // ============================================
       // Sidebar UI colors (derived from branding)
+      // ============================================
       // Glass background using sidebarColor with high opacity
       root.style.setProperty(
         CSS_VARS.SIDEBAR_GLASS_BG,
         hexToRgba(branding.sidebarColor, 0.95)
       );
-      // Accent text using accent color
+      // Text colors
+      root.style.setProperty(CSS_VARS.SIDEBAR_TEXT_PRIMARY, '#FFFFFF');
+      root.style.setProperty(CSS_VARS.SIDEBAR_TEXT_SECONDARY, '#E5E5E5');
+      root.style.setProperty(CSS_VARS.SIDEBAR_TEXT_MUTED, '#94A3AB');
       root.style.setProperty(CSS_VARS.SIDEBAR_TEXT_ACCENT, branding.accentColor);
       // Active background using primary color with transparency
       root.style.setProperty(
@@ -592,6 +711,8 @@ export function useBrandingCSSVars(): void {
       root.style.setProperty(CSS_VARS.SIDEBAR_ACTIVE_BORDER, branding.primaryColor);
       // Hover background
       root.style.setProperty(CSS_VARS.SIDEBAR_HOVER_BG, 'rgba(255, 255, 255, 0.08)');
+      // Divider color
+      root.style.setProperty(CSS_VARS.SIDEBAR_DIVIDER, 'rgba(255, 255, 255, 0.06)');
       // Active item shadow using primary color
       root.style.setProperty(
         CSS_VARS.SIDEBAR_ITEM_SHADOW_ACTIVE,

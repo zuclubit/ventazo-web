@@ -55,6 +55,10 @@ export {
 export { LeadFormSheet } from './LeadFormSheet';
 export type { LeadFormSheetProps } from './LeadFormSheet';
 
+// Lead Detail Sheet (Unified View/Edit)
+export { LeadDetailSheet } from './LeadDetailSheet';
+export type { LeadDetailSheetProps } from './LeadDetailSheet';
+
 // Re-export existing dialog components for convenience
 export { LeadFormDialog } from './lead-form-dialog';
 export { DeleteLeadDialog } from './delete-lead-dialog';

@@ -104,7 +104,7 @@ function KPIMiniCard({
           <span className={cn(
             'text-xl font-bold tabular-nums leading-none',
             variant === 'hot' && 'text-[var(--brand-orange)]',
-            isActive && variant !== 'hot' && 'text-[#0EB58C]'
+            isActive && variant !== 'hot' && 'text-[var(--tenant-primary)]'
           )}>
             {value}
           </span>

@@ -69,13 +69,55 @@ const CSS_VARIABLES = [
 /**
  * Apply branding colors as CSS variables
  * Converts hex colors to HSL format for CSS custom properties
+ * Also sets tenant-specific variables for dynamic theming
  */
-function applyCssVariables(branding: TenantBranding): void {
+function applyCssVariables(branding: TenantBranding, tenantColors?: {
+  sidebarColor?: string;
+  primaryColor?: string;
+  accentColor?: string;
+  surfaceColor?: string;
+}): void {
   const { colors, shapes } = branding;
 
   // Primary
   setCssVariable('--primary', hexToHslString(colors.primary));
   setCssVariable('--primary-foreground', hexToHslString(colors.primaryForeground));
+
+  // ============================================
+  // TENANT DYNAMIC COLORS (4-color semantic palette)
+  // Used by leads module and other dynamic components
+  // ============================================
+  if (tenantColors) {
+    const primaryHex = tenantColors.primaryColor || colors.primary;
+    const accentHex = tenantColors.accentColor || colors.accent;
+    const sidebarHex = tenantColors.sidebarColor || darken(colors.primary, 35);
+    const surfaceHex = tenantColors.surfaceColor || darken(colors.primary, 40);
+
+    // Set tenant colors as hex for direct use
+    setCssVariable('--tenant-primary', primaryHex);
+    setCssVariable('--tenant-accent', accentHex);
+    setCssVariable('--tenant-sidebar', sidebarHex);
+    setCssVariable('--tenant-surface', surfaceHex);
+
+    // Computed foregrounds for contrast
+    setCssVariable('--tenant-primary-foreground', getOptimalForeground(primaryHex));
+    setCssVariable('--tenant-accent-foreground', getOptimalForeground(accentHex));
+
+    // Primary variations (for hover, light backgrounds, etc.)
+    setCssVariable('--tenant-primary-hover', darken(primaryHex, 10));
+    setCssVariable('--tenant-primary-light', lighten(primaryHex, 35));
+    setCssVariable('--tenant-primary-lighter', lighten(primaryHex, 45));
+    setCssVariable('--tenant-primary-glow', `${primaryHex}40`); // 25% opacity
+
+    // Accent variations
+    setCssVariable('--tenant-accent-hover', darken(accentHex, 10));
+    setCssVariable('--tenant-accent-light', lighten(accentHex, 35));
+    setCssVariable('--tenant-accent-glow', `${accentHex}40`);
+
+    // Surface variations
+    setCssVariable('--tenant-surface-light', lighten(surfaceHex, 5));
+    setCssVariable('--tenant-surface-border', lighten(surfaceHex, 15));
+  }
 
   // Secondary
   setCssVariable('--secondary', hexToHslString(colors.secondary));
@@ -266,9 +308,25 @@ export function TenantThemeProvider({
       });
     }
 
-    // Apply the resolved branding
+    // Extract 4-color semantic palette from tenant metadata
+    const tenantColors = metadataBranding ? {
+      sidebarColor: isValidHexColor(metadataBranding.sidebarColor)
+        ? metadataBranding.sidebarColor as string
+        : undefined,
+      primaryColor: isValidHexColor(metadataBranding.primaryColor)
+        ? metadataBranding.primaryColor as string
+        : undefined,
+      accentColor: isValidHexColor(metadataBranding.accentColor)
+        ? metadataBranding.accentColor as string
+        : undefined,
+      surfaceColor: isValidHexColor(metadataBranding.surfaceColor)
+        ? metadataBranding.surfaceColor as string
+        : undefined,
+    } : undefined;
+
+    // Apply the resolved branding with tenant-specific colors
     setBranding(resolvedBranding);
-    applyCssVariables(resolvedBranding);
+    applyCssVariables(resolvedBranding, tenantColors);
     setIsLoading(false);
   }, [currentTenant, storeSettings.primaryColor, storeSettings.secondaryColor]);
 
