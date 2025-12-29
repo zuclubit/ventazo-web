@@ -5,7 +5,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { Activity, Columns3, Settings, User, Users, Menu } from 'lucide-react';
+import { Activity, Columns3, Settings, User, Users, Menu, Plug } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -46,6 +46,12 @@ const settingsNavItems: NavItem[] = [
     href: '/app/settings/pipeline',
     label: 'Pipeline',
     icon: Columns3,
+    minRole: 'admin',
+  },
+  {
+    href: '/app/settings/integrations',
+    label: 'Integraciones',
+    icon: Plug,
     minRole: 'admin',
   },
   {
