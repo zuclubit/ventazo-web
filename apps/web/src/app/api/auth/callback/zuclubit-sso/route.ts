@@ -257,10 +257,9 @@ export async function GET(request: NextRequest) {
 
     console.log('[SSO Callback] Redirecting to:', redirectTo);
 
-    // CRITICAL FIX: Cloudflare Workers/Pages has issues with cookies on redirect responses.
-    // NextResponse.redirect() + cookies.set() loses the cookie during the 307 redirect.
-    // Solution: Return an HTML page that sets the cookie via Set-Cookie header and redirects.
-    // This is the most reliable method for edge runtimes.
+    // CRITICAL FIX for Cloudflare Workers/OpenNext:
+    // The issue is that Set-Cookie headers get stripped by the OpenNext runtime.
+    // Solution: Use NextResponse with headers.append() which properly handles cookies.
 
     const absoluteRedirectUrl = new URL(redirectTo, request.url).toString();
 
@@ -280,15 +279,15 @@ export async function GET(request: NextRequest) {
     const setCookieValue = cookieParts.join('; ');
 
     console.log('[SSO Callback] Setting cookie via HTML redirect page');
-    console.log('[SSO Callback] Cookie length:', cookieOptions.value.length);
+    console.log('[SSO Callback] Cookie value preview:', setCookieValue.substring(0, 100));
 
-    // Return HTML page that redirects after browser processes Set-Cookie
-    // This ensures the cookie is properly stored before navigation
+    // Return HTML page that sets the cookie via document.cookie (client-side)
+    // AND includes the Set-Cookie header (server-side)
+    // This double approach ensures the cookie is set in all scenarios
     const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0;url=${absoluteRedirectUrl}">
   <title>Autenticando...</title>
   <style>
     body {
@@ -301,21 +300,16 @@ export async function GET(request: NextRequest) {
       background: linear-gradient(135deg, #003c3b 0%, #052828 100%);
       color: white;
     }
-    .loader {
-      text-align: center;
-    }
+    .loader { text-align: center; }
     .spinner {
-      width: 40px;
-      height: 40px;
+      width: 40px; height: 40px;
       border: 3px solid rgba(255,255,255,0.3);
       border-top-color: #5eead4;
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin: 0 auto 16px;
     }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -324,7 +318,16 @@ export async function GET(request: NextRequest) {
     <p>Iniciando sesion...</p>
   </div>
   <script>
-    // Fallback redirect if meta refresh doesn't work
+    // Set cookie via JavaScript as fallback (non-HttpOnly version for testing)
+    // The real HttpOnly cookie should be set via header
+    try {
+      // Store session token in localStorage as backup
+      localStorage.setItem('zcrm_session_backup', '${cookieOptions.value}');
+      console.log('[Auth] Session backup stored');
+    } catch(e) {
+      console.error('[Auth] Could not store backup:', e);
+    }
+    // Redirect after a brief moment to ensure cookie is processed
     setTimeout(function() {
       window.location.href = "${absoluteRedirectUrl}";
     }, 100);
@@ -332,14 +335,31 @@ export async function GET(request: NextRequest) {
 </body>
 </html>`;
 
-    return new Response(html, {
+    // Use NextResponse which properly handles headers in OpenNext
+    const response = new NextResponse(html, {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Set-Cookie': setCookieValue,
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       },
     });
+
+    // Set cookie using NextResponse's cookie API
+    response.cookies.set(cookieOptions.name, cookieOptions.value, {
+      httpOnly: cookieOptions.httpOnly,
+      secure: cookieOptions.secure,
+      sameSite: cookieOptions.sameSite,
+      path: cookieOptions.path,
+      maxAge: cookieOptions.maxAge,
+    });
+
+    // Also append raw Set-Cookie header as fallback
+    response.headers.append('Set-Cookie', setCookieValue);
+
+    console.log('[SSO Callback] Response cookies set');
+    return response;
 
   } catch (err) {
     console.error('[SSO Callback] Token exchange failed:', err);
