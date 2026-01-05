@@ -228,31 +228,29 @@ export function addErrorInterceptor(interceptor: ErrorInterceptor): void {
 // Default Error Interceptor (401 handling)
 // ============================================
 
-// Flag to prevent redirect loops
-let isRedirecting = false;
+// NOTE: Auto-logout on 401 has been DISABLED.
+//
+// Reason: The session cookie (zcrm_session) is validated by middleware
+// and remains valid even if individual API calls fail with 401.
+// This can happen when:
+// 1. SSO access token expires but session is still valid
+// 2. Backend rejects specific requests but user is still authenticated
+// 3. Race conditions during token refresh
+//
+// Instead of destroying valid sessions, we let components handle 401
+// errors gracefully (show error message, retry, etc).
+//
+// If the session itself is truly invalid, the middleware will redirect
+// to login during the next navigation.
 
+// Keep the interceptor for logging purposes only
 addErrorInterceptor(async (error) => {
-  if (error.isUnauthorized && !isRedirecting) {
-    isRedirecting = true;
-
-    // Redirect to login if in browser
-    if (typeof window !== 'undefined') {
-      const currentPath = window.location.pathname;
-
-      // Clear the session cookie via API route before redirecting
-      try {
-        await fetch('/api/auth/logout', { method: 'POST' });
-      } catch {
-        // Ignore errors - we'll redirect anyway
-      }
-
-      window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&error=session_expired`;
-    }
-
-    // Reset flag after a delay
-    setTimeout(() => {
-      isRedirecting = false;
-    }, 5000);
+  if (error.isUnauthorized) {
+    console.warn(
+      '[API Client] Received 401 error. Session may need refresh.',
+      'The user will NOT be auto-logged out.',
+      'Path:', typeof window !== 'undefined' ? window.location.pathname : 'server'
+    );
   }
 });
 
