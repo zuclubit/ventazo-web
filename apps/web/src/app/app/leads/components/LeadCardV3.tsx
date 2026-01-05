@@ -16,8 +16,9 @@
  * - Secure URL handling (XSS prevention)
  * - Full i18n internationalization support
  *
- * @version 3.2.0
+ * @version 3.3.0
  * @author Zuclubit Team
+ * @phase FASE 6 - Integrated with CARD_TOKENS Design System
  */
 
 import * as React from 'react';
@@ -32,12 +33,16 @@ import {
   Globe,
   AlertTriangle,
   Flame,
+  Loader2,
+  GripVertical,
 } from 'lucide-react';
 
 import type { Lead, LeadSource } from '@/lib/leads';
 import { LeadStatus, STATUS_LABELS } from '@/lib/leads';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
+import { decodeHtmlEntities } from '@/lib/security';
+import { CARD_TOKENS, getCardInteractiveClasses } from '@/components/cards';
 
 // ============================================
 // Types & Interfaces
@@ -58,6 +63,8 @@ export interface LeadCardV3Props {
   isDragging?: boolean;
   /** Whether this is the drag overlay */
   isOverlay?: boolean;
+  /** Whether this card is currently being moved (stage transition in progress) */
+  isMoving?: boolean;
   /** Enable drag functionality */
   draggable?: boolean;
   /** Click handler for card selection */
@@ -118,34 +125,32 @@ interface ChannelInfo {
 }
 
 // ============================================
-// Design Tokens (Centralized)
+// Design Tokens (Extended from CARD_TOKENS)
 // ============================================
 
+/**
+ * Extended tokens that complement CARD_TOKENS with LeadCard-specific values.
+ * Base tokens (touchTarget, radius, transition, focus) come from CARD_TOKENS.
+ */
 const DESIGN_TOKENS = {
-  // Touch target sizes (WCAG 2.5.5 - 44px minimum)
-  touchTarget: {
-    min: 'min-h-[44px] min-w-[44px]',
-    button: 'w-11 h-11', // 44px
-  },
+  // Touch target - Delegate to CARD_TOKENS
+  touchTarget: CARD_TOKENS.touchTarget,
 
-  // Border radius scale - Using CSS Variables
+  // Border radius - Extend CARD_TOKENS with score-specific radius
   radius: {
-    sm: 'rounded-[var(--card-radius-internal)]',
-    md: 'rounded-[var(--card-radius-sm)]',
-    lg: 'rounded-[var(--card-radius-md)]',
-    xl: 'rounded-[var(--card-radius-lg)]',
-    score: 'rounded-[var(--score-radius)]',
+    ...CARD_TOKENS.radius,
+    sm: CARD_TOKENS.radius.internal,
+    md: CARD_TOKENS.radius.cardSm,
+    lg: CARD_TOKENS.radius.card,
+    xl: CARD_TOKENS.radius.cardLg,
+    score: 'rounded-[var(--score-radius)]', // Lead-specific
   },
 
-  // Transition presets - Using CSS Variables
-  transition: {
-    fast: 'transition-all duration-[var(--transition-micro)]',
-    normal: 'transition-all duration-[var(--transition-fast)]',
-    slow: 'transition-all duration-[var(--transition-normal)]',
-  },
+  // Transition - Delegate to CARD_TOKENS
+  transition: CARD_TOKENS.transition,
 
-  // Focus ring for accessibility
-  focusRing: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2',
+  // Focus ring - Delegate to CARD_TOKENS
+  focusRing: CARD_TOKENS.focus.ring,
 
   // Typography colors - Theme aware with proper contrast (using CSS vars)
   text: {
@@ -159,26 +164,31 @@ const DESIGN_TOKENS = {
   // Card using CSS Variables
   card: {
     base: 'kanban-card-ventazo',
-    padding: 'p-[var(--card-padding-md)]',
+    padding: CARD_TOKENS.padding.md,
     gap: 'gap-[var(--card-gap)]',
   },
 } as const;
 
+/**
+ * Status styles using CSS variables for FULL dynamic theming v4.0
+ * Key statuses (new, won, lost) use tenant-aware semantic colors
+ * Other statuses use fixed semantic colors for clarity
+ */
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   new: {
-    bg: 'bg-blue-500/15 dark:bg-blue-500/25',
-    text: 'text-blue-700 dark:text-blue-300',
-    border: 'border-blue-300 dark:border-blue-500/40',
+    bg: 'bg-[var(--status-info-bg)]',
+    text: 'text-[var(--status-info-text)]',
+    border: 'border-[var(--status-info-border)]',
   },
   contacted: {
-    bg: 'bg-amber-500/15 dark:bg-amber-500/25',
-    text: 'text-amber-700 dark:text-amber-300',
-    border: 'border-amber-300 dark:border-amber-500/40',
+    bg: 'bg-[var(--status-warning-bg)]',
+    text: 'text-[var(--status-warning-text)]',
+    border: 'border-[var(--status-warning-border)]',
   },
   in_progress: {
-    bg: 'bg-orange-500/15 dark:bg-orange-500/25',
-    text: 'text-orange-700 dark:text-orange-300',
-    border: 'border-orange-300 dark:border-orange-500/40',
+    bg: 'bg-[var(--score-hot-bg)]',
+    text: 'text-[var(--score-hot)]',
+    border: 'border-[var(--score-hot-border)]',
   },
   qualified: {
     bg: 'bg-violet-500/15 dark:bg-violet-500/25',
@@ -186,9 +196,10 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
     border: 'border-violet-300 dark:border-violet-500/40',
   },
   proposal: {
-    bg: 'bg-teal-500/15 dark:bg-teal-500/25',
-    text: 'text-teal-700 dark:text-teal-300',
-    border: 'border-teal-300 dark:border-teal-500/40',
+    // Use tenant primary for proposal stage
+    bg: 'bg-[rgba(var(--tenant-primary-rgb),0.15)]',
+    text: 'text-[var(--tenant-primary)]',
+    border: 'border-[var(--tenant-primary-glow)]',
   },
   negotiation: {
     bg: 'bg-pink-500/15 dark:bg-pink-500/25',
@@ -196,14 +207,15 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
     border: 'border-pink-300 dark:border-pink-500/40',
   },
   won: {
-    bg: 'bg-emerald-500/15 dark:bg-emerald-500/25',
-    text: 'text-emerald-700 dark:text-emerald-300',
-    border: 'border-emerald-300 dark:border-emerald-500/40',
+    // Use tenant accent for success/won
+    bg: 'bg-[var(--status-success-bg)]',
+    text: 'text-[var(--status-success-text)]',
+    border: 'border-[var(--status-success-border)]',
   },
   lost: {
-    bg: 'bg-red-500/15 dark:bg-red-500/25',
-    text: 'text-red-600 dark:text-red-300',
-    border: 'border-red-300 dark:border-red-500/40',
+    bg: 'bg-[var(--status-error-bg)]',
+    text: 'text-[var(--status-error-text)]',
+    border: 'border-[var(--status-error-border)]',
   },
 };
 
@@ -228,20 +240,20 @@ const ACTION_STYLES: Record<ActionVariant, string> = {
   email: 'action-btn-premium email',
 };
 
-// Channel map with i18n keys
+// Channel map with i18n keys - Uses CSS variables for dynamic colors
 const CHANNEL_KEYS: Record<string, { icon: typeof MessageCircle; key: string; color: string }> = {
-  whatsapp: { icon: MessageCircle, key: 'whatsapp', color: 'text-emerald-600 dark:text-emerald-400' },
-  social: { icon: MessageCircle, key: 'social', color: 'text-emerald-600 dark:text-emerald-400' },
-  email: { icon: Mail, key: 'email', color: 'text-blue-600 dark:text-blue-400' },
-  referral: { icon: Mail, key: 'referral', color: 'text-purple-600 dark:text-purple-400' },
-  phone: { icon: Phone, key: 'phone', color: 'text-violet-600 dark:text-violet-400' },
-  manual: { icon: Phone, key: 'manual', color: 'text-slate-600 dark:text-slate-400' },
-  website: { icon: Globe, key: 'website', color: 'text-orange-600 dark:text-orange-400' },
-  ad: { icon: Globe, key: 'ad', color: 'text-pink-600 dark:text-pink-400' },
-  organic: { icon: Globe, key: 'organic', color: 'text-teal-600 dark:text-teal-400' },
+  whatsapp: { icon: MessageCircle, key: 'whatsapp', color: 'text-[var(--channel-whatsapp)]' },
+  social: { icon: MessageCircle, key: 'social', color: 'text-[var(--channel-social)]' },
+  email: { icon: Mail, key: 'email', color: 'text-[var(--channel-email)]' },
+  referral: { icon: Mail, key: 'referral', color: 'text-[var(--channel-referral)]' },
+  phone: { icon: Phone, key: 'phone', color: 'text-[var(--channel-phone)]' },
+  manual: { icon: Phone, key: 'manual', color: 'text-muted-foreground' },
+  website: { icon: Globe, key: 'website', color: 'text-[var(--channel-website)]' },
+  ad: { icon: Globe, key: 'ad', color: 'text-[var(--channel-ad)]' },
+  organic: { icon: Globe, key: 'organic', color: 'text-[var(--channel-organic)]' },
 };
 
-const DEFAULT_CHANNEL_KEY = { icon: Globe, key: 'website', color: 'text-slate-600 dark:text-slate-400' };
+const DEFAULT_CHANNEL_KEY = { icon: Globe, key: 'website', color: 'text-muted-foreground' };
 
 // ============================================
 // Utility Functions (Pure, Memoizable)
@@ -545,6 +557,7 @@ export const LeadCardV3 = React.memo<LeadCardV3Props>(function LeadCardV3({
   isSelected = false,
   isDragging = false,
   isOverlay = false,
+  isMoving = false,
   draggable = true,
   onClick,
   onWhatsApp,
@@ -572,6 +585,16 @@ export const LeadCardV3 = React.memo<LeadCardV3Props>(function LeadCardV3({
     disabled: !draggable,
   });
 
+  // Mobile detection for drag handle optimization
+  // On mobile (<1024px), only drag handle initiates drag to allow scroll
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Computed values (memoized)
   const isCurrentlyDragging = isDragging || isSortableDragging;
 
@@ -588,7 +611,16 @@ export const LeadCardV3 = React.memo<LeadCardV3Props>(function LeadCardV3({
 
   const channelKey = React.useMemo(() => getChannelKey(lead.source), [lead.source]);
   const isOverdue = React.useMemo(() => isDateOverdue(lead.nextFollowUpAt), [lead.nextFollowUpAt]);
-  const initials = React.useMemo(() => getInitials(lead.fullName), [lead.fullName]);
+  // Decode HTML entities in names for proper display
+  const decodedFullName = React.useMemo(
+    () => decodeHtmlEntities(lead.fullName || ''),
+    [lead.fullName]
+  );
+  const decodedCompanyName = React.useMemo(
+    () => decodeHtmlEntities(lead.companyName || ''),
+    [lead.companyName]
+  );
+  const initials = React.useMemo(() => getInitials(decodedFullName), [decodedFullName]);
   const timeInfo = React.useMemo(() => formatCompactTime(lead.lastActivityAt), [lead.lastActivityAt]);
 
   // Get translated channel label
@@ -674,17 +706,47 @@ export const LeadCardV3 = React.memo<LeadCardV3Props>(function LeadCardV3({
     <div
       ref={setNodeRef}
       style={style}
-      className={cn('touch-none', isCurrentlyDragging && !isOverlay && 'z-0', className)}
-      {...(draggable ? attributes : {})}
-      {...(draggable ? listeners : {})}
+      className={cn(
+        // Relative for drag handle positioning
+        'relative',
+        // Mobile: allow scroll, only drag handle blocks touch
+        // Desktop: full card can initiate drag
+        isMobile ? '' : 'touch-none',
+        isCurrentlyDragging && !isOverlay && 'z-0',
+        className
+      )}
+      // Desktop: full card is draggable
+      // Mobile: card wrapper doesn't have drag listeners (handle does)
+      {...(draggable && !isMobile ? attributes : {})}
+      {...(draggable && !isMobile ? listeners : {})}
     >
+      {/* Mobile Drag Handle - Touch-friendly, always visible */}
+      {isMobile && draggable && (
+        <div
+          className={cn(
+            'absolute left-0 top-0 bottom-0 w-7 z-10',
+            'flex items-center justify-center',
+            'touch-none cursor-grab active:cursor-grabbing',
+            'bg-gradient-to-r from-slate-100/90 to-transparent dark:from-slate-800/90 dark:to-transparent',
+            'rounded-l-xl',
+            'transition-all duration-200',
+            isCurrentlyDragging ? 'opacity-100 bg-slate-200/90 dark:bg-slate-700/90' : 'opacity-70 hover:opacity-100'
+          )}
+          {...attributes}
+          {...listeners}
+          aria-label="Arrastrar para mover"
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground/60" />
+        </div>
+      )}
+
       <article
         role="button"
         tabIndex={onClick ? 0 : undefined}
         onClick={handleCardClick}
         onKeyDown={handleKeyDown}
         aria-selected={isSelected}
-        aria-label={`${lead.fullName || cardT.noName}${lead.companyName ? `, ${lead.companyName}` : ''}, ${cardT.score}: ${lead.score}`}
+        aria-label={`${decodedFullName || cardT.noName}${decodedCompanyName ? `, ${decodedCompanyName}` : ''}, ${cardT.score}: ${lead.score}`}
         className={cn(
           // VENTAZO 2025: Premium card class from CSS utilities
           DESIGN_TOKENS.card.base,
@@ -692,6 +754,11 @@ export const LeadCardV3 = React.memo<LeadCardV3Props>(function LeadCardV3({
           'group',
           // Entry animation
           'animate-card-enter',
+          // Relative for moving overlay
+          'relative',
+
+          // Mobile: Add left padding for drag handle
+          isMobile && draggable && 'pl-8',
 
           // Focus for keyboard navigation
           DESIGN_TOKENS.focusRing,
@@ -702,12 +769,25 @@ export const LeadCardV3 = React.memo<LeadCardV3Props>(function LeadCardV3({
           // Dragging state
           isCurrentlyDragging && 'is-dragging',
 
-          // Cursor
+          // Moving state (stage transition in progress) - Homologated with Opportunities
+          isMoving && 'opacity-70 pointer-events-none ring-2 ring-blue-400/50',
+
+          // Cursor - different for mobile (pointer) vs desktop (grab)
           draggable
-            ? (isCurrentlyDragging ? 'cursor-grabbing' : 'cursor-grab')
+            ? (isCurrentlyDragging ? 'cursor-grabbing' : (isMobile ? 'cursor-pointer' : 'cursor-grab'))
             : (onClick ? 'cursor-pointer' : 'cursor-default')
         )}
       >
+        {/* Moving indicator overlay - Homologated with OpportunityKanbanCard */}
+        {isMoving && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/50 backdrop-blur-[1px] z-10">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-xs font-medium">Moviendo...</span>
+            </div>
+          </div>
+        )}
+
         {/* ============================
             HEADER: Score + Avatar + Name + Actions
             ============================ */}
@@ -733,9 +813,9 @@ export const LeadCardV3 = React.memo<LeadCardV3Props>(function LeadCardV3({
               'text-[14px] font-semibold truncate leading-tight',
               DESIGN_TOKENS.text.primary
             )}>
-              {lead.fullName || cardT.noName}
+              {decodedFullName || cardT.noName}
             </h3>
-            {lead.companyName && (
+            {decodedCompanyName && (
               <p className={cn(
                 'flex items-center gap-1 text-[12px] truncate',
                 DESIGN_TOKENS.text.secondary
@@ -744,7 +824,7 @@ export const LeadCardV3 = React.memo<LeadCardV3Props>(function LeadCardV3({
                   className={cn('h-3 w-3 shrink-0', DESIGN_TOKENS.text.icon)}
                   aria-hidden="true"
                 />
-                <span className="truncate">{lead.companyName}</span>
+                <span className="truncate">{decodedCompanyName}</span>
               </p>
             )}
           </div>
@@ -756,7 +836,7 @@ export const LeadCardV3 = React.memo<LeadCardV3Props>(function LeadCardV3({
               'action-group-premium',
               // Subtle appearance that becomes more prominent on hover
               'opacity-80 group-hover:opacity-100',
-              DESIGN_TOKENS.transition.fast
+              CARD_TOKENS.transition.micro
             )}
             onClick={(e) => e.stopPropagation()}
           >
@@ -866,7 +946,7 @@ export const LeadCardV3Skeleton = React.memo<{ variant?: CardVariant }>(
             className={cn(
               scoreSize,
               DESIGN_TOKENS.radius.score,
-              'bg-slate-200 dark:bg-slate-700',
+              'bg-muted',
               'animate-shimmer'
             )}
             aria-hidden="true"
@@ -877,7 +957,7 @@ export const LeadCardV3Skeleton = React.memo<{ variant?: CardVariant }>(
             className={cn(
               'w-9 h-9',
               DESIGN_TOKENS.radius.md,
-              'bg-slate-200 dark:bg-slate-700',
+              'bg-muted',
               'animate-shimmer'
             )}
             style={{ animationDelay: '100ms' }}
@@ -887,12 +967,20 @@ export const LeadCardV3Skeleton = React.memo<{ variant?: CardVariant }>(
           {/* Name skeleton */}
           <div className="flex-1 space-y-1.5">
             <div
-              className="h-4 w-3/4 rounded-[var(--card-radius-internal)] bg-slate-200 dark:bg-slate-700 animate-shimmer"
+              className={cn(
+                'h-4 w-3/4 animate-shimmer',
+                CARD_TOKENS.radius.internal,
+                'bg-muted'
+              )}
               style={{ animationDelay: '200ms' }}
               aria-hidden="true"
             />
             <div
-              className="h-3 w-1/2 rounded-[var(--card-radius-internal)] bg-slate-200 dark:bg-slate-700 animate-shimmer"
+              className={cn(
+                'h-3 w-1/2 animate-shimmer',
+                CARD_TOKENS.radius.internal,
+                'bg-muted'
+              )}
               style={{ animationDelay: '300ms' }}
               aria-hidden="true"
             />
@@ -902,7 +990,11 @@ export const LeadCardV3Skeleton = React.memo<{ variant?: CardVariant }>(
         {/* BODY skeleton */}
         <div className="flex gap-2 pl-[calc(var(--score-size-md)+0.75rem)]">
           <div
-            className="h-5 w-16 rounded-[var(--badge-radius)] bg-slate-200 dark:bg-slate-700 animate-shimmer"
+            className={cn(
+              'h-5 w-16 animate-shimmer',
+              CARD_TOKENS.radius.badge,
+              'bg-muted'
+            )}
             style={{ animationDelay: '400ms' }}
             aria-hidden="true"
           />
@@ -911,12 +1003,20 @@ export const LeadCardV3Skeleton = React.memo<{ variant?: CardVariant }>(
         {/* FOOTER skeleton */}
         <div className="flex gap-2 pl-[calc(var(--score-size-md)+0.75rem)]">
           <div
-            className="h-4 w-12 rounded-[var(--badge-radius)] bg-slate-200 dark:bg-slate-700 animate-shimmer"
+            className={cn(
+              'h-4 w-12 animate-shimmer',
+              CARD_TOKENS.radius.badge,
+              'bg-muted'
+            )}
             style={{ animationDelay: '500ms' }}
             aria-hidden="true"
           />
           <div
-            className="h-4 w-16 rounded-[var(--badge-radius)] bg-slate-200 dark:bg-slate-700 animate-shimmer"
+            className={cn(
+              'h-4 w-16 animate-shimmer',
+              CARD_TOKENS.radius.badge,
+              'bg-muted'
+            )}
             style={{ animationDelay: '600ms' }}
             aria-hidden="true"
           />

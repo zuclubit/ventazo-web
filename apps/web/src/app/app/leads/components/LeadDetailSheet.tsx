@@ -93,6 +93,8 @@ import {
 } from './lead-form';
 import { LeadScoreIndicator } from './LeadScoreIndicator';
 import { QuickActionsBar } from './QuickActionsBar';
+import { AttachmentSection } from '@/components/ui/attachment-section';
+import { Paperclip } from 'lucide-react';
 
 // ============================================
 // Types & Schema
@@ -611,6 +613,26 @@ function ViewMode({ lead, onEdit, onDelete, onConvert, onClose, aiInsight }: Vie
             </>
           )}
 
+          {/* Attachments */}
+          <Separator />
+          <section>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+              <Paperclip className="h-4 w-4" />
+              Documentos Adjuntos
+            </h3>
+            <AttachmentSection
+              entityType="lead"
+              entityId={lead.id}
+              title=""
+              description="Propuestas, documentos y archivos relacionados"
+              category="document"
+              accessLevel="team"
+              view="list"
+              showUploader
+              showList
+            />
+          </section>
+
           {/* Follow-up Alert */}
           {lead.nextFollowUpAt && (
             <>
@@ -654,9 +676,12 @@ function ViewMode({ lead, onEdit, onDelete, onConvert, onClose, aiInsight }: Vie
       {/* Footer Actions */}
       <div className={cn(
         'shrink-0 border-t border-border/40',
-        'px-4 py-4 sm:px-5',
+        'px-4 pt-4 sm:px-5',
         'bg-background/95 backdrop-blur-sm',
-        'pb-[max(1rem,env(safe-area-inset-bottom))]'
+        // Mobile: account for bottom bar (64px) + safe area + padding
+        'pb-[calc(var(--bottom-bar-height,64px)+env(safe-area-inset-bottom,0px)+1rem)]',
+        // Desktop: normal padding (no bottom bar)
+        'sm:pb-4'
       )}>
         <div className="flex items-center gap-3">
           {/* Edit Button - Primary */}
@@ -1257,6 +1282,25 @@ function EditMode({ lead, onCancel, onSave }: EditModeProps) {
                 />
               </FormField>
             </FormSection>
+
+            {/* Attachments */}
+            <FormSection
+              title="Documentos Adjuntos"
+              icon={Paperclip}
+              defaultExpanded={false}
+              description="Adjunta propuestas, documentos y archivos relacionados"
+            >
+              <AttachmentSection
+                entityType="lead"
+                entityId={lead.id}
+                title=""
+                description=""
+                category="document"
+                accessLevel="team"
+                view="compact"
+                compact
+              />
+            </FormSection>
           </FormSections>
         </form>
       </ScrollArea>
@@ -1265,8 +1309,11 @@ function EditMode({ lead, onCancel, onSave }: EditModeProps) {
       <div
         className={cn(
           'shrink-0',
-          'px-4 pt-3 pb-4 sm:px-5 sm:pt-4',
-          'pb-[max(1rem,env(safe-area-inset-bottom))]',
+          'px-4 pt-3 sm:px-5 sm:pt-4',
+          // Mobile: account for bottom bar (64px) + safe area + padding
+          'pb-[calc(var(--bottom-bar-height,64px)+env(safe-area-inset-bottom,0px)+1rem)]',
+          // Desktop: normal padding (no bottom bar)
+          'sm:pb-4',
           'border-t border-border/40',
           'bg-background/95 backdrop-blur-sm'
         )}
@@ -1388,6 +1435,7 @@ export function LeadDetailSheet({
       <SheetContent
         side="right"
         hideCloseButton
+        accessibleTitle={lead ? `Detalles de ${lead.fullName}` : 'Detalles del Lead'}
         className={cn(
           // Layout
           'flex flex-col p-0 gap-0',

@@ -57,14 +57,23 @@ export interface TenantFeatures {
 
 /**
  * Tenant settings (locale, branding, features)
+ * Supports 4-color semantic palette for dynamic theming
  */
 export interface TenantSettings {
   currency: string;
   locale: string;
   timezone: string;
   dateFormat: string;
+  /** Main brand color for buttons, CTAs */
   primaryColor?: string;
+  /** @deprecated Use sidebarColor instead */
   secondaryColor?: string;
+  /** Sidebar/navigation background color */
+  sidebarColor?: string;
+  /** Accent color for highlights, links */
+  accentColor?: string;
+  /** Surface color for cards, dropdowns */
+  surfaceColor?: string;
   logo?: string;
   features: TenantFeatures;
 }
@@ -77,6 +86,18 @@ export type TenantSettingsUpdate = Partial<Omit<TenantSettings, 'features'>> & {
 };
 
 /**
+ * Cached branding for instant theme application
+ * Persisted to localStorage to prevent FOUC (Flash of Unstyled Content)
+ */
+export interface CachedBranding {
+  primaryColor: string;
+  sidebarColor: string;
+  accentColor: string;
+  surfaceColor: string;
+  logoUrl?: string;
+}
+
+/**
  * Store state interface
  */
 interface TenantState {
@@ -85,6 +106,8 @@ interface TenantState {
   settings: TenantSettings;
   isLoading: boolean;
   error: string | null;
+  /** Cached branding for instant theme application (hydrated from localStorage) */
+  _cachedBranding: CachedBranding | null;
 
   // Actions
   setTenant: (tenant: Tenant | null) => void;
@@ -184,29 +207,51 @@ const PLAN_ORDER: Readonly<Record<PlanTier, number>> = Object.freeze({
 // ============================================
 
 /**
- * Extract and validate branding from tenant metadata
- * Security: Validates all color and URL inputs
+ * Branding result type with 4-color semantic palette
  */
-function extractBrandingFromTenant(tenant: Tenant): {
+interface BrandingResult {
   primaryColor?: string;
   secondaryColor?: string;
+  sidebarColor?: string;
+  accentColor?: string;
+  surfaceColor?: string;
   logo?: string;
-} {
-  const result: {
-    primaryColor?: string;
-    secondaryColor?: string;
-    logo?: string;
-  } = {};
+}
+
+/**
+ * Extract and validate branding from tenant metadata
+ * Security: Validates all color and URL inputs
+ * Supports 4-color semantic palette for dynamic theming
+ */
+function extractBrandingFromTenant(tenant: Tenant): BrandingResult {
+  const result: BrandingResult = {};
 
   // Priority 1: metadata.branding (where onboarding stores data)
   const metadataBranding = tenant.metadata?.branding;
   if (metadataBranding) {
+    // Primary color
     if (isValidHexColor(metadataBranding.primaryColor)) {
       result.primaryColor = sanitizeHexColor(metadataBranding.primaryColor, '');
     }
+    // Secondary color (legacy)
     if (isValidHexColor(metadataBranding.secondaryColor)) {
       result.secondaryColor = sanitizeHexColor(metadataBranding.secondaryColor, '');
     }
+    // Sidebar color (new - fallback to secondaryColor for backward compatibility)
+    if (isValidHexColor(metadataBranding.sidebarColor)) {
+      result.sidebarColor = sanitizeHexColor(metadataBranding.sidebarColor, '');
+    } else if (isValidHexColor(metadataBranding.secondaryColor)) {
+      result.sidebarColor = sanitizeHexColor(metadataBranding.secondaryColor, '');
+    }
+    // Accent color (new)
+    if (isValidHexColor(metadataBranding.accentColor)) {
+      result.accentColor = sanitizeHexColor(metadataBranding.accentColor, '');
+    }
+    // Surface color (new)
+    if (isValidHexColor(metadataBranding.surfaceColor)) {
+      result.surfaceColor = sanitizeHexColor(metadataBranding.surfaceColor, '');
+    }
+    // Logo
     const logoValue = metadataBranding.logo || metadataBranding.logoUrl;
     if (isValidAssetUrl(logoValue)) {
       result.logo = sanitizeAssetUrl(logoValue, '');
@@ -221,6 +266,16 @@ function extractBrandingFromTenant(tenant: Tenant): {
     }
     if (isValidHexColor(settings['secondaryColor'])) {
       result.secondaryColor = sanitizeHexColor(settings['secondaryColor'], '');
+      result.sidebarColor = result.secondaryColor; // Legacy mapping
+    }
+    if (isValidHexColor(settings['sidebarColor'])) {
+      result.sidebarColor = sanitizeHexColor(settings['sidebarColor'], '');
+    }
+    if (isValidHexColor(settings['accentColor'])) {
+      result.accentColor = sanitizeHexColor(settings['accentColor'], '');
+    }
+    if (isValidHexColor(settings['surfaceColor'])) {
+      result.surfaceColor = sanitizeHexColor(settings['surfaceColor'], '');
     }
     const logoValue = settings['logo'] || settings['logoUrl'];
     if (isValidAssetUrl(logoValue)) {
@@ -270,6 +325,7 @@ export const useTenantStore = create<TenantState>()(
       settings: { ...DEFAULT_SETTINGS },
       isLoading: false,
       error: null,
+      _cachedBranding: null,
 
       // ============================================
       // Actions
@@ -296,10 +352,13 @@ export const useTenantStore = create<TenantState>()(
             if (localeSettings.timezone) state.settings.timezone = localeSettings.timezone;
             if (localeSettings.dateFormat) state.settings.dateFormat = localeSettings.dateFormat;
 
-            // Apply branding (security validated)
+            // Apply branding (security validated) - 4-color semantic palette
             const branding = extractBrandingFromTenant(tenant);
             if (branding.primaryColor) state.settings.primaryColor = branding.primaryColor;
             if (branding.secondaryColor) state.settings.secondaryColor = branding.secondaryColor;
+            if (branding.sidebarColor) state.settings.sidebarColor = branding.sidebarColor;
+            if (branding.accentColor) state.settings.accentColor = branding.accentColor;
+            if (branding.surfaceColor) state.settings.surfaceColor = branding.surfaceColor;
             if (branding.logo) state.settings.logo = branding.logo;
           } else {
             // Reset to defaults when clearing tenant
@@ -310,10 +369,11 @@ export const useTenantStore = create<TenantState>()(
 
       /**
        * Update settings partially
+       * Supports 4-color semantic palette for dynamic theming
        */
       updateSettings: (newSettings) => {
         set((state) => {
-          // Validate colors before applying
+          // Validate colors before applying - 4-color semantic palette
           if (newSettings.primaryColor !== undefined) {
             state.settings.primaryColor = isValidHexColor(newSettings.primaryColor)
               ? sanitizeHexColor(newSettings.primaryColor, state.settings.primaryColor ?? '')
@@ -323,6 +383,21 @@ export const useTenantStore = create<TenantState>()(
             state.settings.secondaryColor = isValidHexColor(newSettings.secondaryColor)
               ? sanitizeHexColor(newSettings.secondaryColor, state.settings.secondaryColor ?? '')
               : state.settings.secondaryColor;
+          }
+          if (newSettings.sidebarColor !== undefined) {
+            state.settings.sidebarColor = isValidHexColor(newSettings.sidebarColor)
+              ? sanitizeHexColor(newSettings.sidebarColor, state.settings.sidebarColor ?? '')
+              : state.settings.sidebarColor;
+          }
+          if (newSettings.accentColor !== undefined) {
+            state.settings.accentColor = isValidHexColor(newSettings.accentColor)
+              ? sanitizeHexColor(newSettings.accentColor, state.settings.accentColor ?? '')
+              : state.settings.accentColor;
+          }
+          if (newSettings.surfaceColor !== undefined) {
+            state.settings.surfaceColor = isValidHexColor(newSettings.surfaceColor)
+              ? sanitizeHexColor(newSettings.surfaceColor, state.settings.surfaceColor ?? '')
+              : state.settings.surfaceColor;
           }
           if (newSettings.logo !== undefined) {
             state.settings.logo = isValidAssetUrl(newSettings.logo)
@@ -404,24 +479,48 @@ export const useTenantStore = create<TenantState>()(
     {
       name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
-      // Only persist non-sensitive locale preferences
+      // Persist locale preferences AND branding colors for instant theme application
       partialize: (state) => ({
         settings: {
           currency: state.settings.currency,
           locale: state.settings.locale,
           timezone: state.settings.timezone,
           dateFormat: state.settings.dateFormat,
+          // Persist branding colors for FOUC prevention
+          primaryColor: state.settings.primaryColor,
+          sidebarColor: state.settings.sidebarColor,
+          accentColor: state.settings.accentColor,
+          surfaceColor: state.settings.surfaceColor,
         },
+        // Cache complete branding for instant theme application
+        cachedBranding: state.currentTenant?.metadata?.branding
+          ? {
+              primaryColor: state.currentTenant.metadata.branding.primaryColor || state.settings.primaryColor || '',
+              sidebarColor: state.currentTenant.metadata.branding.sidebarColor || state.settings.sidebarColor || '',
+              accentColor: state.currentTenant.metadata.branding.accentColor || state.settings.accentColor || '',
+              surfaceColor: state.currentTenant.metadata.branding.surfaceColor || state.settings.surfaceColor || '',
+              logoUrl: state.currentTenant.metadata.branding.logoUrl || state.currentTenant.metadata.branding.logo || '',
+            }
+          : state.settings.primaryColor
+            ? {
+                primaryColor: state.settings.primaryColor,
+                sidebarColor: state.settings.sidebarColor || '',
+                accentColor: state.settings.accentColor || '',
+                surfaceColor: state.settings.surfaceColor || '',
+              }
+            : null,
       }),
-      // Merge persisted state with defaults
+      // Merge persisted state with defaults, restoring cached branding
       merge: (persisted, current) => {
-        const persistedState = persisted as Partial<TenantState> | undefined;
+        const persistedState = persisted as Partial<TenantState & { cachedBranding: CachedBranding | null }> | undefined;
         return {
           ...current,
           settings: {
             ...current.settings,
             ...(persistedState?.settings ?? {}),
           },
+          // Restore cached branding for instant theme application
+          _cachedBranding: persistedState?.cachedBranding ?? null,
         };
       },
     }
@@ -467,6 +566,10 @@ export const useTenantLoading = () =>
 /** Get error state */
 export const useTenantError = () =>
   useTenantStore((state) => state.error);
+
+/** Get cached branding for instant theme application */
+export const useCachedBranding = () =>
+  useTenantStore((state) => state._cachedBranding);
 
 /** Check if plan is at least specified tier */
 export const useIsPlanAtLeast = (plan: PlanTier) =>

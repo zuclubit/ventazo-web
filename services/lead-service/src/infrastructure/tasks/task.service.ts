@@ -218,7 +218,7 @@ export class TaskService {
     sort?: TaskSortOptions,
     page: number = 1,
     limit: number = 20
-  ): Promise<Result<{ tasks: TaskDTO[]; total: number; page: number; totalPages: number }>> {
+  ): Promise<Result<{ data: TaskDTO[]; meta: { total: number; page: number; pageSize: number; totalPages: number } }>> {
     try {
       let whereClause = 'WHERE t.tenant_id = $1';
       const values: unknown[] = [tenantId];
@@ -322,10 +322,13 @@ export class TaskService {
       );
 
       return Result.ok({
-        tasks,
-        total,
-        page,
-        totalPages: Math.ceil(total / limit),
+        data: tasks,
+        meta: {
+          total,
+          page,
+          pageSize: limit,
+          totalPages: Math.ceil(total / limit),
+        },
       });
     } catch (error) {
       return Result.fail(`Failed to get tasks: ${(error as Error).message}`);

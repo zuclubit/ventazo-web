@@ -1,0 +1,139 @@
+{
+  "name": "@zuclubit/ui-kit",
+  "version": "1.0.0",
+  "description": "Color Intelligence Design System - Hexagonal Architecture UI Kit",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./domain": {
+      "types": "./dist/domain/index.d.ts",
+      "import": "./dist/domain/index.mjs",
+      "require": "./dist/domain/index.js"
+    },
+    "./application": {
+      "types": "./dist/application/index.d.ts",
+      "import": "./dist/application/index.mjs",
+      "require": "./dist/application/index.js"
+    },
+    "./adapters": {
+      "types": "./dist/adapters/index.d.ts",
+      "import": "./dist/adapters/index.mjs",
+      "require": "./dist/adapters/index.js"
+    },
+    "./adapters/react": {
+      "types": "./dist/adapters/react/index.d.ts",
+      "import": "./dist/adapters/react/index.mjs",
+      "require": "./dist/adapters/react/index.js"
+    },
+    "./adapters/css": {
+      "types": "./dist/adapters/css/index.d.ts",
+      "import": "./dist/adapters/css/index.mjs",
+      "require": "./dist/adapters/css/index.js"
+    },
+    "./adapters/tailwind": {
+      "types": "./dist/adapters/tailwind/index.d.ts",
+      "import": "./dist/adapters/tailwind/index.mjs",
+      "require": "./dist/adapters/tailwind/index.js"
+    },
+    "./infrastructure": {
+      "types": "./dist/infrastructure/index.d.ts",
+      "import": "./dist/infrastructure/index.mjs",
+      "require": "./dist/infrastructure/index.js"
+    },
+    "./infrastructure/audit": {
+      "types": "./dist/infrastructure/audit/index.d.ts",
+      "import": "./dist/infrastructure/audit/index.mjs",
+      "require": "./dist/infrastructure/audit/index.js"
+    },
+    "./infrastructure/exporters": {
+      "types": "./dist/infrastructure/exporters/index.d.ts",
+      "import": "./dist/infrastructure/exporters/index.mjs",
+      "require": "./dist/infrastructure/exporters/index.js"
+    },
+    "./components": {
+      "types": "./dist/components/index.d.ts",
+      "import": "./dist/components/index.mjs",
+      "require": "./dist/components/index.js"
+    },
+    "./components/primitives": {
+      "types": "./dist/components/primitives/index.d.ts",
+      "import": "./dist/components/primitives/index.mjs",
+      "require": "./dist/components/primitives/index.js"
+    },
+    "./components/composed": {
+      "types": "./dist/components/composed/index.d.ts",
+      "import": "./dist/components/composed/index.mjs",
+      "require": "./dist/components/composed/index.js"
+    },
+    "./validation": {
+      "types": "./dist/validation/index.d.ts",
+      "import": "./dist/validation/index.mjs",
+      "require": "./dist/validation/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "design-system",
+    "color-intelligence",
+    "tokens",
+    "accessibility",
+    "wcag",
+    "apca",
+    "oklch",
+    "hexagonal-architecture",
+    "ddd"
+  ],
+  "author": "Zuclubit",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zuclubit/ui-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zuclubit/ui-kit/issues"
+  },
+  "homepage": "https://github.com/zuclubit/ui-kit#readme"
+}

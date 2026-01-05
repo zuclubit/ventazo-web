@@ -1,10 +1,21 @@
 'use client';
 
+/**
+ * Tooltip Component - Ventazo Design System 2025
+ *
+ * Z-Index Architecture:
+ * - TooltipContent uses z-[70] (alertOverlay level) to ensure
+ *   tooltips appear above Sheets (z-60) when used inside modals.
+ *
+ * @version 2.0.0
+ */
+
 import * as React from 'react';
 
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 
 import { cn } from '@/lib/utils';
+import { zIndexClasses } from '@/lib/theme/z-index';
 
 const TooltipProvider = TooltipPrimitive.Provider;
 
@@ -19,7 +30,13 @@ const TooltipContent = React.forwardRef<
   <TooltipPrimitive.Content
     ref={ref}
     className={cn(
-      'z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+      // z-[70] (alertOverlay) - above sheets (z-60), ensures visibility inside modals
+      zIndexClasses.alertOverlay,
+      'overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md',
+      'animate-in fade-in-0 zoom-in-95',
+      'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+      'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2',
+      'data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
       className
     )}
     sideOffset={sideOffset}

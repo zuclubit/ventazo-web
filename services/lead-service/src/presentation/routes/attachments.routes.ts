@@ -181,6 +181,11 @@ export async function attachmentsRoutes(fastify: FastifyInstance): Promise<void>
   /**
    * Confirm upload completed (after direct browser upload)
    * POST /api/v1/attachments/:id/confirm
+   *
+   * This endpoint:
+   * 1. Verifies the file exists in storage
+   * 2. Updates storage_url with proper URL (public or generates presigned)
+   * 3. Marks the attachment as ready
    */
   fastify.post(
     '/:id/confirm',
@@ -199,11 +204,49 @@ export async function attachmentsRoutes(fastify: FastifyInstance): Promise<void>
 
       const { id } = request.params;
 
-      // TODO: Implement upload confirmation
-      // This would verify the file exists in storage and update status
+      // Get the attachment to verify it exists and get storage details
+      const attachmentResult = await storageService.getAttachmentById(tenantId, id);
+
+      if (attachmentResult.isFailure || !attachmentResult.value) {
+        return reply.status(404).send({
+          error: 'Not Found',
+          message: 'Attachment not found',
+        });
+      }
+
+      const attachment = attachmentResult.value;
+
+      // Verify the file exists in storage and get download URL
+      const downloadResult = await storageService.getDownloadUrl(
+        tenantId,
+        id,
+        86400 // 24 hour expiry for the storage URL
+      );
+
+      if (downloadResult.isFailure || !downloadResult.value) {
+        return reply.status(400).send({
+          error: 'Confirmation Failed',
+          message: 'Could not verify file in storage. Please try uploading again.',
+        });
+      }
+
+      // Update the attachment with storage URL
+      const updateResult = await storageService.confirmUpload(
+        tenantId,
+        id,
+        downloadResult.value.downloadUrl
+      );
+
+      if (updateResult.isFailure || !updateResult.value) {
+        return reply.status(400).send({
+          error: 'Confirmation Failed',
+          message: updateResult.error || 'Failed to confirm upload',
+        });
+      }
+
       return reply.status(200).send({
         success: true,
-        data: { id, confirmed: true },
+        data: updateResult.value,
       });
     }
   );

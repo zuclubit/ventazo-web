@@ -53,6 +53,22 @@ export function getStorageConfig(): StorageServiceConfig | undefined {
     return undefined;
   }
 
+  // Cloudflare R2 (S3-compatible) - preferred for production
+  if ((provider === 's3' || provider === 'r2') && process.env.R2_ACCOUNT_ID) {
+    return {
+      provider: 's3', // R2 uses S3 protocol
+      s3: {
+        region: 'auto',
+        accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+        bucket: process.env.R2_BUCKET_NAME || 'attachments',
+        endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        forcePathStyle: true,
+      },
+    };
+  }
+
+  // AWS S3
   if (provider === 's3' && process.env.AWS_ACCESS_KEY_ID) {
     return {
       provider: 's3',
@@ -67,6 +83,7 @@ export function getStorageConfig(): StorageServiceConfig | undefined {
     };
   }
 
+  // Supabase Storage
   if (provider === 'supabase' && process.env.SUPABASE_URL) {
     return {
       provider: 'supabase',
@@ -382,6 +399,37 @@ export class StorageService {
       });
     } catch (error) {
       return Result.fail(`Failed to get download URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Confirm upload completed and update storage URL
+   * Called after direct browser upload to presigned URL
+   */
+  async confirmUpload(
+    tenantId: string,
+    attachmentId: string,
+    storageUrl: string
+  ): Promise<Result<Attachment>> {
+    try {
+      const query = `
+        UPDATE attachments
+        SET storage_url = $1,
+            scan_status = 'clean',
+            updated_at = NOW()
+        WHERE id = $2 AND tenant_id = $3 AND deleted_at IS NULL
+        RETURNING *
+      `;
+
+      const result = await this.pool.query(query, [storageUrl, attachmentId, tenantId]);
+
+      if (result.isFailure || !result.value || !result.value.rows[0]) {
+        return Result.fail('Failed to confirm upload');
+      }
+
+      return Result.ok(this.mapRowToAttachment(result.value.rows[0]));
+    } catch (error) {
+      return Result.fail(`Failed to confirm upload: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

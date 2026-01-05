@@ -37,13 +37,14 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
   [LeadStatus.LOST]: 'Perdido',
 };
 
+// Using CSS variables for dynamic theming
 export const STATUS_COLORS: Record<LeadStatus, string> = {
-  [LeadStatus.NEW]: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  [LeadStatus.CONTACTED]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-  [LeadStatus.QUALIFIED]: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
-  [LeadStatus.PROPOSAL]: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300',
-  [LeadStatus.WON]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  [LeadStatus.LOST]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+  [LeadStatus.NEW]: 'bg-[var(--pipeline-new-bg)] text-[var(--pipeline-new-text)] border border-[var(--pipeline-new-border)]',
+  [LeadStatus.CONTACTED]: 'bg-[var(--pipeline-contacted-bg)] text-[var(--pipeline-contacted-text)] border border-[var(--pipeline-contacted-border)]',
+  [LeadStatus.QUALIFIED]: 'bg-[var(--pipeline-qualified-bg)] text-[var(--pipeline-qualified-text)] border border-[var(--pipeline-qualified-border)]',
+  [LeadStatus.PROPOSAL]: 'bg-[var(--pipeline-proposal-bg)] text-[var(--pipeline-proposal-text)] border border-[var(--pipeline-proposal-border)]',
+  [LeadStatus.WON]: 'bg-[var(--pipeline-won-bg)] text-[var(--pipeline-won-text)] border border-[var(--pipeline-won-border)]',
+  [LeadStatus.LOST]: 'bg-[var(--pipeline-lost-bg)] text-[var(--pipeline-lost-text)] border border-[var(--pipeline-lost-border)]',
 };
 
 // ============================================
@@ -133,11 +134,12 @@ export const STAGE_COLOR_PALETTE = [
   '#84CC16', // lime
 ];
 
-// Score category colors
+// Score category colors - Using CSS variables
+// Note: Hot uses orange (priority feel), Warm uses amber, Cold uses gray
 export const SCORE_CATEGORY_COLORS: Record<ScoreCategory, string> = {
-  hot: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-  warm: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-  cold: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+  hot: 'bg-[var(--score-hot-bg)] text-[var(--score-hot)] border border-[var(--score-hot-border)]',
+  warm: 'bg-[var(--score-warm-bg)] text-[var(--score-warm)] border border-[var(--score-warm-border)]',
+  cold: 'bg-[var(--score-cold-bg)] text-[var(--score-cold)] border border-[var(--score-cold-border)]',
 };
 
 export const SOURCE_LABELS: Record<LeadSource, string> = {
@@ -150,14 +152,15 @@ export const SOURCE_LABELS: Record<LeadSource, string> = {
   [LeadSource.OTHER]: 'Otro',
 };
 
+// Source colors - Using channel CSS variables
 export const SOURCE_COLORS: Record<LeadSource, string> = {
-  [LeadSource.REFERRAL]: 'bg-indigo-100 text-indigo-800',
-  [LeadSource.SOCIAL]: 'bg-pink-100 text-pink-800',
-  [LeadSource.WEBSITE]: 'bg-cyan-100 text-cyan-800',
-  [LeadSource.AD]: 'bg-orange-100 text-orange-800',
-  [LeadSource.ORGANIC]: 'bg-emerald-100 text-emerald-800',
-  [LeadSource.MANUAL]: 'bg-slate-100 text-slate-800',
-  [LeadSource.OTHER]: 'bg-gray-100 text-gray-800',
+  [LeadSource.REFERRAL]: 'bg-[var(--channel-referral-bg,rgba(99,102,241,0.12))] text-[var(--channel-referral)]',
+  [LeadSource.SOCIAL]: 'bg-[var(--channel-social-bg,rgba(236,72,153,0.12))] text-[var(--channel-social)]',
+  [LeadSource.WEBSITE]: 'bg-[var(--channel-website-bg,rgba(6,182,212,0.12))] text-[var(--channel-website)]',
+  [LeadSource.AD]: 'bg-[var(--channel-ad-bg,rgba(249,115,22,0.12))] text-[var(--channel-ad)]',
+  [LeadSource.ORGANIC]: 'bg-[var(--channel-organic-bg,rgba(16,185,129,0.12))] text-[var(--channel-organic)]',
+  [LeadSource.MANUAL]: 'bg-muted text-muted-foreground',
+  [LeadSource.OTHER]: 'bg-muted text-muted-foreground',
 };
 
 // Lead Activity Types

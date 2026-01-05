@@ -1,12 +1,12 @@
 /**
  * Authentication Service
  * Handles user authentication, tenant memberships, and user management
+ * Native JWT authentication (no Supabase Auth dependency)
  */
 
 import { injectable, inject } from 'tsyringe';
 import { DatabasePool } from '@zuclubit/database';
 import { Result } from '@zuclubit/domain';
-import { createClient, SupabaseClient, User as SupabaseUser } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import {
   UserRole,
@@ -18,6 +18,8 @@ import {
 import { getAuthConfig, getResendConfig, getAppConfig } from '../../config/environment';
 import { ResendProvider } from '../email/resend.provider';
 import { EmailTemplate } from '../email/types';
+import { JwtService, TokenPayload } from './jwt.service';
+import { PasswordService } from './password.service';
 
 /**
  * User profile data
@@ -115,16 +117,85 @@ export interface UserWithMemberships extends UserProfile {
   }>;
 }
 
+// Account lockout configuration
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MINUTES = 15;
+
+// Performance optimization: Tenant cache configuration
+// See: docs/PERFORMANCE_REMEDIATION_LOG.md - P1.1 Login Optimization
+const TENANT_CACHE_TTL_MS = 300_000; // 5 minutes
+const TENANT_CACHE_MAX_SIZE = 1000; // Max users to cache
+
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
 @injectable()
 export class AuthService {
-  private supabaseAdmin: SupabaseClient | null = null;
   private emailProvider: ResendProvider | null = null;
   private emailInitialized = false;
+  private jwtService: JwtService;
+  private passwordService: PasswordService;
+
+  // Performance optimization: In-memory tenant cache to reduce login latency
+  // Reduces login time by ~100-150ms by avoiding repeated DB queries
+  private tenantCache = new Map<string, CacheEntry<UserWithMemberships>>();
 
   constructor(
     @inject('DatabasePool') private readonly pool: DatabasePool
   ) {
+    this.jwtService = new JwtService();
+    this.passwordService = new PasswordService();
     this.initializeEmailProvider();
+
+    // Periodic cache cleanup to prevent memory leaks
+    setInterval(() => this.cleanupTenantCache(), 60_000); // Every minute
+  }
+
+  /**
+   * Clean up expired cache entries
+   * Performance optimization: Prevents memory buildup
+   */
+  private cleanupTenantCache(): void {
+    const now = Date.now();
+    let cleaned = 0;
+    for (const [key, entry] of this.tenantCache.entries()) {
+      if (entry.expiresAt < now) {
+        this.tenantCache.delete(key);
+        cleaned++;
+      }
+    }
+    // Enforce max size by removing oldest entries
+    if (this.tenantCache.size > TENANT_CACHE_MAX_SIZE) {
+      const entriesToRemove = this.tenantCache.size - TENANT_CACHE_MAX_SIZE;
+      const keys = Array.from(this.tenantCache.keys()).slice(0, entriesToRemove);
+      keys.forEach(k => this.tenantCache.delete(k));
+      cleaned += entriesToRemove;
+    }
+    if (cleaned > 0) {
+      console.log(`[AuthService] Cleaned ${cleaned} expired tenant cache entries`);
+    }
+  }
+
+  /**
+   * Invalidate tenant cache for a user
+   * Call this when memberships are created, updated, or deleted
+   */
+  invalidateTenantCache(userId: string): void {
+    this.tenantCache.delete(userId);
+  }
+
+  /**
+   * Invalidate all tenant cache entries for a tenant
+   * Call this when tenant data changes (name, plan, etc.)
+   */
+  invalidateTenantCacheForTenant(tenantId: string): void {
+    for (const [userId, entry] of this.tenantCache.entries()) {
+      if (entry.data.memberships?.some(m => m.tenantId === tenantId)) {
+        this.tenantCache.delete(userId);
+      }
+    }
   }
 
   /**
@@ -152,34 +223,18 @@ export class AuthService {
   }
 
   /**
-   * Get Supabase Admin client
+   * Verify JWT token and get user (Native JWT)
+   * Returns the token payload with user information
    */
-  private getSupabaseAdmin(): SupabaseClient {
-    if (!this.supabaseAdmin) {
-      const config = getAuthConfig();
-      this.supabaseAdmin = createClient(config.supabaseUrl, config.supabaseServiceKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      });
-    }
-    return this.supabaseAdmin;
-  }
-
-  /**
-   * Verify JWT token and get user
-   */
-  async verifyToken(token: string): Promise<Result<SupabaseUser>> {
+  async verifyToken(token: string): Promise<Result<TokenPayload>> {
     try {
-      const supabase = this.getSupabaseAdmin();
-      const { data: { user }, error } = await supabase.auth.getUser(token);
+      const verifyResult = await this.jwtService.verifyAccessToken(token);
 
-      if (error || !user) {
-        return Result.fail(error?.message || 'Invalid token');
+      if (verifyResult.isFailure || !verifyResult.value) {
+        return Result.fail(verifyResult.error || 'Invalid token');
       }
 
-      return Result.ok(user);
+      return Result.ok(verifyResult.value);
     } catch (error) {
       return Result.fail(`Token verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -222,22 +277,23 @@ export class AuthService {
   }
 
   /**
-   * Get authenticated user context with permissions
+   * Get authenticated user context with permissions (Native JWT)
    */
   async getAuthUser(
     token: string,
     tenantId: string
   ): Promise<Result<AuthUser>> {
     // Verify token
-    const userResult = await this.verifyToken(token);
-    if (userResult.isFailure || !userResult.value) {
-      return Result.fail(userResult.error || 'Token verification failed');
+    const tokenResult = await this.verifyToken(token);
+    if (tokenResult.isFailure || !tokenResult.value) {
+      return Result.fail(tokenResult.error || 'Token verification failed');
     }
 
-    const supabaseUser = userResult.value;
+    const tokenPayload = tokenResult.value;
+    const userId = tokenPayload.sub!;
 
     // Get tenant membership
-    const membershipResult = await this.getTenantMembership(supabaseUser.id, tenantId);
+    const membershipResult = await this.getTenantMembership(userId, tenantId);
     if (membershipResult.isFailure) {
       return Result.fail(membershipResult.error || 'Membership lookup failed');
     }
@@ -258,15 +314,18 @@ export class AuthService {
 
     const role = membership.role as UserRole;
 
+    // Get user profile for additional metadata
+    const userProfile = await this.getUserById(userId);
+
     const authUser: AuthUser = {
-      id: supabaseUser.id,
-      email: supabaseUser.email || '',
+      id: userId,
+      email: tokenPayload.email,
       tenantId,
       role,
       permissions: getPermissionsForRole(role),
       metadata: {
-        fullName: supabaseUser.user_metadata?.full_name as string | undefined,
-        avatarUrl: supabaseUser.user_metadata?.avatar_url as string | undefined,
+        fullName: userProfile.value?.fullName || undefined,
+        avatarUrl: userProfile.value?.avatarUrl || undefined,
       },
     };
 
@@ -274,31 +333,30 @@ export class AuthService {
   }
 
   /**
-   * Create a new user in Supabase Auth
+   * Create a new user (Native - no Supabase Auth)
    */
   async createUser(request: CreateUserRequest): Promise<Result<UserProfile>> {
     try {
-      const supabase = this.getSupabaseAdmin();
-
-      // Create user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: request.email,
-        password: request.password,
-        email_confirm: true, // Auto-confirm email
-        user_metadata: {
-          full_name: request.fullName,
-        },
-      });
-
-      if (authError || !authData.user) {
-        return Result.fail(authError?.message || 'Failed to create user');
+      // Validate password complexity
+      const passwordValidation = this.passwordService.validatePasswordComplexity(request.password);
+      if (!passwordValidation.isValid) {
+        return Result.fail(passwordValidation.errors[0]);
       }
 
-      // Create user profile in our database
+      // Hash password
+      const hashResult = await this.passwordService.hashPassword(request.password);
+      if (hashResult.isFailure || !hashResult.value) {
+        return Result.fail(hashResult.error || 'Failed to hash password');
+      }
+
+      const passwordHash = hashResult.value;
+      const userId = uuidv4();
       const now = new Date();
+
+      // Create user profile in our database with password hash
       const profileResult = await this.pool.query<UserProfile>(
-        `INSERT INTO users (id, email, full_name, phone, metadata, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO users (id, email, password_hash, full_name, phone, metadata, email_verified, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING
            id,
            email,
@@ -311,19 +369,19 @@ export class AuthService {
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         [
-          authData.user.id,
-          request.email,
+          userId,
+          request.email.toLowerCase(),
+          passwordHash,
           request.fullName || null,
           request.phone || null,
           request.metadata || {},
+          false, // email_verified - false until verified
           now,
           now,
         ]
       );
 
       if (profileResult.isFailure || !profileResult.value) {
-        // Rollback: delete user from Supabase
-        await supabase.auth.admin.deleteUser(authData.user.id);
         return Result.fail(profileResult.error || 'Failed to create user profile');
       }
 
@@ -600,6 +658,9 @@ export class AuthService {
         return Result.fail(result.error || 'Failed to add member');
       }
 
+      // Performance optimization: Invalidate tenant cache for proactive cache freshness
+      this.invalidateTenantCache(userId);
+
       return Result.ok(result.value.rows[0]);
     } catch (error) {
       return Result.fail(`Failed to add member: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -707,7 +768,12 @@ export class AuthService {
         return Result.fail('Invitation not found');
       }
 
-      return Result.ok(result.value.rows[0]);
+      const membership = result.value.rows[0];
+
+      // Performance optimization: Invalidate tenant cache on membership change
+      this.invalidateTenantCache(membership.userId);
+
+      return Result.ok(membership);
     } catch (error) {
       return Result.fail(`Failed to accept invitation: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -769,7 +835,12 @@ export class AuthService {
         return Result.fail('Membership not found');
       }
 
-      return Result.ok(result.value.rows[0]);
+      const membership = result.value.rows[0];
+
+      // Performance optimization: Invalidate tenant cache on membership change
+      this.invalidateTenantCache(membership.userId);
+
+      return Result.ok(membership);
     } catch (error) {
       return Result.fail(`Failed to update membership: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -780,13 +851,19 @@ export class AuthService {
    */
   async removeMember(membershipId: string): Promise<Result<void>> {
     try {
-      const result = await this.pool.query(
-        `DELETE FROM tenant_memberships WHERE id = $1`,
+      // First get the userId for cache invalidation
+      const result = await this.pool.query<{ userId: string }>(
+        `DELETE FROM tenant_memberships WHERE id = $1 RETURNING user_id as "userId"`,
         [membershipId]
       );
 
       if (result.isFailure) {
         return Result.fail(result.error || 'Failed to remove member');
+      }
+
+      // Performance optimization: Invalidate tenant cache
+      if (result.value && result.value.rows.length > 0) {
+        this.invalidateTenantCache(result.value.rows[0].userId);
       }
 
       return Result.ok(undefined);
@@ -817,6 +894,11 @@ export class AuthService {
           tm.is_active as "isActive",
           tm.created_at as "createdAt",
           tm.updated_at as "updatedAt",
+          CASE
+            WHEN tm.is_active = false THEN 'suspended'
+            WHEN tm.accepted_at IS NULL THEN 'pending'
+            ELSE 'active'
+          END as status,
           jsonb_build_object(
             'email', u.email,
             'fullName', u.full_name,
@@ -841,9 +923,17 @@ export class AuthService {
 
   /**
    * Get user's tenants (memberships)
+   * Performance optimization: Uses in-memory cache with 5-min TTL
+   * See: docs/PERFORMANCE_REMEDIATION_LOG.md - P1.1 Login Optimization
    */
   async getUserTenants(userId: string): Promise<Result<UserWithMemberships>> {
     try {
+      // Performance optimization: Check cache first
+      const cached = this.tenantCache.get(userId);
+      if (cached && cached.expiresAt > Date.now()) {
+        return Result.ok(cached.data);
+      }
+
       // Get user profile
       const userResult = await this.getUserById(userId);
       if (userResult.isFailure) {
@@ -883,10 +973,18 @@ export class AuthService {
         return Result.fail(membershipsResult.error || 'Failed to get memberships');
       }
 
-      return Result.ok({
+      const result: UserWithMemberships = {
         ...userResult.value,
         memberships: membershipsResult.value.rows,
+      };
+
+      // Performance optimization: Store in cache
+      this.tenantCache.set(userId, {
+        data: result,
+        expiresAt: Date.now() + TENANT_CACHE_TTL_MS,
       });
+
+      return Result.ok(result);
     } catch (error) {
       return Result.fail(`Failed to get user tenants: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -1457,10 +1555,11 @@ export class AuthService {
 
   // ============================================
   // Authentication Methods (Login/Register/Logout)
+  // Native JWT Authentication (no Supabase dependency)
   // ============================================
 
   /**
-   * Sign in with email and password
+   * Sign in with email and password (Native JWT)
    * Returns user, session, tenants, and onboarding status for proper redirection
    */
   async signIn(email: string, password: string): Promise<Result<{
@@ -1487,58 +1586,103 @@ export class AuthService {
     };
   }>> {
     try {
-      const supabase = this.getSupabaseAdmin();
+      const normalizedEmail = email.toLowerCase().trim();
 
-      // Sign in with Supabase
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Get user from database with password hash
+      const userResult = await this.pool.query<UserProfile & { passwordHash: string | null; emailVerified: boolean; failedLoginAttempts: number; lockedUntil: Date | null }>(
+        `SELECT
+          id,
+          email,
+          password_hash as "passwordHash",
+          full_name as "fullName",
+          avatar_url as "avatarUrl",
+          phone,
+          is_active as "isActive",
+          email_verified as "emailVerified",
+          failed_login_attempts as "failedLoginAttempts",
+          locked_until as "lockedUntil",
+          last_login_at as "lastLoginAt",
+          metadata,
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM users
+        WHERE LOWER(email) = $1`,
+        [normalizedEmail]
+      );
 
-      if (authError || !authData.session || !authData.user) {
-        // Map Supabase errors to user-friendly messages
-        if (authError?.message?.includes('Invalid login credentials')) {
-          return Result.fail('Credenciales invalidas');
-        }
-        if (authError?.message?.includes('Email not confirmed')) {
-          return Result.fail('email_not_confirmed');
-        }
-        return Result.fail(authError?.message || 'Error al iniciar sesion');
+      if (userResult.isFailure || !userResult.value || userResult.value.rows.length === 0) {
+        return Result.fail('Credenciales invalidas');
       }
 
-      // Get or create user profile in our database
-      let userProfile = await this.getUserByEmail(email);
+      const user = userResult.value.rows[0];
 
-      if (userProfile.isFailure || !userProfile.value) {
-        // User exists in Supabase but not in our DB - sync them
-        console.log('[AuthService] Syncing user from Supabase:', authData.user.id, authData.user.email);
-        const syncResult = await this.syncUserFromSupabase({
-          supabaseUserId: authData.user.id,
-          email: authData.user.email!,
-          fullName: authData.user.user_metadata?.full_name as string | undefined,
-          avatarUrl: authData.user.user_metadata?.avatar_url as string | undefined,
-        });
-
-        if (syncResult.isFailure || !syncResult.value) {
-          console.error('[AuthService] Sync failed:', syncResult.error);
-          return Result.fail('Error al sincronizar usuario');
-        }
-
-        console.log('[AuthService] User synced successfully:', syncResult.value.id);
-        userProfile = Result.ok(syncResult.value);
+      // Check if account is locked
+      if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
+        const remainingMinutes = Math.ceil((new Date(user.lockedUntil).getTime() - Date.now()) / 60000);
+        return Result.fail(`Cuenta bloqueada. Intenta de nuevo en ${remainingMinutes} minutos.`);
       }
 
-      // Update last login
-      await this.updateLastLogin(userProfile.value!.id);
+      // Check if user is active
+      if (!user.isActive) {
+        return Result.fail('Cuenta desactivada. Contacta al administrador.');
+      }
 
-      // Get user's tenants
-      const tenantsResult = await this.getUserTenants(authData.user.id);
+      // Check if password hash exists (migration from Supabase)
+      if (!user.passwordHash) {
+        return Result.fail('Cuenta requiere restablecimiento de contraseña');
+      }
+
+      // Verify password
+      const passwordValid = await this.passwordService.verifyPassword(password, user.passwordHash);
+      if (passwordValid.isFailure || !passwordValid.value) {
+        // Increment failed attempts
+        await this.incrementFailedLoginAttempts(user.id);
+        return Result.fail('Credenciales invalidas');
+      }
+
+      // Check email verification (optional - can be made strict)
+      if (!user.emailVerified) {
+        return Result.fail('email_not_confirmed');
+      }
+
+      // PERFORMANCE OPTIMIZATION: Parallelize post-authentication operations
+      // This reduces login time by ~60-80ms by running independent operations concurrently
+      // See: docs/PERFORMANCE_OPTIMIZATION_PLAN_V2.md - Section 1.2
+
+      // 1. Combined: Reset failed attempts + Update last login (single query)
+      // Runs in parallel with tenant/onboarding fetches
+      const updateLoginPromise = this.resetAttemptsAndUpdateLogin(user.id);
+
+      // 2. Parallel fetch: Get tenants and onboarding status concurrently
+      const [tenantsResult, onboardingResult] = await Promise.all([
+        this.getUserTenants(user.id),
+        this.getOnboardingStatus(user.id),
+      ]);
+
+      // Wait for login update to complete (fire-and-forget would be unsafe)
+      await updateLoginPromise;
+
       const memberships = tenantsResult.isSuccess && tenantsResult.value?.memberships
         ? tenantsResult.value.memberships
         : [];
 
-      // Get onboarding status
-      const onboardingResult = await this.getOnboardingStatus(authData.user.id);
+      // Get default tenant for token (first active tenant)
+      const defaultTenant = memberships.find(m => m.isActive);
+
+      // Generate JWT tokens (depends on tenant info, cannot be parallelized further)
+      const tokenResult = await this.jwtService.generateTokenPair(
+        user.id,
+        user.email,
+        defaultTenant?.tenantId,
+        defaultTenant?.role
+      );
+
+      if (tokenResult.isFailure || !tokenResult.value) {
+        return Result.fail('Error al generar tokens de sesión');
+      }
+
+      const tokens = tokenResult.value;
+
       const onboardingData = onboardingResult.isSuccess && onboardingResult.value
         ? onboardingResult.value
         : null;
@@ -1573,13 +1717,27 @@ export class AuthService {
         currentStep = 'create-business';
       }
 
+      // Build user profile response (without password hash)
+      const userProfile: UserProfile = {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
+        phone: user.phone,
+        isActive: user.isActive,
+        lastLoginAt: user.lastLoginAt,
+        metadata: user.metadata,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      };
+
       return Result.ok({
-        user: userProfile.value!,
+        user: userProfile,
         session: {
-          accessToken: authData.session.access_token,
-          refreshToken: authData.session.refresh_token,
-          expiresIn: authData.session.expires_in || 3600,
-          expiresAt: authData.session.expires_at || Math.floor(Date.now() / 1000) + 3600,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresIn: tokens.expiresIn,
+          expiresAt: tokens.expiresAt,
         },
         tenants: memberships.map(m => ({
           id: m.tenantId,
@@ -1602,7 +1760,74 @@ export class AuthService {
   }
 
   /**
-   * Register a new user using Admin API (no rate limits) and send verification via Resend
+   * Increment failed login attempts for account lockout
+   */
+  private async incrementFailedLoginAttempts(userId: string): Promise<void> {
+    try {
+      const now = new Date();
+      await this.pool.query(
+        `UPDATE users
+         SET
+           failed_login_attempts = COALESCE(failed_login_attempts, 0) + 1,
+           locked_until = CASE
+             WHEN COALESCE(failed_login_attempts, 0) + 1 >= $2
+             THEN $3
+             ELSE locked_until
+           END,
+           updated_at = $4
+         WHERE id = $1`,
+        [
+          userId,
+          MAX_FAILED_ATTEMPTS,
+          new Date(now.getTime() + LOCKOUT_DURATION_MINUTES * 60 * 1000),
+          now,
+        ]
+      );
+    } catch (error) {
+      console.error('[AuthService] Failed to increment login attempts:', error);
+    }
+  }
+
+  /**
+   * Reset failed login attempts after successful login
+   */
+  private async resetFailedLoginAttempts(userId: string): Promise<void> {
+    try {
+      await this.pool.query(
+        `UPDATE users
+         SET failed_login_attempts = 0, locked_until = NULL, updated_at = $2
+         WHERE id = $1`,
+        [userId, new Date()]
+      );
+    } catch (error) {
+      console.error('[AuthService] Failed to reset login attempts:', error);
+    }
+  }
+
+  /**
+   * Combined: Reset failed attempts + Update last login in single query
+   * PERFORMANCE: Reduces 2 DB round-trips to 1 (~30-60ms saved)
+   */
+  private async resetAttemptsAndUpdateLogin(userId: string): Promise<void> {
+    try {
+      const now = new Date();
+      await this.pool.query(
+        `UPDATE users
+         SET failed_login_attempts = 0,
+             locked_until = NULL,
+             last_login_at = $2,
+             updated_at = $2
+         WHERE id = $1`,
+        [userId, now]
+      );
+    } catch (error) {
+      console.error('[AuthService] Failed to reset attempts and update login:', error);
+    }
+  }
+
+  /**
+   * Register a new user (Native - no Supabase Auth)
+   * Creates user with password hash directly in database
    */
   async signUp(
     email: string,
@@ -1620,41 +1845,34 @@ export class AuthService {
     confirmationRequired: boolean;
   }>> {
     try {
-      const supabase = this.getSupabaseAdmin();
+      const normalizedEmail = email.toLowerCase().trim();
 
       // Check if email is already registered
-      const existingUser = await this.getUserByEmail(email);
+      const existingUser = await this.getUserByEmail(normalizedEmail);
       if (existingUser.isSuccess && existingUser.value) {
         return Result.fail('El correo ya esta registrado');
       }
 
-      // Create user in Supabase Auth using Admin API (bypasses email rate limits)
-      // email_confirm: false means the user's email is NOT yet confirmed
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: false, // User needs to verify email
-        user_metadata: {
-          full_name: fullName,
-          ...metadata,
-        },
-      });
-
-      if (authError || !authData.user) {
-        if (authError?.message?.includes('already registered') || authError?.message?.includes('already exists')) {
-          return Result.fail('El correo ya esta registrado');
-        }
-        return Result.fail(authError?.message || 'Error al registrar usuario');
+      // Validate password complexity
+      const passwordValidation = this.passwordService.validatePasswordComplexity(password);
+      if (!passwordValidation.isValid) {
+        return Result.fail(passwordValidation.errors[0]);
       }
 
-      // Create user profile in our database
+      // Hash password
+      const hashResult = await this.passwordService.hashPassword(password);
+      if (hashResult.isFailure || !hashResult.value) {
+        return Result.fail(hashResult.error || 'Error al procesar contraseña');
+      }
+
+      const passwordHash = hashResult.value;
+      const userId = uuidv4();
       const now = new Date();
+
+      // Create user profile in our database with password hash
       const profileResult = await this.pool.query<UserProfile>(
-        `INSERT INTO users (id, email, full_name, metadata, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (id) DO UPDATE SET
-           full_name = COALESCE(EXCLUDED.full_name, users.full_name),
-           updated_at = EXCLUDED.updated_at
+        `INSERT INTO users (id, email, password_hash, full_name, metadata, email_verified, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING
            id,
            email,
@@ -1667,10 +1885,12 @@ export class AuthService {
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         [
-          authData.user.id,
-          email,
+          userId,
+          normalizedEmail,
+          passwordHash,
           fullName || null,
           metadata || {},
+          false, // email_verified = false until verified
           now,
           now,
         ]
@@ -1689,7 +1909,7 @@ export class AuthService {
       await this.pool.query(
         `INSERT INTO email_verification_tokens (user_id, token, email, expires_at)
          VALUES ($1, $2, $3, $4)`,
-        [authData.user.id, verificationToken, email, expiresAt]
+        [userId, verificationToken, normalizedEmail, expiresAt]
       );
 
       // Send verification email via Resend (no rate limits!)
@@ -1697,8 +1917,8 @@ export class AuthService {
         const appConfig = getAppConfig();
         const verificationUrl = `${appConfig.appUrl}/auth/verify-email?token=${verificationToken}`;
 
-        const emailResult = await this.emailProvider.sendEmailVerification(email, {
-          userName: fullName || email.split('@')[0],
+        const emailResult = await this.emailProvider.sendEmailVerification(normalizedEmail, {
+          userName: fullName || normalizedEmail.split('@')[0],
           verificationUrl,
         });
 
@@ -1706,7 +1926,7 @@ export class AuthService {
           console.warn('[AuthService] Failed to send verification email:', emailResult.isFailure ? emailResult.error : emailResult.getValue().error);
           // Don't fail registration if email fails, user can request resend
         } else {
-          console.log(`[AuthService] Verification email sent to ${email}`);
+          console.log(`[AuthService] Verification email sent to ${normalizedEmail}`);
         }
       } else {
         console.warn('[AuthService] Email provider not initialized, skipping verification email');
@@ -1724,12 +1944,10 @@ export class AuthService {
   }
 
   /**
-   * Verify email with token
+   * Verify email with token (Native - no Supabase)
    */
   async verifyEmail(token: string): Promise<Result<{ userId: string; email: string }>> {
     try {
-      const supabase = this.getSupabaseAdmin();
-
       // Find and validate the token
       const tokenResult = await this.pool.query<{
         id: string;
@@ -1766,16 +1984,14 @@ export class AuthService {
         [tokenData.id]
       );
 
-      // Update Supabase Auth user to confirm email
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
-        tokenData.user_id,
-        { email_confirm: true }
+      // Update user's email_verified flag in our database
+      const now = new Date();
+      await this.pool.query(
+        `UPDATE users
+         SET email_verified = true, email_verified_at = $2, updated_at = $2
+         WHERE id = $1`,
+        [tokenData.user_id, now]
       );
-
-      if (updateError) {
-        console.error('[AuthService] Failed to confirm email in Supabase:', updateError.message);
-        return Result.fail('Error al confirmar el correo electrónico');
-      }
 
       console.log(`[AuthService] Email verified for user ${tokenData.user_id}`);
 
@@ -1789,27 +2005,28 @@ export class AuthService {
   }
 
   /**
-   * Resend verification email
+   * Resend verification email (Native - no Supabase)
    */
   async resendVerificationEmail(email: string): Promise<Result<void>> {
     try {
-      // Find user by email
-      const userResult = await this.getUserByEmail(email);
-      if (userResult.isFailure || !userResult.value) {
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Find user by email and check verification status
+      const userResult = await this.pool.query<{ id: string; email: string; fullName: string | null; emailVerified: boolean }>(
+        `SELECT id, email, full_name as "fullName", email_verified as "emailVerified"
+         FROM users
+         WHERE LOWER(email) = $1`,
+        [normalizedEmail]
+      );
+
+      if (userResult.isFailure || !userResult.value?.rows[0]) {
         return Result.fail('Usuario no encontrado');
       }
 
-      const user = userResult.value;
+      const user = userResult.value.rows[0];
 
       // Check if user is already verified
-      const supabase = this.getSupabaseAdmin();
-      const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(user.id);
-
-      if (authError || !authUser.user) {
-        return Result.fail('Usuario no encontrado en el sistema de autenticación');
-      }
-
-      if (authUser.user.email_confirmed_at) {
+      if (user.emailVerified) {
         return Result.fail('El correo ya está verificado');
       }
 
@@ -1828,7 +2045,7 @@ export class AuthService {
       await this.pool.query(
         `INSERT INTO email_verification_tokens (user_id, token, email, expires_at)
          VALUES ($1, $2, $3, $4)`,
-        [user.id, verificationToken, email, expiresAt]
+        [user.id, verificationToken, normalizedEmail, expiresAt]
       );
 
       // Send verification email via Resend
@@ -1836,8 +2053,8 @@ export class AuthService {
         const appConfig = getAppConfig();
         const verificationUrl = `${appConfig.appUrl}/auth/verify-email?token=${verificationToken}`;
 
-        const emailResult = await this.emailProvider.sendEmailVerification(email, {
-          userName: user.fullName || email.split('@')[0],
+        const emailResult = await this.emailProvider.sendEmailVerification(normalizedEmail, {
+          userName: user.fullName || normalizedEmail.split('@')[0],
           verificationUrl,
         });
 
@@ -1845,7 +2062,7 @@ export class AuthService {
           return Result.fail('Error al enviar el correo de verificación');
         }
 
-        console.log(`[AuthService] Verification email resent to ${email}`);
+        console.log(`[AuthService] Verification email resent to ${normalizedEmail}`);
         return Result.ok();
       } else {
         return Result.fail('Servicio de correo no disponible');
@@ -1856,7 +2073,7 @@ export class AuthService {
   }
 
   /**
-   * Refresh access token
+   * Refresh access token (Native JWT)
    */
   async refreshToken(refreshToken: string): Promise<Result<{
     accessToken: string;
@@ -1865,21 +2082,37 @@ export class AuthService {
     expiresAt: number;
   }>> {
     try {
-      const supabase = this.getSupabaseAdmin();
+      // Verify the refresh token
+      const verifyResult = await this.jwtService.verifyRefreshToken(refreshToken);
+      if (verifyResult.isFailure || !verifyResult.value) {
+        return Result.fail(verifyResult.error || 'Refresh token invalido');
+      }
 
-      const { data, error } = await supabase.auth.refreshSession({
-        refresh_token: refreshToken,
-      });
+      const payload = verifyResult.value;
 
-      if (error || !data.session) {
-        return Result.fail(error?.message || 'Error al refrescar sesion');
+      // Get user to fetch latest tenant info
+      const tenantsResult = await this.getUserTenants(payload.sub!);
+      const defaultTenant = tenantsResult.isSuccess && tenantsResult.value?.memberships
+        ? tenantsResult.value.memberships.find(m => m.isActive)
+        : undefined;
+
+      // Generate new token pair
+      const tokenResult = await this.jwtService.generateTokenPair(
+        payload.sub!,
+        payload.email,
+        defaultTenant?.tenantId,
+        defaultTenant?.role
+      );
+
+      if (tokenResult.isFailure || !tokenResult.value) {
+        return Result.fail('Error al generar nuevos tokens');
       }
 
       return Result.ok({
-        accessToken: data.session.access_token,
-        refreshToken: data.session.refresh_token,
-        expiresIn: data.session.expires_in || 3600,
-        expiresAt: data.session.expires_at || Math.floor(Date.now() / 1000) + 3600,
+        accessToken: tokenResult.value.accessToken,
+        refreshToken: tokenResult.value.refreshToken,
+        expiresIn: tokenResult.value.expiresIn,
+        expiresAt: tokenResult.value.expiresAt,
       });
     } catch (error) {
       return Result.fail(`Token refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1887,27 +2120,22 @@ export class AuthService {
   }
 
   /**
-   * Sign out user
+   * Sign out user (Native JWT)
+   * Note: With stateless JWT, we just acknowledge the logout.
+   * For true session invalidation, implement token blacklisting or short-lived tokens.
    */
   async signOut(accessToken: string): Promise<Result<void>> {
     try {
-      const supabase = this.getSupabaseAdmin();
+      // Verify the token to get user ID for logging
+      const tokenResult = await this.jwtService.verifyAccessToken(accessToken);
 
-      // Get user from token to invalidate their session
-      const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
-
-      if (userError || !user) {
-        // Token might already be invalid, which is fine for logout
-        return Result.ok(undefined);
+      if (tokenResult.isSuccess && tokenResult.value) {
+        console.log(`[AuthService] User ${tokenResult.value.sub} signed out`);
       }
 
-      // Sign out the user (invalidates all their sessions)
-      const { error } = await supabase.auth.admin.signOut(user.id);
-
-      if (error) {
-        // Don't fail logout if there's an error, just log it
-        console.warn('[AuthService] Error during sign out:', error.message);
-      }
+      // With stateless JWT, there's no server-side session to invalidate
+      // The client should discard the tokens
+      // For enhanced security, consider implementing token blacklisting in Redis
 
       return Result.ok(undefined);
     } catch (error) {
@@ -1918,7 +2146,7 @@ export class AuthService {
   }
 
   /**
-   * Request password reset using Resend (bypasses Supabase rate limits)
+   * Request password reset (Native - no Supabase)
    */
   async requestPasswordReset(email: string): Promise<Result<void>> {
     try {
@@ -1926,29 +2154,29 @@ export class AuthService {
       await this.initializeEmailProvider();
 
       const appConfig = getAppConfig();
+      const normalizedEmail = email.toLowerCase().trim();
 
-      // Find user by email in Supabase
-      const supabase = this.getSupabaseAdmin();
-      const { data: users, error: listError } = await supabase.auth.admin.listUsers();
+      // Find user by email in our database
+      const userResult = await this.pool.query<{ id: string; email: string; fullName: string | null }>(
+        `SELECT id, email, full_name as "fullName"
+         FROM users
+         WHERE LOWER(email) = $1 AND is_active = true`,
+        [normalizedEmail]
+      );
 
-      if (listError) {
-        console.warn('[AuthService] Error listing users:', listError.message);
-        return Result.ok(undefined); // Don't reveal errors
-      }
-
-      const user = users.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-
-      if (!user) {
+      if (userResult.isFailure || !userResult.value?.rows[0]) {
         // User not found, but don't reveal this
         console.log('[AuthService] Password reset requested for non-existent email');
         return Result.ok(undefined);
       }
 
+      const user = userResult.value.rows[0];
+
       // Generate reset token
       const resetToken = uuidv4();
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-      // Store token in database (using email_verification_tokens table with type indicator)
+      // Store token in database
       try {
         await this.pool.query(
           `INSERT INTO password_reset_tokens (user_id, token, email, expires_at)
@@ -1958,7 +2186,7 @@ export class AuthService {
              expires_at = EXCLUDED.expires_at,
              used_at = NULL,
              created_at = NOW()`,
-          [user.id, resetToken, email, expiresAt]
+          [user.id, resetToken, normalizedEmail, expiresAt]
         );
       } catch (dbError) {
         // Table might not exist, create it
@@ -1984,16 +2212,16 @@ export class AuthService {
              expires_at = EXCLUDED.expires_at,
              used_at = NULL,
              created_at = NOW()`,
-          [user.id, resetToken, email, expiresAt]
+          [user.id, resetToken, normalizedEmail, expiresAt]
         );
       }
 
-      // Send email via Resend (no rate limits!)
+      // Send email via Resend
       if (this.emailProvider && this.emailInitialized) {
         const resetUrl = `${appConfig.appUrl}/reset-password?token=${resetToken}`;
 
-        const emailResult = await this.emailProvider.sendPasswordReset(email, {
-          userName: user.user_metadata?.full_name || email.split('@')[0],
+        const emailResult = await this.emailProvider.sendPasswordReset(normalizedEmail, {
+          userName: user.fullName || normalizedEmail.split('@')[0],
           resetUrl,
         });
 
@@ -2001,17 +2229,10 @@ export class AuthService {
           console.warn('[AuthService] Failed to send password reset email:',
             emailResult.isFailure ? emailResult.error : emailResult.getValue().error);
         } else {
-          console.log(`[AuthService] Password reset email sent to ${email} via Resend`);
+          console.log(`[AuthService] Password reset email sent to ${normalizedEmail} via Resend`);
         }
       } else {
-        // Fallback to Supabase if Resend not available
-        console.log('[AuthService] Resend not available, falling back to Supabase');
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${appConfig.appUrl}/reset-password`,
-        });
-        if (error) {
-          console.warn('[AuthService] Supabase password reset error:', error.message);
-        }
+        console.warn('[AuthService] Email provider not available for password reset');
       }
 
       return Result.ok(undefined);
@@ -2022,58 +2243,48 @@ export class AuthService {
   }
 
   /**
-   * Resend confirmation email
+   * Resend confirmation email (uses native verification flow)
    */
   async resendConfirmationEmail(email: string): Promise<Result<void>> {
-    try {
-      const supabase = this.getSupabaseAdmin();
-      const appConfig = getAppConfig();
-
-      // Use Supabase's resend method
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email,
-        options: {
-          emailRedirectTo: `${appConfig.appUrl}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        // Don't reveal if email exists or already confirmed
-        console.warn('[AuthService] Resend confirmation error:', error.message);
-      }
-
-      // Always return success to not reveal email status
-      return Result.ok(undefined);
-    } catch (error) {
-      console.warn('[AuthService] Resend confirmation error:', error);
-      return Result.ok(undefined);
-    }
+    // Delegate to resendVerificationEmail which is already native
+    return this.resendVerificationEmail(email);
   }
 
   /**
-   * Update user password
+   * Update user password (Native - no Supabase)
    */
   async updatePassword(accessToken: string, newPassword: string): Promise<Result<void>> {
     try {
-      const supabase = this.getSupabaseAdmin();
-
-      // Get user from token
-      const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
-
-      if (userError || !user) {
+      // Verify the access token
+      const tokenResult = await this.jwtService.verifyAccessToken(accessToken);
+      if (tokenResult.isFailure || !tokenResult.value) {
         return Result.fail('Sesion invalida');
       }
 
-      // Update password
-      const { error } = await supabase.auth.admin.updateUserById(user.id, {
-        password: newPassword,
-      });
+      const userId = tokenResult.value.sub!;
 
-      if (error) {
-        return Result.fail(error.message || 'Error al actualizar contrasena');
+      // Validate password complexity
+      const passwordValidation = this.passwordService.validatePasswordComplexity(newPassword);
+      if (!passwordValidation.isValid) {
+        return Result.fail(passwordValidation.errors[0]);
       }
 
+      // Hash the new password
+      const hashResult = await this.passwordService.hashPassword(newPassword);
+      if (hashResult.isFailure || !hashResult.value) {
+        return Result.fail('Error al procesar la nueva contraseña');
+      }
+
+      // Update password in database
+      const now = new Date();
+      await this.pool.query(
+        `UPDATE users
+         SET password_hash = $2, updated_at = $3
+         WHERE id = $1`,
+        [userId, hashResult.value, now]
+      );
+
+      console.log(`[AuthService] Password updated for user ${userId}`);
       return Result.ok(undefined);
     } catch (error) {
       return Result.fail(`Password update failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -2081,117 +2292,78 @@ export class AuthService {
   }
 
   /**
-   * Reset password using recovery token from email link
-   * Supports both Supabase access_tokens (type=recovery) and our custom UUID tokens
+   * Reset password using recovery token from email link (Native - no Supabase)
+   * Uses our custom UUID tokens only
    */
   async resetPasswordWithToken(recoveryToken: string, newPassword: string): Promise<Result<{
     success: boolean;
     email: string;
   }>> {
     try {
-      const supabase = this.getSupabaseAdmin();
-
-      // Validate password strength first (server-side validation)
-      const passwordValidation = this.validatePasswordStrength(newPassword);
-      if (passwordValidation.isFailure) {
-        return Result.fail(passwordValidation.error!);
+      // Validate password complexity
+      const passwordValidation = this.passwordService.validatePasswordComplexity(newPassword);
+      if (!passwordValidation.isValid) {
+        return Result.fail(passwordValidation.errors[0]);
       }
 
-      let userId: string | null = null;
-      let userEmail: string = '';
+      // Validate our custom token from database
+      console.log('[AuthService] Validating password reset token');
 
-      // Check if it's a UUID token (our custom token from Resend flow)
-      const isUuidToken = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recoveryToken);
+      const tokenResult = await this.pool.query<{
+        id: string;
+        user_id: string;
+        email: string;
+        expires_at: Date;
+        used_at: Date | null;
+      }>(
+        `SELECT id, user_id, email, expires_at, used_at
+         FROM password_reset_tokens
+         WHERE token = $1`,
+        [recoveryToken]
+      );
 
-      if (isUuidToken) {
-        // Validate our custom token from database
-        console.log('[AuthService] Validating custom reset token');
-
-        const tokenResult = await this.pool.query<{
-          id: string;
-          user_id: string;
-          email: string;
-          expires_at: Date;
-          used_at: Date | null;
-        }>(
-          `SELECT id, user_id, email, expires_at, used_at
-           FROM password_reset_tokens
-           WHERE token = $1`,
-          [recoveryToken]
-        );
-
-        if (tokenResult.isFailure || !tokenResult.value?.rows[0]) {
-          return Result.fail('El enlace de recuperación es inválido. Por favor solicita uno nuevo.');
-        }
-
-        const tokenData = tokenResult.value.rows[0];
-
-        // Check if already used
-        if (tokenData.used_at) {
-          return Result.fail('Este enlace ya fue utilizado. Por favor solicita uno nuevo.');
-        }
-
-        // Check if expired
-        if (new Date() > new Date(tokenData.expires_at)) {
-          return Result.fail('El enlace de recuperación ha expirado. Por favor solicita uno nuevo.');
-        }
-
-        userId = tokenData.user_id;
-        userEmail = tokenData.email;
-
-        // Mark token as used
-        await this.pool.query(
-          `UPDATE password_reset_tokens SET used_at = NOW() WHERE token = $1`,
-          [recoveryToken]
-        );
-
-      } else {
-        // Try Supabase access_token (recovery type)
-        console.log('[AuthService] Validating Supabase recovery token');
-
-        const { data: { user }, error: userError } = await supabase.auth.getUser(recoveryToken);
-
-        if (userError) {
-          console.error('[AuthService] Recovery token validation failed:', userError.message);
-
-          if (userError.message.includes('expired') || userError.message.includes('invalid')) {
-            return Result.fail('El enlace de recuperación ha expirado o es inválido. Por favor solicita uno nuevo.');
-          }
-
-          return Result.fail('Token de recuperación inválido');
-        }
-
-        if (!user) {
-          return Result.fail('No se pudo verificar el token de recuperación');
-        }
-
-        userId = user.id;
-        userEmail = user.email || '';
+      if (tokenResult.isFailure || !tokenResult.value?.rows[0]) {
+        return Result.fail('El enlace de recuperación es inválido. Por favor solicita uno nuevo.');
       }
 
-      if (!userId) {
-        return Result.fail('No se pudo identificar el usuario');
+      const tokenData = tokenResult.value.rows[0];
+
+      // Check if already used
+      if (tokenData.used_at) {
+        return Result.fail('Este enlace ya fue utilizado. Por favor solicita uno nuevo.');
       }
 
-      // Update the password using admin API
-      const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
-        password: newPassword,
-      });
-
-      if (updateError) {
-        console.error('[AuthService] Password update failed:', updateError.message);
-        return Result.fail(updateError.message || 'Error al actualizar la contraseña');
+      // Check if expired
+      if (new Date() > new Date(tokenData.expires_at)) {
+        return Result.fail('El enlace de recuperación ha expirado. Por favor solicita uno nuevo.');
       }
+
+      const userId = tokenData.user_id;
+      const userEmail = tokenData.email;
+
+      // Mark token as used
+      await this.pool.query(
+        `UPDATE password_reset_tokens SET used_at = NOW() WHERE token = $1`,
+        [recoveryToken]
+      );
+
+      // Hash the new password
+      const hashResult = await this.passwordService.hashPassword(newPassword);
+      if (hashResult.isFailure || !hashResult.value) {
+        return Result.fail('Error al procesar la nueva contraseña');
+      }
+
+      // Update the password in our database
+      const now = new Date();
+      await this.pool.query(
+        `UPDATE users
+         SET password_hash = $2, updated_at = $3
+         WHERE id = $1`,
+        [userId, hashResult.value, now]
+      );
 
       // Log the password reset for audit purposes
       console.log(`[AuthService] Password reset successful for user: ${userEmail}`);
-
-      // Invalidate all existing sessions for security
-      try {
-        await supabase.auth.admin.signOut(userId);
-      } catch (signOutError) {
-        console.warn('[AuthService] Could not invalidate sessions:', signOutError);
-      }
 
       // Send password changed confirmation email
       if (this.emailProvider && this.emailInitialized && userEmail) {

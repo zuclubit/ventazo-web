@@ -1,33 +1,34 @@
 'use client';
 
 /**
- * Leads Page - Kanban View (v2.0)
+ * Leads Page - Kanban View (v3.0 - Homologated with Opportunities)
  *
  * Redesigned with bulletproof layout architecture.
  * Uses PageContainer pattern for consistent containment.
+ * Homologated with Opportunities module patterns.
+ *
+ * v3.0 Features (Homologated with Opportunities):
+ * - Stage transition validation with visual feedback
+ * - Per-lead loading states
+ * - Terminal stage handling (won/lost via convert dialog)
+ * - Retry logic with exponential backoff
+ * - Undo capability for recent moves
  *
  * Layout Structure:
  * PageContainer (flex-col, flex-1, min-h-0)
- *   ├── Header (shrink-0)
  *   └── Body (flex-1, min-h-0)
- *       ├── Content scroll="horizontal" (flex-1, min-h-0, overflow-x-auto)
- *       │   └── KanbanBoard (inline-flex, h-full)
- *       │       └── KanbanColumn[] (flex-col, h-full, shrink-0)
- *       │           ├── Header (shrink-0)
- *       │           └── Cards (flex-1, min-h-0, overflow-y-auto)
- *       └── Sidebar (optional, hidden on mobile)
+ *       └── Content scroll="horizontal" (flex-1, min-h-0, overflow-x-auto)
+ *           └── KanbanBoard (inline-flex, h-full)
+ *               └── KanbanColumn[] (flex-col, h-full, shrink-0)
  *
- * Responsive behavior:
- * - Mobile: Horizontal scroll, bottom Sheet for preview
- * - Tablet: Scrollable columns, side panel
- * - Desktop: All columns visible, right panel
+ * @version 3.0.0
  */
 
 import * as React from 'react';
 import { Plus } from 'lucide-react';
 import { PageContainer } from '@/components/layout';
 import { RBACGuard } from '@/lib/auth';
-import { usePipelineView, type Lead } from '@/lib/leads';
+import { type Lead } from '@/lib/leads';
 
 // Components
 import {
@@ -41,7 +42,7 @@ import {
 } from './components';
 
 // Hooks
-import { useKanbanTheme } from './hooks';
+import { useKanbanTheme, useLeadsKanban } from './hooks';
 
 // ============================================
 // Leads Page Component - Kanban View
@@ -51,32 +52,50 @@ export default function LeadsPage() {
   // Initialize dynamic Kanban theming (applies CSS variables)
   useKanbanTheme();
 
-  // Fetch pipeline data
-  const {
-    data: pipelineData,
-    isLoading,
-    error,
-    refetch,
-  } = usePipelineView();
-
-  // Dialog states
+  // Dialog states (defined first so they can be used in callbacks)
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [editLead, setEditLead] = React.useState<Lead | null>(null);
   const [deleteLead, setDeleteLead] = React.useState<Lead | null>(null);
   const [convertLead, setConvertLead] = React.useState<Lead | null>(null);
   const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
 
+  // Pipeline Kanban data with enhanced state management (homologated with Opportunities)
+  const {
+    columns,
+    isLoading,
+    error,
+    isMoving,
+    isLeadMoving,
+    canMoveToStage,
+    moveToStage,
+    refetchPipeline,
+  } = useLeadsKanban({
+    onMoveSuccess: (leadId, targetStageId) => {
+      // Optionally refresh or handle success
+      console.log(`Lead ${leadId} moved to ${targetStageId}`);
+    },
+    onMoveError: (err, leadId) => {
+      console.error(`Failed to move lead ${leadId}:`, err);
+    },
+    onTerminalStageAttempt: (lead, stageType) => {
+      // Open convert dialog when user tries to drag to won/lost stage
+      if (stageType === 'won') {
+        setConvertLead(lead);
+      }
+      // For 'lost', we could add a "Mark as Lost" dialog in the future
+    },
+  });
+
   // Derived values
-  const columns = pipelineData?.stages ?? [];
   const isEmpty = columns.length === 0 || columns.every((c) => c.leads.length === 0);
 
   // Handlers
-  const handleLeadClick = (lead: Lead) => setSelectedLead(lead);
-  const handleLeadEdit = (lead: Lead) => setEditLead(lead);
-  const handleLeadDelete = (lead: Lead) => setDeleteLead(lead);
-  const handleLeadConvert = (lead: Lead) => setConvertLead(lead);
-  const handleClosePreview = () => setSelectedLead(null);
-  const handleRefresh = () => refetch();
+  const handleLeadClick = React.useCallback((lead: Lead) => setSelectedLead(lead), []);
+  const handleLeadEdit = React.useCallback((lead: Lead) => setEditLead(lead), []);
+  const handleLeadDelete = React.useCallback((lead: Lead) => setDeleteLead(lead), []);
+  const handleLeadConvert = React.useCallback((lead: Lead) => setConvertLead(lead), []);
+  const handleClosePreview = React.useCallback(() => setSelectedLead(null), []);
+  const handleRefresh = React.useCallback(() => refetchPipeline(), [refetchPipeline]);
 
   return (
     <PageContainer variant="full-bleed">
@@ -111,6 +130,11 @@ export default function LeadsPage() {
           ) : (
             <KanbanBoard
               columns={columns}
+              isLoading={isLoading}
+              isMoving={isMoving}
+              canMoveToStage={canMoveToStage}
+              isLeadMoving={isLeadMoving}
+              onMoveToStage={moveToStage}
               onLeadClick={handleLeadClick}
               onLeadEdit={handleLeadEdit}
               onLeadDelete={handleLeadDelete}
@@ -127,7 +151,7 @@ export default function LeadsPage() {
         open={!!selectedLead}
         onClose={handleClosePreview}
         onSuccess={() => {
-          refetch();
+          refetchPipeline();
           setSelectedLead(null);
         }}
         onDelete={() => {

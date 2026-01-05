@@ -2,7 +2,10 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { MessageCircle, Mail, Phone, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
+import { MessageCircle, Mail, Phone, Calendar, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
+
+import { useCalendarIntegrations } from '@/lib/calendar';
+import { useEmailAccounts } from '@/lib/emails/hooks';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,13 +23,33 @@ interface Integration {
   href: string;
   status: 'connected' | 'disconnected' | 'coming_soon';
   color: string;
+  connectedCount?: number;
 }
 
 // ============================================
 // Available Integrations
 // ============================================
 
-const integrations: Integration[] = [
+// Base integrations (static ones)
+const baseIntegrations: Integration[] = [
+  {
+    id: 'calendar',
+    name: 'Calendario',
+    description: 'Sincroniza Google Calendar o Microsoft Outlook para gestionar reuniones y eventos.',
+    icon: Calendar,
+    href: '/app/settings/integrations/calendar',
+    status: 'disconnected',
+    color: 'bg-indigo-500',
+  },
+  {
+    id: 'email',
+    name: 'Correo Electronico',
+    description: 'Sincroniza tu cuenta de Gmail u Outlook para gestionar emails desde la bandeja unificada.',
+    icon: Mail,
+    href: '/app/settings/integrations/email',
+    status: 'disconnected',
+    color: 'bg-purple-500',
+  },
   {
     id: 'messenger',
     name: 'Facebook Messenger',
@@ -45,15 +68,6 @@ const integrations: Integration[] = [
     status: 'coming_soon',
     color: 'bg-green-500',
   },
-  {
-    id: 'email',
-    name: 'Email',
-    description: 'Sincroniza tu cuenta de correo para gestionar emails desde la bandeja unificada.',
-    icon: Mail,
-    href: '/app/settings/integrations/email',
-    status: 'coming_soon',
-    color: 'bg-purple-500',
-  },
 ];
 
 // ============================================
@@ -63,6 +77,7 @@ const integrations: Integration[] = [
 function IntegrationCard({ integration }: { integration: Integration }) {
   const Icon = integration.icon;
   const isComingSoon = integration.status === 'coming_soon';
+  const connectedCount = integration.connectedCount ?? 0;
 
   return (
     <Card className={isComingSoon ? 'opacity-60' : ''}>
@@ -76,7 +91,7 @@ function IntegrationCard({ integration }: { integration: Integration }) {
             {integration.status === 'connected' && (
               <Badge variant="default" className="bg-green-500 hover:bg-green-600">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
-                Conectado
+                {connectedCount > 1 ? `${connectedCount} conectadas` : 'Conectado'}
               </Badge>
             )}
             {integration.status === 'disconnected' && (
@@ -100,7 +115,7 @@ function IntegrationCard({ integration }: { integration: Integration }) {
         ) : (
           <Button asChild variant="outline" className="w-full sm:w-auto">
             <Link href={integration.href}>
-              Configurar
+              {integration.status === 'connected' ? 'Gestionar' : 'Configurar'}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Link>
           </Button>
@@ -115,6 +130,39 @@ function IntegrationCard({ integration }: { integration: Integration }) {
 // ============================================
 
 export default function IntegrationsPage() {
+  // Fetch calendar integrations to determine connection status
+  const { data: calendarIntegrations } = useCalendarIntegrations();
+
+  // Fetch email accounts to determine connection status
+  const { data: emailAccountsData } = useEmailAccounts();
+
+  // Compute integrations with dynamic status
+  const integrations = React.useMemo(() => {
+    return baseIntegrations.map((integration) => {
+      if (integration.id === 'calendar') {
+        const connectedCalendars = calendarIntegrations?.filter(
+          (i) => i.status === 'connected'
+        ) ?? [];
+        return {
+          ...integration,
+          status: connectedCalendars.length > 0 ? 'connected' as const : 'disconnected' as const,
+          connectedCount: connectedCalendars.length,
+        };
+      }
+      if (integration.id === 'email') {
+        const connectedEmails = emailAccountsData?.accounts?.filter(
+          (a) => a.isConnected
+        ) ?? [];
+        return {
+          ...integration,
+          status: connectedEmails.length > 0 ? 'connected' as const : 'disconnected' as const,
+          connectedCount: connectedEmails.length,
+        };
+      }
+      return integration;
+    });
+  }, [calendarIntegrations, emailAccountsData]);
+
   return (
     <div className="space-y-6">
       {/* Header */}

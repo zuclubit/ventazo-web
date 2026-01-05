@@ -224,6 +224,12 @@ export async function loginAction(
     });
 
     // 5. Create encrypted session cookie with onboarding state
+    // IMPORTANT: Calculate session expiry based on SESSION_DURATION (7 days),
+    // NOT the accessToken expiry (~1 hour). The accessToken is refreshed separately.
+    const SESSION_DURATION_DAYS = 7;
+    const now = Math.floor(Date.now() / 1000);
+    const sessionExpiresAt = now + (SESSION_DURATION_DAYS * 24 * 60 * 60);
+
     console.log('[LoginAction] Creating session with:', {
       userId: loginData.user.id,
       email: loginData.user.email,
@@ -232,6 +238,8 @@ export async function loginAction(
       onboardingStatus,
       currentStep,
       requiresOnboarding,
+      sessionExpiresAt: new Date(sessionExpiresAt * 1000).toISOString(),
+      accessTokenExpiresAt: new Date(loginData.session.expiresAt * 1000).toISOString(),
     });
 
     try {
@@ -242,7 +250,10 @@ export async function loginAction(
         role,
         accessToken: loginData.session.accessToken,
         refreshToken: loginData.session.refreshToken,
-        expiresAt: loginData.session.expiresAt,
+        // Use session duration (7 days), NOT accessToken expiry (~1 hour)
+        expiresAt: sessionExpiresAt,
+        // Store access token expiry for refresh logic in API proxy
+        accessTokenExpiresAt: loginData.session.expiresAt,
         onboardingStatus: onboardingStatus,
         onboardingStep: currentStep,
         requiresOnboarding: requiresOnboarding,
@@ -420,12 +431,15 @@ export async function refreshSessionAction(): Promise<boolean> {
     const data = (await response.json()) as BackendRefreshResponse;
 
     // Update session with new tokens
+    // NOTE: Only update accessToken, refreshToken, and accessTokenExpiresAt
+    // Do NOT update expiresAt - that's the session expiry (7 days), not the access token expiry
     await updateSession({
       accessToken: data.accessToken,
       refreshToken: data.refreshToken,
-      expiresAt: data.expiresAt,
+      accessTokenExpiresAt: data.expiresAt,
     });
 
+    console.log('[RefreshSessionAction] Tokens refreshed successfully');
     return true;
   } catch (error) {
     console.error('[RefreshSessionAction] Error:', error);
@@ -1193,10 +1207,21 @@ export async function sendInvitationsAction(
 
 export interface TenantBranding {
   logo?: string;
+  /** Main brand color for buttons, CTAs */
   primaryColor?: string;
+  /** @deprecated Use sidebarColor instead */
   secondaryColor?: string;
+  /** Sidebar/navigation background color */
+  sidebarColor?: string;
+  /** Accent color for highlights, links */
+  accentColor?: string;
+  /** Surface color for cards, dropdowns */
+  surfaceColor?: string;
   companyDisplayName?: string;
   favicon?: string;
+  /** Brand/App name for display */
+  appName?: string;
+  brandName?: string;
 }
 
 export interface TenantDetails {
@@ -1261,6 +1286,7 @@ export async function getTenantDetailsAction(): Promise<TenantDetails | null> {
     const brandingData = metadata?.['branding'] as TenantBranding | undefined;
 
     // Build tenant details with branding
+    // Include all 4-color semantic palette fields for dynamic theming
     const tenantDetails: TenantDetails = {
       id: tenant.id,
       name: tenant.name || 'Mi Negocio',
@@ -1274,6 +1300,10 @@ export async function getTenantDetailsAction(): Promise<TenantDetails | null> {
         logoUrl: brandingData?.logo, // Alias for frontend compatibility
         primaryColor: brandingData?.primaryColor,
         secondaryColor: brandingData?.secondaryColor,
+        // New 4-color semantic palette
+        sidebarColor: brandingData?.sidebarColor || brandingData?.secondaryColor,
+        accentColor: brandingData?.accentColor,
+        surfaceColor: brandingData?.surfaceColor,
       },
       branding: brandingData,
       createdAt: tenant.createdAt || new Date().toISOString(),

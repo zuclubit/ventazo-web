@@ -58,6 +58,13 @@ function getSecretKey(): Uint8Array {
 // ============================================
 
 /**
+ * Authentication mode
+ * - sso: User authenticated via Zuclubit SSO (RS256 tokens)
+ * - legacy: User authenticated via legacy email/password (HS256 tokens)
+ */
+export type AuthMode = 'sso' | 'legacy';
+
+/**
  * Session payload stored in encrypted JWT
  * Contains user identity and API tokens
  */
@@ -66,7 +73,9 @@ export interface SessionPayload extends JWTPayload {
   userId: string;
   email: string;
   tenantId: string;
+  tenantSlug?: string; // SSO tenant slug
   role: string;
+  permissions?: string[]; // SSO permissions array
 
   // API tokens (for backend communication)
   accessToken: string;
@@ -75,6 +84,7 @@ export interface SessionPayload extends JWTPayload {
   // Metadata
   expiresAt: number; // Unix timestamp (seconds)
   createdAt: number; // Unix timestamp (seconds)
+  authMode: AuthMode; // Authentication source
 }
 
 /**
@@ -85,7 +95,10 @@ export interface SessionVerification {
   userId: string | null;
   email: string | null;
   tenantId: string | null;
+  tenantSlug: string | null;
   role: string | null;
+  permissions: string[] | null;
+  authMode: AuthMode | null;
 }
 
 /**
@@ -96,7 +109,10 @@ export interface ClientSession {
   userId: string;
   email: string;
   tenantId: string;
+  tenantSlug?: string;
   role: string;
+  permissions?: string[];
+  authMode: AuthMode;
   isAuthenticated: boolean;
 }
 
@@ -181,11 +197,14 @@ export async function decryptSession(
       userId,
       email,
       tenantId: (payload['tenantId'] as string) || '',
+      tenantSlug: (payload['tenantSlug'] as string) || undefined,
       role: (payload['role'] as string) || 'viewer',
+      permissions: (payload['permissions'] as string[]) || undefined,
       accessToken: (payload['accessToken'] as string) || '',
       refreshToken: (payload['refreshToken'] as string) || '',
       expiresAt: (payload['expiresAt'] as number) || 0,
       createdAt: (payload['createdAt'] as number) || 0,
+      authMode: (payload['authMode'] as AuthMode) || 'legacy',
     } as SessionPayload;
   } catch (error) {
     // Don't log for normal expiration
@@ -250,11 +269,14 @@ export async function updateSession(
     userId: updates['userId'] ?? currentSession.userId,
     email: updates['email'] ?? currentSession.email,
     tenantId: updates['tenantId'] ?? currentSession.tenantId,
+    tenantSlug: updates['tenantSlug'] ?? currentSession.tenantSlug,
     role: updates['role'] ?? currentSession.role,
+    permissions: updates['permissions'] ?? currentSession.permissions,
     accessToken: updates['accessToken'] ?? currentSession.accessToken,
     refreshToken: updates['refreshToken'] ?? currentSession.refreshToken,
     expiresAt: updates['expiresAt'] ?? currentSession.expiresAt,
     createdAt: currentSession.createdAt,
+    authMode: updates['authMode'] ?? currentSession.authMode,
   };
 
   await createSession(updatedPayload);
@@ -288,7 +310,10 @@ export const verifySession = cache(async (): Promise<SessionVerification> => {
       userId: null,
       email: null,
       tenantId: null,
+      tenantSlug: null,
       role: null,
+      permissions: null,
+      authMode: null,
     };
   }
 
@@ -300,7 +325,10 @@ export const verifySession = cache(async (): Promise<SessionVerification> => {
       userId: null,
       email: null,
       tenantId: null,
+      tenantSlug: null,
       role: null,
+      permissions: null,
+      authMode: null,
     };
   }
 
@@ -309,7 +337,10 @@ export const verifySession = cache(async (): Promise<SessionVerification> => {
     userId: session.userId,
     email: session.email,
     tenantId: session.tenantId,
+    tenantSlug: session.tenantSlug || null,
     role: session.role,
+    permissions: session.permissions || null,
+    authMode: session.authMode,
   };
 });
 
@@ -356,7 +387,10 @@ export async function getClientSession(): Promise<ClientSession | null> {
     userId: session.userId,
     email: session.email,
     tenantId: session.tenantId,
+    tenantSlug: session.tenantSlug,
     role: session.role,
+    permissions: session.permissions,
+    authMode: session.authMode,
     isAuthenticated: true,
   };
 }

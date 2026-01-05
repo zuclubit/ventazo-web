@@ -1,288 +1,115 @@
 'use client';
 
 /**
- * Opportunities Page - Redesigned
+ * Opportunities Page - Pipeline Kanban View (v2.0)
  *
- * Kanban-first view homologated with Leads page design:
- * - KPI Dashboard with glassmorphism
- * - Kanban board as primary view
- * - Right sidebar preview panel (desktop) / Sheet (mobile)
- * - Responsive multi-device experience
+ * Redesigned with bulletproof layout architecture.
+ * Homologated with Leads module design patterns.
+ * Uses PageContainer pattern for consistent containment.
  *
- * Based on leads module architecture and design patterns.
+ * Layout Structure:
+ * PageContainer (flex-col, flex-1, min-h-0)
+ *   └── Body (flex-1, min-h-0)
+ *       └── Content scroll="horizontal" (flex-1, min-h-0, overflow-x-auto)
+ *           └── OpportunityKanbanBoard (inline-flex, h-full)
+ *               └── OpportunityKanbanColumn[] (flex-col, h-full, shrink-0)
+ *
+ * Pipeline Stages (from backend):
+ * Dynamic stages based on tenant configuration
+ *
+ * Responsive behavior:
+ * - Mobile: Horizontal scroll, bottom Sheet for preview
+ * - Tablet: Scrollable columns, side panel
+ * - Desktop: All columns visible, right panel
  */
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  Plus,
-  RefreshCw,
-  Search,
-  List,
-  Kanban,
-  X,
-} from 'lucide-react';
-
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useMediaQuery } from '@/hooks/use-media-query';
-import { useI18n } from '@/lib/i18n';
+import { Plus } from 'lucide-react';
+import { PageContainer } from '@/components/layout';
 import { RBACGuard } from '@/lib/auth';
-import {
-  usePipelineStages,
-  type Opportunity,
-  type OpportunityStatus,
-  type OpportunityPriority,
-  OPPORTUNITY_STATUS,
-  OPPORTUNITY_PRIORITY,
-} from '@/lib/opportunities';
-import { cn } from '@/lib/utils';
+import { type Opportunity } from '@/lib/opportunities';
+import { useToast } from '@/hooks/use-toast';
 
-// Local components
+// Components
 import {
-  OpportunitiesKPIDashboard,
   OpportunityKanbanBoard,
-  OpportunityPreviewPanel,
+  OpportunityKanbanBoardSkeleton,
   OpportunitiesEmptyState,
-  OpportunitiesPageSkeleton,
-  type OpportunityKPIFilter,
+  OpportunityDetailSheet,
+  OpportunityFormSheet,
 } from './components';
-import { useOpportunityKanban, useWinLostDialog } from './hooks';
-import { OpportunityFormDialog } from './components/opportunity-form-dialog';
 import { WinLostDialog } from './components/win-lost-dialog';
+import { DeleteOpportunityDialog } from './components/delete-opportunity-dialog';
+
+// Hooks
+import {
+  useOpportunityKanban,
+  useWinLostDialog,
+  useOpportunityTheme,
+} from './hooks';
 
 // ============================================
-// View Toggle Component
-// ============================================
-
-type ViewMode = 'kanban' | 'list';
-
-interface ViewToggleProps {
-  mode: ViewMode;
-  onChange: (mode: ViewMode) => void;
-}
-
-function ViewToggle({ mode, onChange }: ViewToggleProps) {
-  const { t } = useI18n();
-
-  return (
-    <div className="flex items-center border rounded-lg p-1 bg-muted/30">
-      <Button
-        variant="ghost"
-        size="sm"
-        className={cn(
-          'h-7 px-3 rounded-md',
-          mode === 'kanban' && 'bg-background shadow-sm'
-        )}
-        onClick={() => onChange('kanban')}
-      >
-        <Kanban className="h-4 w-4 mr-1.5" />
-        <span className="hidden sm:inline">Kanban</span>
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className={cn(
-          'h-7 px-3 rounded-md',
-          mode === 'list' && 'bg-background shadow-sm'
-        )}
-        onClick={() => onChange('list')}
-      >
-        <List className="h-4 w-4 mr-1.5" />
-        <span className="hidden sm:inline">{t.opportunities.kanban.viewToggle.list}</span>
-      </Button>
-    </div>
-  );
-}
-
-// ============================================
-// Filter Chips Component
-// ============================================
-
-interface FilterChipsProps {
-  statusFilter: OpportunityStatus | 'all';
-  priorityFilter: OpportunityPriority | 'all';
-  stageFilter: string;
-  searchTerm: string;
-  onClearStatus: () => void;
-  onClearPriority: () => void;
-  onClearStage: () => void;
-  onClearSearch: () => void;
-  onClearAll: () => void;
-}
-
-function FilterChips({
-  statusFilter,
-  priorityFilter,
-  stageFilter,
-  searchTerm,
-  onClearStatus,
-  onClearPriority,
-  onClearStage,
-  onClearSearch,
-  onClearAll,
-}: FilterChipsProps) {
-  const { t } = useI18n();
-  const hasFilters =
-    statusFilter !== 'all' ||
-    priorityFilter !== 'all' ||
-    stageFilter !== 'all' ||
-    searchTerm.trim().length > 0;
-
-  if (!hasFilters) return null;
-
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-xs text-muted-foreground">{t.opportunities.filters.label}:</span>
-
-      {searchTerm.trim() && (
-        <Badge variant="secondary" className="gap-1 pr-1">
-          {t.opportunities.filters.search}: "{searchTerm}"
-          <button
-            className="ml-1 hover:bg-muted rounded-full p-0.5"
-            onClick={onClearSearch}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </Badge>
-      )}
-
-      {statusFilter !== 'all' && (
-        <Badge variant="secondary" className="gap-1 pr-1">
-          {t.opportunities.status.label}: {t.opportunities.status[statusFilter as keyof typeof t.opportunities.status]}
-          <button
-            className="ml-1 hover:bg-muted rounded-full p-0.5"
-            onClick={onClearStatus}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </Badge>
-      )}
-
-      {priorityFilter !== 'all' && (
-        <Badge variant="secondary" className="gap-1 pr-1">
-          {t.opportunities.priority.label}: {t.opportunities.priority[priorityFilter as keyof typeof t.opportunities.priority]}
-          <button
-            className="ml-1 hover:bg-muted rounded-full p-0.5"
-            onClick={onClearPriority}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </Badge>
-      )}
-
-      {stageFilter !== 'all' && (
-        <Badge variant="secondary" className="gap-1 pr-1">
-          {t.opportunities.filters.activeStage}
-          <button
-            className="ml-1 hover:bg-muted rounded-full p-0.5"
-            onClick={onClearStage}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </Badge>
-      )}
-
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-6 text-xs text-muted-foreground hover:text-foreground"
-        onClick={onClearAll}
-      >
-        {t.opportunities.filters.clearAll}
-      </Button>
-    </div>
-  );
-}
-
-// ============================================
-// Main Page Component
+// Opportunities Page Component - Pipeline Kanban View
 // ============================================
 
 export default function OpportunitiesPage() {
-  const router = useRouter();
-  const { t } = useI18n();
-  const isMobile = useMediaQuery('(max-width: 1023px)');
+  // Initialize dynamic pipeline theming (applies CSS variables)
+  useOpportunityTheme();
 
-  // ============================================
-  // State
-  // ============================================
+  // Toast hook for user feedback
+  const { toast } = useToast();
 
-  // View mode
-  const [viewMode, setViewMode] = React.useState<ViewMode>('kanban');
-
-  // Filters
-  const [searchTerm, setSearchTerm] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState<OpportunityStatus | 'all'>('all');
-  const [priorityFilter, setPriorityFilter] = React.useState<OpportunityPriority | 'all'>('all');
-  const [stageFilter, setStageFilter] = React.useState<string>('all');
-  const [kpiFilter, setKpiFilter] = React.useState<OpportunityKPIFilter>('all');
-
-  // Selected opportunity for preview
-  const [selectedOpportunity, setSelectedOpportunity] = React.useState<Opportunity | null>(null);
-  const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
-
-  // Dialogs
+  // Dialog states (defined first so they can be used in callbacks)
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [editOpportunity, setEditOpportunity] = React.useState<Opportunity | null>(null);
+  const [selectedOpportunity, setSelectedOpportunity] = React.useState<Opportunity | null>(null);
+  const [deleteOpportunity, setDeleteOpportunity] = React.useState<Opportunity | null>(null);
 
-  // Win/Lost dialog
+  // Win/Lost dialog (defined before useOpportunityKanban so callback can use it)
   const winLostDialog = useWinLostDialog();
 
-  // ============================================
-  // Data
-  // ============================================
-
-  // Pipeline stages
-  const { data: stages } = usePipelineStages();
-
-  // Kanban data
+  // Pipeline Kanban data with enhanced state management
   const {
     columns,
     isLoading,
     isMoving,
-    totalOpportunities,
-    totalAmount,
-    totalForecast,
-    wonAmount,
-    lostAmount,
+    isOpportunityMoving,
+    canMoveToStage,
     moveToStage,
     refetchPipeline,
-  } = useOpportunityKanban();
+  } = useOpportunityKanban({
+    onMoveSuccess: (_opportunityId, _targetStageId) => {
+      // Show success toast to user
+      toast({
+        title: 'Oportunidad movida',
+        description: 'La oportunidad se movió exitosamente a la nueva etapa.',
+      });
+    },
+    onMoveError: (error, _opportunityId) => {
+      // Show error toast to user
+      toast({
+        title: 'Error al mover',
+        description: error instanceof Error ? error.message : 'No se pudo mover la oportunidad. Intenta de nuevo.',
+        variant: 'destructive',
+      });
+    },
+    onTerminalStageAttempt: (opportunity, stageType) => {
+      // Open appropriate dialog when user tries to drag to won/lost stage
+      if (stageType === 'won') {
+        winLostDialog.openWinDialog(opportunity);
+      } else if (stageType === 'lost') {
+        winLostDialog.openLostDialog(opportunity);
+      }
+    },
+  });
 
-  // Calculate won/lost counts
-  const wonCount = React.useMemo(() => {
-    return columns.reduce((acc, col) => {
-      return acc + col.opportunities.filter((o) => o.status === 'won').length;
-    }, 0);
-  }, [columns]);
+  // Derived values
+  const isEmpty = columns.length === 0 || columns.every((col) => col.opportunities.length === 0);
 
-  const lostCount = React.useMemo(() => {
-    return columns.reduce((acc, col) => {
-      return acc + col.opportunities.filter((o) => o.status === 'lost').length;
-    }, 0);
-  }, [columns]);
-
-  // ============================================
   // Handlers
-  // ============================================
-
   const handleOpportunityClick = React.useCallback((opportunity: Opportunity) => {
     setSelectedOpportunity(opportunity);
-    setIsPreviewOpen(true);
   }, []);
-
-  const handleOpportunityView = React.useCallback((opportunity: Opportunity) => {
-    router.push(`/app/opportunities/${opportunity.id}`);
-  }, [router]);
 
   const handleOpportunityEdit = React.useCallback((opportunity: Opportunity) => {
     setEditOpportunity(opportunity);
@@ -296,305 +123,94 @@ export default function OpportunitiesPage() {
     winLostDialog.openLostDialog(opportunity);
   }, [winLostDialog]);
 
-  const handleAddOpportunity = React.useCallback((_stageId: string) => {
+  const handleClosePreview = React.useCallback(() => {
+    setSelectedOpportunity(null);
+  }, []);
+
+  const handleAddOpportunity = React.useCallback((_stageId?: string) => {
     // Could pre-select stage in form
     setIsCreateOpen(true);
   }, []);
 
-  const handleClosePreview = React.useCallback(() => {
-    setIsPreviewOpen(false);
-    // Delay clearing selection to allow animation
-    setTimeout(() => setSelectedOpportunity(null), 200);
-  }, []);
-
-  const handleKPIFilterChange = React.useCallback((filter: OpportunityKPIFilter) => {
-    setKpiFilter(filter);
-    // Map KPI filter to status filter
-    if (filter === 'all') {
-      setStatusFilter('all');
-    } else if (filter === 'open') {
-      setStatusFilter('open');
-    } else if (filter === 'won') {
-      setStatusFilter('won');
-    } else if (filter === 'lost') {
-      setStatusFilter('lost');
-    }
-  }, []);
-
-  const clearAllFilters = React.useCallback(() => {
-    setSearchTerm('');
-    setStatusFilter('all');
-    setPriorityFilter('all');
-    setStageFilter('all');
-    setKpiFilter('all');
-  }, []);
-
-  // ============================================
-  // Loading State
-  // ============================================
-
-  if (isLoading) {
-    return <OpportunitiesPageSkeleton />;
-  }
-
-  // ============================================
-  // Empty State
-  // ============================================
-
-  const hasNoOpportunities = columns.every((col) => col.opportunities.length === 0);
-
-  if (hasNoOpportunities && !searchTerm && statusFilter === 'all') {
-    return (
-      <div className="flex flex-col h-full">
-        {/* Header */}
-        <div className="flex-shrink-0 px-4 py-4 md:px-6 border-b bg-card/50 backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">{t.opportunities.title}</h1>
-              <p className="text-sm text-muted-foreground">
-                {t.opportunities.subtitle}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Empty State */}
-        <div className="flex-1 overflow-auto">
-          <OpportunitiesEmptyState
-            onCreateFromLead={() => router.push('/app/leads')}
-            onCreateManually={() => setIsCreateOpen(true)}
-            onImport={() => {/* TODO: implement import */}}
-            onViewLeads={() => router.push('/app/leads')}
-          />
-        </div>
-
-        {/* Create Dialog */}
-        <OpportunityFormDialog
-          open={isCreateOpen}
-          opportunity={null}
-          onClose={() => setIsCreateOpen(false)}
-        />
-      </div>
-    );
-  }
-
-  // ============================================
-  // Main Render
-  // ============================================
+  const handleRefresh = React.useCallback(() => {
+    refetchPipeline();
+  }, [refetchPipeline]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex-shrink-0 px-4 py-4 md:px-6 border-b bg-card/50 backdrop-blur-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          {/* Title */}
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{t.opportunities.title}</h1>
-            <p className="text-sm text-muted-foreground">
-              {totalOpportunities} {t.opportunities.pipelineSubtitle}
-            </p>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            <ViewToggle mode={viewMode} onChange={setViewMode} />
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetchPipeline()}
-              disabled={isMoving}
-            >
-              <RefreshCw className={cn('h-4 w-4', isMoving && 'animate-spin')} />
-              <span className="ml-2 hidden sm:inline">{t.opportunities.actions.refresh}</span>
-            </Button>
-
-            <RBACGuard fallback={null} minRole="sales_rep">
-              <Button size="sm" onClick={() => setIsCreateOpen(true)}>
-                <Plus className="h-4 w-4" />
-                <span className="ml-2 hidden sm:inline">{t.opportunities.newOpportunity}</span>
-              </Button>
-            </RBACGuard>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Dashboard */}
-      <div className="flex-shrink-0 px-4 py-4 md:px-6">
-        <OpportunitiesKPIDashboard
-          pipelineTotal={totalAmount}
-          totalCount={totalOpportunities}
-          forecastValue={totalForecast}
-          wonAmount={wonAmount}
-          wonCount={wonCount}
-          lostAmount={lostAmount}
-          lostCount={lostCount}
-          activeFilter={kpiFilter}
-          onFilterChange={handleKPIFilterChange}
-        />
-      </div>
-
-      {/* Filters Bar */}
-      <div className="flex-shrink-0 px-4 md:px-6 pb-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          {/* Search */}
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={t.opportunities.filters.searchPlaceholder}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-9"
-            />
-          </div>
-
-          {/* Filter Selects */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v as OpportunityStatus | 'all')}
-            >
-              <SelectTrigger className="h-9 w-[140px]">
-                <SelectValue placeholder={t.opportunities.status.label} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t.opportunities.status.all}</SelectItem>
-                {OPPORTUNITY_STATUS.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {t.opportunities.status[status as keyof typeof t.opportunities.status]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={priorityFilter}
-              onValueChange={(v) => setPriorityFilter(v as OpportunityPriority | 'all')}
-            >
-              <SelectTrigger className="h-9 w-[140px]">
-                <SelectValue placeholder={t.opportunities.priority.label} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t.opportunities.priority.all}</SelectItem>
-                {OPPORTUNITY_PRIORITY.map((priority) => (
-                  <SelectItem key={priority} value={priority}>
-                    {t.opportunities.priority[priority as keyof typeof t.opportunities.priority]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {stages && stages.length > 0 && (
-              <Select
-                value={stageFilter}
-                onValueChange={setStageFilter}
-              >
-                <SelectTrigger className="h-9 w-[160px]">
-                  <SelectValue placeholder={t.opportunities.filters.stage} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t.opportunities.filters.allStages}</SelectItem>
-                  {stages.map((stage) => (
-                    <SelectItem key={stage.id} value={stage.id}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: stage.color }}
-                        />
-                        {stage.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        </div>
-
-        {/* Filter Chips */}
-        <div className="mt-3">
-          <FilterChips
-            statusFilter={statusFilter}
-            priorityFilter={priorityFilter}
-            stageFilter={stageFilter}
-            searchTerm={searchTerm}
-            onClearStatus={() => setStatusFilter('all')}
-            onClearPriority={() => setPriorityFilter('all')}
-            onClearStage={() => setStageFilter('all')}
-            onClearSearch={() => setSearchTerm('')}
-            onClearAll={clearAllFilters}
-          />
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Kanban Board */}
-        <div
-          className={cn(
-            'flex-1 overflow-auto px-4 md:px-6',
-            // Adjust width when preview is open on desktop
-            !isMobile && selectedOpportunity && isPreviewOpen && 'pr-0'
-          )}
-        >
-          {viewMode === 'kanban' ? (
+    <PageContainer variant="full-bleed">
+      {/* Body: Full height Kanban */}
+      <PageContainer.Body>
+        {/*
+          Main Content Area
+          CRITICAL: scroll="horizontal" enables horizontal scroll
+          The OpportunityKanbanBoard will be h-full inside this container
+        */}
+        <PageContainer.Content scroll="horizontal" padding="none">
+          {isLoading ? (
+            <OpportunityKanbanBoardSkeleton />
+          ) : isEmpty ? (
+            <div className="flex items-center justify-center h-full p-4">
+              <OpportunitiesEmptyState
+                onCreateManually={() => setIsCreateOpen(true)}
+              />
+            </div>
+          ) : (
             <OpportunityKanbanBoard
               columns={columns}
               isLoading={isLoading}
               isMoving={isMoving}
+              canMoveToStage={canMoveToStage}
+              isOpportunityMoving={isOpportunityMoving}
               onMoveToStage={moveToStage}
               onOpportunityClick={handleOpportunityClick}
               onOpportunityEdit={handleOpportunityEdit}
               onOpportunityWin={handleOpportunityWin}
               onOpportunityLost={handleOpportunityLost}
-              onOpportunityView={handleOpportunityView}
               onAddOpportunity={handleAddOpportunity}
             />
-          ) : (
-            // List view - coming soon
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <p className="text-muted-foreground mb-4">
-                  {t.opportunities.kanban.listViewInProgress}
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => setViewMode('kanban')}
-                >
-                  {t.opportunities.kanban.backToKanban}
-                </Button>
-              </div>
-            </div>
           )}
-        </div>
+        </PageContainer.Content>
+      </PageContainer.Body>
 
-        {/* Preview Panel (Desktop only) */}
-        {!isMobile && selectedOpportunity && isPreviewOpen && (
-          <OpportunityPreviewPanel
-            opportunity={selectedOpportunity}
-            isOpen={isPreviewOpen}
-            onClose={handleClosePreview}
-            onEdit={handleOpportunityEdit}
-            onWin={handleOpportunityWin}
-            onLost={handleOpportunityLost}
-          />
-        )}
-      </div>
+      {/* Opportunity Detail Sheet - Unified View/Edit */}
+      <OpportunityDetailSheet
+        opportunity={selectedOpportunity}
+        open={!!selectedOpportunity}
+        onClose={handleClosePreview}
+        onSuccess={() => {
+          refetchPipeline();
+          setSelectedOpportunity(null);
+        }}
+        onDelete={() => {
+          // Open delete confirmation dialog
+          if (selectedOpportunity) {
+            setDeleteOpportunity(selectedOpportunity);
+          }
+          setSelectedOpportunity(null);
+        }}
+        onWin={() => {
+          if (selectedOpportunity) handleOpportunityWin(selectedOpportunity);
+          setSelectedOpportunity(null);
+        }}
+        onLost={() => {
+          if (selectedOpportunity) handleOpportunityLost(selectedOpportunity);
+          setSelectedOpportunity(null);
+        }}
+      />
 
-      {/* Preview Panel (Mobile - Sheet) */}
-      {isMobile && (
-        <OpportunityPreviewPanel
-          opportunity={selectedOpportunity}
-          isOpen={isPreviewOpen}
-          onClose={handleClosePreview}
-          onEdit={handleOpportunityEdit}
-          onWin={handleOpportunityWin}
-          onLost={handleOpportunityLost}
-        />
-      )}
+      {/* FAB - Floating Action Button for creating opportunities */}
+      <RBACGuard fallback={null} minRole="sales_rep">
+        <button
+          onClick={() => setIsCreateOpen(true)}
+          className="opportunities-fab"
+          aria-label="Nueva Oportunidad"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      </RBACGuard>
 
       {/* Dialogs */}
-      <OpportunityFormDialog
+      <OpportunityFormSheet
         open={isCreateOpen || !!editOpportunity}
         opportunity={editOpportunity}
         onClose={() => {
@@ -609,6 +225,15 @@ export default function OpportunitiesPage() {
         action={winLostDialog.action}
         onClose={winLostDialog.closeDialog}
       />
-    </div>
+
+      <DeleteOpportunityDialog
+        open={!!deleteOpportunity}
+        opportunity={deleteOpportunity}
+        onClose={() => {
+          setDeleteOpportunity(null);
+          refetchPipeline();
+        }}
+      />
+    </PageContainer>
   );
 }

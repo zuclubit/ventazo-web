@@ -20,7 +20,7 @@
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
 
-import { useTenantBranding, useBrandingCSSVars } from '@/hooks/use-tenant-branding';
+import { useTenantBranding } from '@/hooks/use-tenant-branding';
 
 // ============================================
 // Constants
@@ -40,7 +40,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/app/leads': 'Leads',
   '/app/leads/pipeline': 'Pipeline de Leads',
   '/app/opportunities': 'Oportunidades',
-  '/app/opportunities/pipeline': 'Pipeline',
+  '/app/kanban': 'Centro de Ventas',
   '/app/customers': 'Clientes',
   '/app/tasks': 'Tareas',
   '/app/services': 'Servicios',
@@ -50,8 +50,10 @@ const PAGE_TITLES: Record<string, string> = {
   '/app/email': 'Email',
   '/app/whatsapp': 'WhatsApp',
   '/app/quotes': 'Cotizaciones',
+  '/app/campaigns': 'Campañas',
   '/app/reports': 'Reportes',
   '/app/notifications': 'Notificaciones',
+  '/app/analytics': 'Analytics',
   '/app/analytics/leads': 'Analytics - Leads',
   '/app/analytics/opportunities': 'Analytics - Oportunidades',
   '/app/analytics/services': 'Analytics - Servicios',
@@ -402,9 +404,11 @@ interface DynamicBrandingSyncProps {
  * Handles:
  * - Document title updates
  * - Favicon/icon updates
- * - CSS variable application
  * - Theme color meta updates
  * - PWA manifest updates
+ *
+ * Note: CSS variables are managed by TenantThemeProvider
+ * @see {@link @/lib/theme/tenant-theme-provider.tsx}
  *
  * @example
  * ```tsx
@@ -414,8 +418,8 @@ interface DynamicBrandingSyncProps {
 export function DynamicBrandingSync({ children }: DynamicBrandingSyncProps) {
   const branding = useTenantBranding();
 
-  // Apply CSS variables to :root
-  useBrandingCSSVars();
+  // CSS variables are now managed by TenantThemeProvider
+  // See: @/lib/theme/tenant-theme-provider.tsx
 
   // Update document title
   useDynamicTitle(branding.name);

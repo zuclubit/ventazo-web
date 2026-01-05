@@ -45,23 +45,23 @@ import { useOnboardingStore } from '@/store/onboarding.store';
 
 const premiumInputClasses = cn(
   'h-12 rounded-xl border-white/10 bg-white/[0.03]',
-  'text-white placeholder:text-[#7A8F8F]',
-  'focus:border-[#0EB58C]/50 focus:ring-2 focus:ring-[#0EB58C]/20',
+  'text-white placeholder:text-[var(--onboarding-text-muted)]',
+  'focus:border-[var(--tenant-primary)]/50 focus:ring-2 focus:ring-[var(--tenant-primary)]/20',
   'hover:border-white/20 transition-all duration-200'
 );
 
 const premiumButtonPrimary = cn(
   'h-12 rounded-xl font-semibold',
-  'bg-gradient-to-r from-[#003C3B] to-[#0EB58C]',
-  'text-white shadow-lg shadow-[#0EB58C]/25',
-  'hover:shadow-xl hover:shadow-[#0EB58C]/30 hover:scale-[1.02]',
+  'bg-gradient-to-r from-[var(--ventazo-dark)] to-[var(--tenant-primary)]',
+  'text-white shadow-lg shadow-[var(--tenant-primary)]/25',
+  'hover:shadow-xl hover:shadow-[var(--tenant-primary)]/30 hover:scale-[1.02]',
   'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100',
   'transition-all duration-200'
 );
 
 const premiumButtonGhost = cn(
   'h-12 rounded-xl font-medium',
-  'text-[#B8C4C4] hover:text-white',
+  'text-[var(--onboarding-text-secondary)] hover:text-white',
   'hover:bg-white/[0.05]',
   'transition-all duration-200'
 );
@@ -165,8 +165,8 @@ export default function SetupPage() {
   // Form states - 4-color semantic brand palette
   // Sidebar: Dark navigation | Primary: CTA/active | Accent: highlights | Surface: cards/dropdowns
   const [logoUrl, setLogoUrl] = React.useState<string | null>(data.logoUrl || null);
-  const [sidebarColor, setSidebarColor] = React.useState(data.sidebarColor || '#003C3B');
-  const [primaryColor, setPrimaryColor] = React.useState(data.primaryColor || '#0EB58C');
+  const [sidebarColor, setSidebarColor] = React.useState(data.sidebarColor || 'var(--ventazo-dark)');
+  const [primaryColor, setPrimaryColor] = React.useState(data.primaryColor || 'var(--tenant-primary)');
   const [accentColor, setAccentColor] = React.useState(data.accentColor || '#5EEAD4');
   const [surfaceColor, setSurfaceColor] = React.useState(data.surfaceColor || '#052828');
   const [companyName, setCompanyName] = React.useState(data.companyName || data.businessName || '');
@@ -386,8 +386,8 @@ export default function SetupPage() {
           icon={<Palette className="h-6 w-6" />}
         >
           <div className="flex flex-col items-center justify-center py-12 gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-[#0EB58C]" />
-            <p className="text-[#7A8F8F] text-sm">{t.common.loading}</p>
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--tenant-primary)]" />
+            <p className="text-[var(--onboarding-text-muted)] text-sm">{t.common.loading}</p>
           </div>
         </StepCard>
       </OnboardingLayout>
@@ -670,7 +670,7 @@ function ModulesForm({ modules, businessType, isLoading, translations: t, onTogg
     <div className="space-y-5">
       {/* Quick Presets - Premium Glass Style */}
       <div className="space-y-2">
-        <p className="text-sm font-medium text-[#E8ECEC]">Configuración rápida</p>
+        <p className="text-sm font-medium text-[var(--onboarding-text-label)]">Configuración rápida</p>
         <div className="grid grid-cols-3 gap-2">
           {Object.entries(MODULE_PRESETS).map(([key, preset]) => (
             <button
@@ -681,12 +681,12 @@ function ModulesForm({ modules, businessType, isLoading, translations: t, onTogg
               className={cn(
                 'rounded-xl border p-3 text-left transition-all',
                 selectedPreset === key
-                  ? 'border-[#0EB58C]/50 bg-[#0EB58C]/10 ring-1 ring-[#0EB58C]/30'
+                  ? 'border-[var(--tenant-primary)]/50 bg-[var(--tenant-primary)]/10 ring-1 ring-[var(--tenant-primary)]/30'
                   : 'border-white/10 bg-white/[0.02] hover:border-white/20'
               )}
             >
               <p className="text-sm font-medium text-white">{preset.label}</p>
-              <p className="text-xs text-[#7A8F8F]">{preset.description}</p>
+              <p className="text-xs text-[var(--onboarding-text-muted)]">{preset.description}</p>
             </button>
           ))}
         </div>
@@ -694,8 +694,8 @@ function ModulesForm({ modules, businessType, isLoading, translations: t, onTogg
 
       {/* Active modules count - Premium Glass Badge */}
       <div className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-white/10 px-4 py-3">
-        <span className="text-sm text-[#B8C4C4]">Módulos activos:</span>
-        <span className="font-semibold text-[#0EB58C]">{activeCount} de 12</span>
+        <span className="text-sm text-[var(--onboarding-text-secondary)]">Módulos activos:</span>
+        <span className="font-semibold text-[var(--tenant-primary)]">{activeCount} de 12</span>
       </div>
 
       {/* Categorized modules - Premium Style */}
@@ -703,8 +703,8 @@ function ModulesForm({ modules, businessType, isLoading, translations: t, onTogg
         {Object.entries(MODULE_CATEGORIES).map(([catKey, category]) => (
           <div key={catKey} className="space-y-2">
             <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-[#E8ECEC]">{category.label}</p>
-              <span className="text-xs text-[#7A8F8F]">• {category.description}</span>
+              <p className="text-sm font-medium text-[var(--onboarding-text-label)]">{category.label}</p>
+              <span className="text-xs text-[var(--onboarding-text-muted)]">• {category.description}</span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {category.modules.map((moduleKey) => {
@@ -717,7 +717,7 @@ function ModulesForm({ modules, businessType, isLoading, translations: t, onTogg
                     className={cn(
                       'flex items-center gap-3 rounded-xl border p-3 transition-all cursor-pointer',
                       modules[moduleKey]
-                        ? 'border-[#0EB58C]/30 bg-[#0EB58C]/10'
+                        ? 'border-[var(--tenant-primary)]/30 bg-[var(--tenant-primary)]/10'
                         : 'border-white/10 bg-white/[0.02] hover:border-white/20'
                     )}
                     onClick={() => !isLoading && onToggle(moduleKey)}
@@ -726,12 +726,12 @@ function ModulesForm({ modules, businessType, isLoading, translations: t, onTogg
                       checked={modules[moduleKey]}
                       disabled={isLoading}
                       onCheckedChange={() => onToggle(moduleKey)}
-                      className="data-[state=checked]:bg-[#0EB58C]"
+                      className="data-[state=checked]:bg-[var(--tenant-primary)]"
                     />
                     <div className="flex-1 min-w-0">
                       <p className={cn(
                         'font-medium text-sm',
-                        modules[moduleKey] ? 'text-white' : 'text-[#B8C4C4]'
+                        modules[moduleKey] ? 'text-white' : 'text-[var(--onboarding-text-secondary)]'
                       )}>{moduleInfo.name}</p>
                     </div>
                   </div>
@@ -861,7 +861,7 @@ function BusinessHoursForm({
   const timeInputClasses = cn(
     'h-10 sm:h-11 rounded-lg border-white/10 bg-white/[0.03]',
     'text-white text-center text-sm sm:text-base',
-    'focus:border-[#0EB58C]/50 focus:ring-2 focus:ring-[#0EB58C]/20',
+    'focus:border-[var(--tenant-primary)]/50 focus:ring-2 focus:ring-[var(--tenant-primary)]/20',
     '[color-scheme:dark]',
     'w-[4.5rem] sm:w-24' // Smaller on mobile
   );
@@ -873,7 +873,7 @@ function BusinessHoursForm({
       className={cn(
         'flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 rounded-xl border p-3 sm:p-4 transition-all',
         businessHours[day].enabled
-          ? 'border-[#0EB58C]/30 bg-[#0EB58C]/10'
+          ? 'border-[var(--tenant-primary)]/30 bg-[var(--tenant-primary)]/10'
           : 'border-white/10 bg-white/[0.02]',
         isWeekend && 'opacity-90'
       )}
@@ -884,12 +884,12 @@ function BusinessHoursForm({
           checked={businessHours[day].enabled}
           disabled={isLoading}
           onCheckedChange={() => onToggleDay(day)}
-          className="data-[state=checked]:bg-[#0EB58C] shrink-0"
+          className="data-[state=checked]:bg-[var(--tenant-primary)] shrink-0"
         />
         <span
           className={cn(
             'font-medium truncate',
-            businessHours[day].enabled ? 'text-white' : 'text-[#7A8F8F]'
+            businessHours[day].enabled ? 'text-white' : 'text-[var(--onboarding-text-muted)]'
           )}
         >
           {/* Show short label on mobile, full on desktop */}
@@ -911,7 +911,7 @@ function BusinessHoursForm({
                 onChange={(e) => onUpdateHours(day, 'open', e.target.value)}
                 aria-label={`Hora de apertura ${dayLabels[day].full}`}
               />
-              <span className="text-[#7A8F8F] text-sm">a</span>
+              <span className="text-[var(--onboarding-text-muted)] text-sm">a</span>
               <Input
                 className={timeInputClasses}
                 disabled={isLoading}
@@ -928,7 +928,7 @@ function BusinessHoursForm({
                 onClick={() => copyToAllDays(day)}
                 disabled={isLoading}
                 className={cn(
-                  'p-1.5 sm:p-2 rounded-lg text-[#7A8F8F] hover:text-[#0EB58C] hover:bg-[#0EB58C]/10',
+                  'p-1.5 sm:p-2 rounded-lg text-[var(--onboarding-text-muted)] hover:text-[var(--tenant-primary)] hover:bg-[var(--tenant-primary)]/10',
                   'transition-all shrink-0',
                   'sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100'
                 )}
@@ -941,7 +941,7 @@ function BusinessHoursForm({
             )}
           </>
         ) : (
-          <span className="text-sm text-[#7A8F8F] px-2">{t.businessHours.closed}</span>
+          <span className="text-sm text-[var(--onboarding-text-muted)] px-2">{t.businessHours.closed}</span>
         )}
       </div>
     </div>
@@ -952,7 +952,7 @@ function BusinessHoursForm({
       {/* Quick Presets - Premium Glass Style */}
       {onSetBusinessHours && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-[#E8ECEC]">Configuración rápida</p>
+          <p className="text-sm font-medium text-[var(--onboarding-text-label)]">Configuración rápida</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {Object.entries(SCHEDULE_PRESETS).map(([key, preset]) => (
               <button
@@ -964,7 +964,7 @@ function BusinessHoursForm({
                   'rounded-xl border p-3 sm:p-4 text-left transition-all',
                   'flex items-start gap-3',
                   selectedPreset === key
-                    ? 'border-[#0EB58C]/50 bg-[#0EB58C]/10 ring-1 ring-[#0EB58C]/30'
+                    ? 'border-[var(--tenant-primary)]/50 bg-[var(--tenant-primary)]/10 ring-1 ring-[var(--tenant-primary)]/30'
                     : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]',
                   'active:scale-[0.98]' // Touch feedback
                 )}
@@ -972,7 +972,7 @@ function BusinessHoursForm({
                 <span className="text-xl sm:text-2xl">{preset.icon}</span>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white truncate">{preset.label}</p>
-                  <p className="text-xs text-[#7A8F8F] truncate">{preset.description}</p>
+                  <p className="text-xs text-[var(--onboarding-text-muted)] truncate">{preset.description}</p>
                 </div>
               </button>
             ))}
@@ -982,18 +982,18 @@ function BusinessHoursForm({
 
       {/* Active days summary - Premium Glass Badge */}
       <div className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-white/10 px-4 py-3">
-        <span className="text-sm text-[#B8C4C4]">Días activos:</span>
+        <span className="text-sm text-[var(--onboarding-text-secondary)]">Días activos:</span>
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-[#0EB58C]">{activeDays} de 7</span>
+          <span className="font-semibold text-[var(--tenant-primary)]">{activeDays} de 7</span>
           {activeDays === 7 && (
-            <span className="text-xs bg-[#0EB58C]/20 text-[#0EB58C] px-2 py-0.5 rounded-full">24/7</span>
+            <span className="text-xs bg-[var(--tenant-primary)]/20 text-[var(--tenant-primary)] px-2 py-0.5 rounded-full">24/7</span>
           )}
         </div>
       </div>
 
       {/* Days list - Weekdays */}
       <div className="space-y-3">
-        <p className="text-xs font-medium text-[#7A8F8F] uppercase tracking-wider">Días laborables</p>
+        <p className="text-xs font-medium text-[var(--onboarding-text-muted)] uppercase tracking-wider">Días laborables</p>
         <div className="space-y-2 group">
           {weekdays.map((day) => renderDayRow(day, false))}
         </div>
@@ -1001,14 +1001,14 @@ function BusinessHoursForm({
 
       {/* Days list - Weekend */}
       <div className="space-y-3">
-        <p className="text-xs font-medium text-[#7A8F8F] uppercase tracking-wider">Fin de semana</p>
+        <p className="text-xs font-medium text-[var(--onboarding-text-muted)] uppercase tracking-wider">Fin de semana</p>
         <div className="space-y-2 group">
           {weekend.map((day) => renderDayRow(day, true))}
         </div>
       </div>
 
       {/* Help text */}
-      <p className="text-xs text-[#7A8F8F] text-center">
+      <p className="text-xs text-[var(--onboarding-text-muted)] text-center">
         💡 Tip: Puedes copiar un horario a todos los días activos usando el ícono de copiar
       </p>
     </div>

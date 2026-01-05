@@ -11,7 +11,7 @@ import { NotesService, SUPPORTED_REACTIONS } from '../../infrastructure/notes';
 import { authenticate, getAuthUser } from '../middlewares/auth.middleware';
 
 // Validation schemas
-const entityTypeSchema = z.enum(['lead', 'customer', 'opportunity', 'task', 'contact']);
+const entityTypeSchema = z.enum(['lead', 'customer', 'opportunity', 'task', 'contact', 'quote']);
 const contentTypeSchema = z.enum(['text', 'markdown', 'html']);
 const noteTypeSchema = z.enum(['note', 'comment', 'internal', 'system']);
 

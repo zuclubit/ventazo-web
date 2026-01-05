@@ -3,7 +3,7 @@
  * Handles quotes and proposals management
  */
 
-import { injectable } from 'tsyringe';
+import { injectable, container } from 'tsyringe';
 import { DatabasePool } from '@zuclubit/database';
 import { Result } from '@zuclubit/domain';
 import {
@@ -21,8 +21,10 @@ import {
 } from './types';
 import { ResendProvider } from '../email/resend.provider';
 import { EmailTemplate } from '../email/types';
-import { getResendConfig, getAppConfig } from '../../config/environment';
+import { getResendConfig, getAppConfig, getPdfServiceConfig } from '../../config/environment';
 import { getMessagingService, MessageTemplate } from '../messaging';
+import { ProposalTemplateService } from '../proposals/proposal-template.service.js';
+import { ProposalSection, ProposalStyles, DEFAULT_SECTIONS, DEFAULT_DARK_STYLES, DEFAULT_LIGHT_STYLES } from '../proposals/types.js';
 
 /**
  * Quote Service
@@ -364,6 +366,29 @@ export class QuoteService {
   }
 
   /**
+   * Allowed status transitions for quotes
+   */
+  private readonly ALLOWED_STATUS_TRANSITIONS: Record<QuoteStatus, QuoteStatus[]> = {
+    'draft': ['pending_review', 'sent'],
+    'pending_review': ['draft', 'sent'],
+    'sent': ['viewed', 'accepted', 'rejected', 'expired', 'revised'],
+    'viewed': ['accepted', 'rejected', 'expired', 'revised'],
+    'accepted': [], // Terminal state
+    'rejected': ['revised'], // Can only be revised
+    'expired': ['revised'], // Can only be revised
+    'revised': [], // Terminal state (original quote marked as revised)
+  };
+
+  /**
+   * Validate status transition
+   */
+  private isValidStatusTransition(from: QuoteStatus, to: QuoteStatus): boolean {
+    if (from === to) return true; // Same status is always valid
+    const allowed = this.ALLOWED_STATUS_TRANSITIONS[from];
+    return allowed?.includes(to) ?? false;
+  }
+
+  /**
    * Update quote
    */
   async updateQuote(
@@ -378,9 +403,32 @@ export class QuoteService {
       return Result.fail('Quote not found');
     }
 
+    const currentStatus = existing.value.status;
+
     // Don't allow updates to accepted/rejected quotes
-    if (['accepted', 'rejected'].includes(existing.value.status)) {
-      return Result.fail(`Cannot update ${existing.value.status} quote`);
+    if (['accepted', 'rejected'].includes(currentStatus)) {
+      return Result.fail(`Cannot update ${currentStatus} quote`);
+    }
+
+    // Validate status transition if status is being changed
+    if (input.status && input.status !== currentStatus) {
+      if (!this.isValidStatusTransition(currentStatus, input.status)) {
+        return Result.fail(
+          `Invalid status transition: cannot change from '${currentStatus}' to '${input.status}'. ` +
+          `Allowed transitions: ${this.ALLOWED_STATUS_TRANSITIONS[currentStatus]?.join(', ') || 'none'}`
+        );
+      }
+    }
+
+    // Warn if modifying sent/viewed quotes (allow but log warning)
+    const modifiableFields = ['title', 'description', 'notes', 'internalNotes', 'lineItems', 'terms', 'expirationDate'];
+    const hasContentChanges = modifiableFields.some(field => input[field as keyof UpdateQuoteInput] !== undefined);
+
+    if (['sent', 'viewed'].includes(currentStatus) && hasContentChanges) {
+      console.warn(
+        `[QuoteService] Warning: Modifying sent/viewed quote ${quoteId}. ` +
+        `Consider creating a revision instead for better audit trail.`
+      );
     }
 
     // Calculate new totals if line items changed
@@ -433,39 +481,41 @@ export class QuoteService {
       }
     }
 
-    // Update quote
+    // Update quote (including status for Kanban drag & drop)
     const updateQuery = `
       UPDATE quotes SET
-        title = COALESCE($1, title),
-        description = COALESCE($2, description),
-        expiration_date = COALESCE($3, expiration_date),
-        billing_address = COALESCE($4, billing_address),
-        contact_name = COALESCE($5, contact_name),
-        contact_email = COALESCE($6, contact_email),
-        contact_phone = COALESCE($7, contact_phone),
-        company_name = COALESCE($8, company_name),
-        terms = COALESCE($9, terms),
-        notes = COALESCE($10, notes),
-        internal_notes = COALESCE($11, internal_notes),
-        signature_required = COALESCE($12, signature_required),
-        payment_terms = COALESCE($13, payment_terms),
-        payment_due_days = COALESCE($14, payment_due_days),
-        deposit_required = COALESCE($15, deposit_required),
-        deposit_percentage = COALESCE($16, deposit_percentage),
-        subtotal = $17,
-        discount_total = $18,
-        tax_total = $19,
-        total = $20,
-        tags = COALESCE($21, tags),
-        custom_fields = COALESCE($22, custom_fields),
-        metadata = COALESCE($23, metadata),
-        updated_by = $24,
+        status = COALESCE($1, status),
+        title = COALESCE($2, title),
+        description = COALESCE($3, description),
+        expiration_date = COALESCE($4, expiration_date),
+        billing_address = COALESCE($5, billing_address),
+        contact_name = COALESCE($6, contact_name),
+        contact_email = COALESCE($7, contact_email),
+        contact_phone = COALESCE($8, contact_phone),
+        company_name = COALESCE($9, company_name),
+        terms = COALESCE($10, terms),
+        notes = COALESCE($11, notes),
+        internal_notes = COALESCE($12, internal_notes),
+        signature_required = COALESCE($13, signature_required),
+        payment_terms = COALESCE($14, payment_terms),
+        payment_due_days = COALESCE($15, payment_due_days),
+        deposit_required = COALESCE($16, deposit_required),
+        deposit_percentage = COALESCE($17, deposit_percentage),
+        subtotal = $18,
+        discount_total = $19,
+        tax_total = $20,
+        total = $21,
+        tags = COALESCE($22, tags),
+        custom_fields = COALESCE($23, custom_fields),
+        metadata = COALESCE($24, metadata),
+        updated_by = $25,
         updated_at = NOW()
-      WHERE tenant_id = $25 AND id = $26
+      WHERE tenant_id = $26 AND id = $27
       RETURNING *
     `;
 
     const updateResult = await this.pool.query(updateQuery, [
+      input.status || null, // Status for Kanban drag & drop
       input.title,
       input.description,
       input.expirationDate,
@@ -494,15 +544,26 @@ export class QuoteService {
       quoteId,
     ]);
 
-    if (updateResult.isFailure || !updateResult.value?.rows?.[0]) {
-      return Result.fail('Failed to update quote');
+    if (updateResult.isFailure) {
+      console.error('[QuoteService] Update failed:', updateResult.error);
+      return Result.fail(`Failed to update quote: ${updateResult.error || 'Unknown error'}`);
     }
 
-    // Log activity
+    if (!updateResult.value?.rows?.[0]) {
+      console.error('[QuoteService] Update returned no rows');
+      return Result.fail('Failed to update quote: No rows returned');
+    }
+
+    // Log activity with specific message for status changes
+    const activityDescription = input.status
+      ? `Quote status changed to ${input.status}`
+      : 'Quote updated';
+
     await this.logActivity(quoteId, tenantId, {
-      type: 'updated',
-      description: 'Quote updated',
+      type: input.status ? 'updated' : 'updated',
+      description: activityDescription,
       userId,
+      changes: input.status ? { status: { old: existing.value.status, new: input.status } } : undefined,
     });
 
     return this.getQuote(tenantId, quoteId);
@@ -526,58 +587,60 @@ export class QuoteService {
    * List quotes
    */
   async listQuotes(filter: QuoteFilter): Promise<Result<{ quotes: Quote[]; total: number }>> {
-    const conditions: string[] = ['tenant_id = $1'];
+    // Use 'q.' prefix for all column references to work with JOIN
+    const conditions: string[] = ['q.tenant_id = $1'];
     const values: unknown[] = [filter.tenantId];
     let paramCount = 2;
 
     if (filter.customerId) {
-      conditions.push(`customer_id = $${paramCount++}`);
+      conditions.push(`q.customer_id = $${paramCount++}`);
       values.push(filter.customerId);
     }
     if (filter.leadId) {
-      conditions.push(`lead_id = $${paramCount++}`);
+      conditions.push(`q.lead_id = $${paramCount++}`);
       values.push(filter.leadId);
     }
     if (filter.opportunityId) {
-      conditions.push(`opportunity_id = $${paramCount++}`);
+      conditions.push(`q.opportunity_id = $${paramCount++}`);
       values.push(filter.opportunityId);
     }
     if (filter.status) {
       if (Array.isArray(filter.status)) {
-        conditions.push(`status = ANY($${paramCount++})`);
+        conditions.push(`q.status = ANY($${paramCount++})`);
         values.push(filter.status);
       } else {
-        conditions.push(`status = $${paramCount++}`);
+        conditions.push(`q.status = $${paramCount++}`);
         values.push(filter.status);
       }
     }
     if (filter.search) {
-      conditions.push(`(title ILIKE $${paramCount} OR quote_number ILIKE $${paramCount} OR contact_name ILIKE $${paramCount} OR company_name ILIKE $${paramCount})`);
+      // Note: customers table uses 'company' and 'name', leads table uses 'company_name' and 'full_name'
+      conditions.push(`(q.title ILIKE $${paramCount} OR q.quote_number ILIKE $${paramCount} OR q.contact_name ILIKE $${paramCount} OR q.company_name ILIKE $${paramCount} OR l.company_name ILIKE $${paramCount} OR c.company ILIKE $${paramCount})`);
       values.push(`%${filter.search}%`);
       paramCount++;
     }
     if (filter.minTotal !== undefined) {
-      conditions.push(`total >= $${paramCount++}`);
+      conditions.push(`q.total >= $${paramCount++}`);
       values.push(filter.minTotal);
     }
     if (filter.maxTotal !== undefined) {
-      conditions.push(`total <= $${paramCount++}`);
+      conditions.push(`q.total <= $${paramCount++}`);
       values.push(filter.maxTotal);
     }
     if (filter.createdFrom) {
-      conditions.push(`created_at >= $${paramCount++}`);
+      conditions.push(`q.created_at >= $${paramCount++}`);
       values.push(filter.createdFrom);
     }
     if (filter.createdTo) {
-      conditions.push(`created_at <= $${paramCount++}`);
+      conditions.push(`q.created_at <= $${paramCount++}`);
       values.push(filter.createdTo);
     }
     if (filter.createdBy) {
-      conditions.push(`created_by = $${paramCount++}`);
+      conditions.push(`q.created_by = $${paramCount++}`);
       values.push(filter.createdBy);
     }
     if (filter.tags && filter.tags.length > 0) {
-      conditions.push(`tags ?| $${paramCount++}`);
+      conditions.push(`q.tags ?| $${paramCount++}`);
       values.push(filter.tags);
     }
 
@@ -588,18 +651,34 @@ export class QuoteService {
     const limit = filter.limit || 50;
     const offset = filter.offset || 0;
 
-    // Get total count
-    const countQuery = `SELECT COUNT(*) FROM quotes WHERE ${whereClause}`;
+    // Get total count - use the same JOIN for accurate count with search
+    const countQuery = `
+      SELECT COUNT(*) FROM quotes q
+      LEFT JOIN leads l ON q.lead_id = l.id
+      LEFT JOIN customers c ON q.customer_id = c.id
+      WHERE ${whereClause}
+    `;
     const countResult = await this.pool.query(countQuery, values);
     const total = countResult.isSuccess && countResult.value?.rows?.[0]
       ? parseInt(countResult.value.rows[0].count as string, 10)
       : 0;
 
-    // Get quotes
+    // Get quotes with LEFT JOIN to get lead/customer names
+    // Note: customers table uses 'company' and 'name', leads table uses 'company_name' and 'full_name'
     const query = `
-      SELECT * FROM quotes
+      SELECT
+        q.*,
+        l.company_name as lead_company_name,
+        l.full_name as lead_contact_name,
+        l.email as lead_email,
+        c.company as customer_company_name,
+        c.name as customer_contact_name,
+        c.email as customer_email
+      FROM quotes q
+      LEFT JOIN leads l ON q.lead_id = l.id
+      LEFT JOIN customers c ON q.customer_id = c.id
       WHERE ${whereClause}
-      ORDER BY ${sortColumn} ${sortOrder}
+      ORDER BY q.${sortColumn} ${sortOrder}
       LIMIT ${limit} OFFSET ${offset}
     `;
 
@@ -609,7 +688,7 @@ export class QuoteService {
       return Result.fail('Failed to list quotes');
     }
 
-    const quotes = result.value.rows.map((row: Record<string, unknown>) => this.mapQuoteRow(row));
+    const quotes = result.value.rows.map((row: Record<string, unknown>) => this.mapQuoteRowWithRelations(row));
 
     return Result.ok({ quotes, total });
   }
@@ -1013,6 +1092,82 @@ export class QuoteService {
   }
 
   /**
+   * Duplicate quote (create a standalone copy)
+   * Unlike createRevision, this creates an independent quote without parent/version tracking
+   */
+  async duplicateQuote(
+    tenantId: string,
+    quoteId: string,
+    userId: string
+  ): Promise<Result<Quote>> {
+    // Get existing quote with items
+    const existing = await this.getQuoteWithItems(tenantId, quoteId);
+    if (existing.isFailure || !existing.value) {
+      return Result.fail('Quote not found');
+    }
+
+    const { quote, lineItems } = existing.value;
+
+    // Create new quote based on existing (as a fresh copy)
+    const input: CreateQuoteInput = {
+      customerId: quote.customerId,
+      leadId: quote.leadId,
+      opportunityId: quote.opportunityId,
+      title: `${quote.title} (Copy)`,
+      description: quote.description,
+      expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      currency: quote.currency,
+      billingAddress: quote.billingAddress,
+      contactName: quote.contactName,
+      contactEmail: quote.contactEmail,
+      contactPhone: quote.contactPhone,
+      companyName: quote.companyName,
+      terms: quote.terms,
+      notes: quote.notes,
+      internalNotes: quote.internalNotes,
+      signatureRequired: quote.signatureRequired,
+      paymentTerms: quote.paymentTerms,
+      paymentDueDays: quote.paymentDueDays,
+      depositRequired: quote.depositRequired,
+      depositPercentage: quote.depositPercentage,
+      lineItems: lineItems.map((item) => ({
+        type: item.type,
+        name: item.name,
+        description: item.description,
+        sku: item.sku,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+        discountType: item.discountType,
+        tax: item.tax,
+        taxable: item.taxable,
+      })),
+      tags: quote.tags,
+      customFields: quote.customFields,
+      metadata: {
+        ...quote.metadata,
+        duplicatedFrom: quoteId,
+        duplicatedAt: new Date().toISOString(),
+      },
+    };
+
+    // Create new quote (will have version 1, no parent)
+    const newQuote = await this.createQuote(tenantId, userId, input);
+    if (newQuote.isFailure || !newQuote.value) {
+      return Result.fail('Failed to duplicate quote');
+    }
+
+    // Log activity on original quote
+    await this.logActivity(quoteId, tenantId, {
+      type: 'duplicated',
+      description: `Quote duplicated to ${newQuote.value.quoteNumber}`,
+      userId,
+    });
+
+    return this.getQuote(tenantId, newQuote.value.id);
+  }
+
+  /**
    * Track quote view
    */
   private async trackView(quoteId: string): Promise<void> {
@@ -1182,6 +1337,71 @@ export class QuoteService {
     return Result.ok(activities);
   }
 
+  // ==================== Stats ====================
+
+  /**
+   * Get quote statistics with efficient SQL aggregation
+   */
+  async getStats(tenantId: string): Promise<Result<{
+    total: number;
+    draft: number;
+    pendingReview: number;
+    sent: number;
+    viewed: number;
+    accepted: number;
+    rejected: number;
+    expired: number;
+    revised: number;
+    totalValue: number;
+    acceptedValue: number;
+    pendingValue: number;
+    conversionRate: number;
+  }>> {
+    const query = `
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'draft') as draft,
+        COUNT(*) FILTER (WHERE status = 'pending_review') as pending_review,
+        COUNT(*) FILTER (WHERE status = 'sent') as sent,
+        COUNT(*) FILTER (WHERE status = 'viewed') as viewed,
+        COUNT(*) FILTER (WHERE status = 'accepted') as accepted,
+        COUNT(*) FILTER (WHERE status = 'rejected') as rejected,
+        COUNT(*) FILTER (WHERE status = 'expired') as expired,
+        COUNT(*) FILTER (WHERE status = 'revised') as revised,
+        COALESCE(SUM(total), 0) as total_value,
+        COALESCE(SUM(total) FILTER (WHERE status = 'accepted'), 0) as accepted_value,
+        COALESCE(SUM(total) FILTER (WHERE status IN ('draft', 'pending_review', 'sent', 'viewed')), 0) as pending_value
+      FROM quotes
+      WHERE tenant_id = $1
+    `;
+
+    const result = await this.pool.query(query, [tenantId]);
+
+    if (result.isFailure || !result.value?.rows?.[0]) {
+      return Result.fail('Failed to get stats');
+    }
+
+    const row = result.value.rows[0];
+    const total = parseInt(row.total as string, 10) || 0;
+    const accepted = parseInt(row.accepted as string, 10) || 0;
+
+    return Result.ok({
+      total,
+      draft: parseInt(row.draft as string, 10) || 0,
+      pendingReview: parseInt(row.pending_review as string, 10) || 0,
+      sent: parseInt(row.sent as string, 10) || 0,
+      viewed: parseInt(row.viewed as string, 10) || 0,
+      accepted,
+      rejected: parseInt(row.rejected as string, 10) || 0,
+      expired: parseInt(row.expired as string, 10) || 0,
+      revised: parseInt(row.revised as string, 10) || 0,
+      totalValue: parseInt(row.total_value as string, 10) || 0,
+      acceptedValue: parseInt(row.accepted_value as string, 10) || 0,
+      pendingValue: parseInt(row.pending_value as string, 10) || 0,
+      conversionRate: total > 0 ? Math.round((accepted / total) * 100) : 0,
+    });
+  }
+
   // ==================== Analytics ====================
 
   /**
@@ -1285,6 +1505,359 @@ export class QuoteService {
     });
   }
 
+  // ==================== PDF Generation ====================
+
+  /**
+   * Generate PDF for a quote
+   */
+  async generatePdf(
+    tenantId: string,
+    quoteId: string,
+    theme: string = 'dark',
+    templateId?: string
+  ): Promise<Result<{ pdfBytes: Uint8Array; filename: string }>> {
+    const pdfConfig = getPdfServiceConfig();
+
+    if (!pdfConfig.isEnabled) {
+      return Result.fail('PDF service not configured');
+    }
+
+    // Get quote with line items
+    const quoteResult = await this.getQuoteWithItems(tenantId, quoteId);
+    if (quoteResult.isFailure || !quoteResult.value) {
+      return Result.fail(quoteResult.error || 'Quote not found');
+    }
+
+    const { quote, lineItems } = quoteResult.value;
+
+    // Get tenant branding
+    const tenantData = await this.getTenantBranding(tenantId);
+
+    // Get template configuration if templateId provided
+    let sections: ProposalSection[] = DEFAULT_SECTIONS;
+    let styles: ProposalStyles = theme === 'light' ? DEFAULT_LIGHT_STYLES : DEFAULT_DARK_STYLES;
+
+    if (templateId) {
+      try {
+        const templateService = container.resolve(ProposalTemplateService);
+        const templateResult = await templateService.getTemplate(tenantId, templateId);
+        if (templateResult.isSuccess && templateResult.value) {
+          sections = templateResult.value.sections;
+          styles = templateResult.value.styles;
+          theme = templateResult.value.styles.theme; // Override theme from template
+        }
+      } catch (err) {
+        console.warn('[QuoteService] Failed to get template, using defaults:', err);
+      }
+    }
+
+    // Prepare quote data for PDF service with dynamic configuration
+    const pdfRequest = {
+      quote: this.mapQuoteToPdfFormat(quote, lineItems),
+      tenant: tenantData,
+      theme,
+      sections: sections.map(s => ({
+        id: s.id,
+        type: s.type,
+        enabled: s.enabled,
+        order: s.order,
+        config: s.config,
+      })),
+      styles: {
+        theme: styles.theme,
+        colors: styles.colors,
+        fonts: styles.fonts,
+        spacing: styles.spacing,
+      },
+      includeTerms: sections.some(s => s.type === 'terms' && s.enabled),
+      includeSignature: sections.some(s => s.type === 'signature' && s.enabled),
+    };
+
+    try {
+      const response = await fetch(`${pdfConfig.url}/api/v1/quotes/pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(pdfRequest),
+        signal: AbortSignal.timeout(pdfConfig.timeout),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[QuoteService] PDF service error:', errorText);
+        return Result.fail(`PDF service error: ${response.status}`);
+      }
+
+      const pdfBytes = new Uint8Array(await response.arrayBuffer());
+      const filename = `${quote.quoteNumber}.pdf`;
+
+      // Log activity
+      await this.logActivity(quoteId, tenantId, {
+        type: 'pdf_generated',
+        description: 'PDF generated for quote',
+      });
+
+      return Result.ok({ pdfBytes, filename });
+    } catch (error) {
+      console.error('[QuoteService] Failed to generate PDF:', error);
+      return Result.fail(`Failed to generate PDF: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Generate PDF preview (base64) for a quote
+   */
+  async generatePdfPreview(
+    tenantId: string,
+    quoteId: string,
+    theme: string = 'dark',
+    templateId?: string
+  ): Promise<Result<{
+    success: boolean;
+    filename: string;
+    contentType: string;
+    size: number;
+    data: string;
+  }>> {
+    const pdfConfig = getPdfServiceConfig();
+
+    if (!pdfConfig.isEnabled) {
+      return Result.fail('PDF service not configured');
+    }
+
+    // Get quote with line items
+    const quoteResult = await this.getQuoteWithItems(tenantId, quoteId);
+    if (quoteResult.isFailure || !quoteResult.value) {
+      return Result.fail(quoteResult.error || 'Quote not found');
+    }
+
+    const { quote, lineItems } = quoteResult.value;
+
+    // Get tenant branding
+    const tenantData = await this.getTenantBranding(tenantId);
+
+    // Get template configuration if templateId provided
+    let sections: ProposalSection[] = DEFAULT_SECTIONS;
+    let styles: ProposalStyles = theme === 'light' ? DEFAULT_LIGHT_STYLES : DEFAULT_DARK_STYLES;
+
+    if (templateId) {
+      try {
+        const templateService = container.resolve(ProposalTemplateService);
+        const templateResult = await templateService.getTemplate(tenantId, templateId);
+        if (templateResult.isSuccess && templateResult.value) {
+          sections = templateResult.value.sections;
+          styles = templateResult.value.styles;
+          theme = templateResult.value.styles.theme;
+        }
+      } catch (err) {
+        console.warn('[QuoteService] Failed to get template, using defaults:', err);
+      }
+    }
+
+    // Prepare quote data for PDF service with dynamic configuration
+    const pdfRequest = {
+      quote: this.mapQuoteToPdfFormat(quote, lineItems),
+      tenant: tenantData,
+      theme,
+      sections: sections.map(s => ({
+        id: s.id,
+        type: s.type,
+        enabled: s.enabled,
+        order: s.order,
+        config: s.config,
+      })),
+      styles: {
+        theme: styles.theme,
+        colors: styles.colors,
+        fonts: styles.fonts,
+        spacing: styles.spacing,
+      },
+      includeTerms: sections.some(s => s.type === 'terms' && s.enabled),
+      includeSignature: sections.some(s => s.type === 'signature' && s.enabled),
+    };
+
+    try {
+      const response = await fetch(`${pdfConfig.url}/api/v1/quotes/pdf/preview`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(pdfRequest),
+        signal: AbortSignal.timeout(pdfConfig.timeout),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[QuoteService] PDF service error:', errorText);
+        return Result.fail(`PDF service error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return Result.ok(result);
+    } catch (error) {
+      console.error('[QuoteService] Failed to generate PDF preview:', error);
+      return Result.fail(`Failed to generate PDF preview: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Get tenant branding data for PDF
+   * Reads from settings JSONB field for complete tenant information
+   */
+  private async getTenantBranding(tenantId: string): Promise<{
+    id: string;
+    name: string;
+    logoUrl?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    website?: string;
+    taxId?: string;
+  } | null> {
+    try {
+      const query = `
+        SELECT id, name, settings
+        FROM tenants WHERE id = $1
+      `;
+      const result = await this.pool.query(query, [tenantId]);
+
+      if (result.isSuccess && result.value?.rows?.[0]) {
+        const row = result.value.rows[0];
+        // Settings is a JSONB field containing all tenant configuration
+        const settings = (typeof row.settings === 'string'
+          ? JSON.parse(row.settings)
+          : row.settings) || {};
+
+        return {
+          id: row.id as string,
+          name: row.name as string,
+          // Branding from settings
+          logoUrl: settings.logoUrl || settings.logo_url,
+          primaryColor: settings.primaryColor || settings.primary_color || '#10b981',
+          secondaryColor: settings.secondaryColor || settings.secondary_color,
+          // Contact information from settings
+          address: settings.address || settings.businessAddress,
+          phone: settings.phone || settings.businessPhone || settings.contactPhone,
+          email: settings.email || settings.businessEmail || settings.contactEmail,
+          website: settings.website || settings.businessWebsite,
+          taxId: settings.taxId || settings.rfc || settings.tax_id,
+        };
+      }
+    } catch (error) {
+      console.error('[QuoteService] Failed to get tenant branding:', error);
+    }
+    return null;
+  }
+
+  /**
+   * Map quote to PDF service format
+   * Ensures complete data mapping for PDF generation consistency
+   */
+  private mapQuoteToPdfFormat(quote: Quote, lineItems: QuoteLineItem[]): Record<string, unknown> {
+    // Cast to access extended properties from JOIN queries
+    const extendedQuote = quote as Quote & {
+      leadName?: string;
+      customerName?: string;
+      opportunityName?: string;
+      leadCompanyName?: string;
+      customerCompanyName?: string;
+      createdByName?: string;
+      assignedToName?: string;
+    };
+
+    return {
+      id: quote.id,
+      tenantId: quote.tenantId,
+      quoteNumber: quote.quoteNumber,
+      title: quote.title,
+      description: quote.description,
+      status: quote.status,
+
+      // Related entities - Complete mapping for PDF display
+      leadId: quote.leadId,
+      leadName: extendedQuote.leadName,
+      customerId: quote.customerId,
+      customerName: extendedQuote.customerName,
+      opportunityId: quote.opportunityId,
+      opportunityName: extendedQuote.opportunityName,
+      // Company name fallback chain for PDF cover section
+      companyName:
+        quote.companyName ||
+        extendedQuote.customerCompanyName ||
+        extendedQuote.customerName ||
+        extendedQuote.leadCompanyName ||
+        extendedQuote.leadName,
+      // Contact information
+      contactName: quote.contactName,
+      contactEmail: quote.contactEmail,
+      contactPhone: quote.contactPhone,
+      // Billing address for invoices/quotes
+      billingAddress: quote.billingAddress,
+
+      // Dates
+      issueDate: quote.issueDate?.toISOString(),
+      expiryDate: quote.expirationDate?.toISOString(),
+      sentAt: quote.sentAt?.toISOString(),
+      viewedAt: quote.viewedAt?.toISOString(),
+      acceptedAt: quote.acceptedAt?.toISOString(),
+      rejectedAt: quote.rejectedAt?.toISOString(),
+
+      // Financial (convert from cents to currency)
+      currency: quote.currency,
+      subtotal: quote.subtotal / 100,
+      discountType: quote.discountType || null,
+      discountValue: quote.discountTotal > 0 ? quote.discountTotal / 100 : null,
+      discountAmount: quote.discountTotal / 100,
+      taxRate: quote.taxRate || 16, // Use quote's tax rate or default IVA
+      taxAmount: quote.taxTotal / 100,
+      total: quote.total / 100,
+
+      // Line items with corrected discount conversion
+      items: lineItems.map((item, index) => ({
+        id: item.id,
+        type: item.type,
+        name: item.name,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice / 100,
+        discountType: item.discountType,
+        // Discount value: percentage stays as-is (5 = 5%), fixed amount converts from cents
+        discountValue: item.discount
+          ? item.discountType === 'percentage'
+            ? item.discount // Percentage: 5 means 5%
+            : item.discount / 100 // Fixed amount: convert from cents
+          : null,
+        taxRate: item.tax,
+        subtotal: (item.quantity * item.unitPrice) / 100,
+        total: item.total / 100,
+        order: item.order ?? index,
+        metadata: item.metadata,
+      })),
+
+      // Content
+      terms: quote.terms,
+      notes: quote.notes,
+      internalNotes: quote.internalNotes,
+
+      // Ownership - Populated from extended query data
+      createdBy: quote.createdBy,
+      createdByName: extendedQuote.createdByName || null,
+      assignedTo: quote.assignedTo,
+      assignedToName: extendedQuote.assignedToName || null,
+
+      // Version
+      version: quote.version,
+
+      // Metadata
+      metadata: quote.metadata,
+      createdAt: quote.createdAt?.toISOString(),
+      updatedAt: quote.updatedAt?.toISOString(),
+    };
+  }
+
   // ==================== Private Helpers ====================
 
   private getSortColumn(sortBy: string): string {
@@ -1296,6 +1869,33 @@ export class QuoteService {
       expirationDate: 'expiration_date',
     };
     return columnMap[sortBy] || 'created_at';
+  }
+
+  /**
+   * Map quote row with lead/customer relation data
+   * This is used when listing quotes with JOINs
+   */
+  private mapQuoteRowWithRelations(row: Record<string, unknown>): Quote {
+    const quote = this.mapQuoteRow(row);
+
+    // If quote doesn't have company/contact info, populate from lead/customer
+    if (!quote.companyName) {
+      quote.companyName = (row.lead_company_name as string) || (row.customer_company_name as string) || undefined;
+    }
+    if (!quote.contactName) {
+      quote.contactName = (row.lead_contact_name as string) || (row.customer_contact_name as string) || undefined;
+    }
+    if (!quote.contactEmail) {
+      quote.contactEmail = (row.lead_email as string) || (row.customer_email as string) || undefined;
+    }
+
+    // Add additional fields for frontend display
+    (quote as Quote & { leadName?: string; customerName?: string }).leadName =
+      (row.lead_company_name as string) || (row.lead_contact_name as string) || undefined;
+    (quote as Quote & { leadName?: string; customerName?: string }).customerName =
+      (row.customer_company_name as string) || (row.customer_contact_name as string) || undefined;
+
+    return quote;
   }
 
   private mapQuoteRow(row: Record<string, unknown>): Quote {

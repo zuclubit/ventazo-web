@@ -24,20 +24,20 @@ import { usePathname } from 'next/navigation';
 
 import {
   BarChart3,
-  BookOpen,
-  Building2,
+  Bot,
   Calendar,
   CheckSquare,
+  Columns3,
   FileText,
   Home,
-  Layers,
   Mail,
+  Megaphone,
   Menu,
   MessageSquare,
+  Package,
   Settings,
   Target,
   Users,
-  Wallet,
   Workflow,
 } from 'lucide-react';
 
@@ -82,54 +82,54 @@ interface NavSection {
 
 const NAVIGATION: NavSection[] = [
   {
-    id: 'main',
-    title: 'Principal',
+    id: 'inicio',
+    title: 'Inicio',
     items: [
       { title: 'Dashboard', href: '/app', icon: Home, exactMatch: true },
-      { title: 'Leads', href: '/app/leads', icon: Users },
-      { title: 'Oportunidades', href: '/app/opportunities', icon: Target },
-      { title: 'Clientes', href: '/app/customers', icon: Building2 },
-      { title: 'Tareas', href: '/app/tasks', icon: CheckSquare },
+      { title: 'Asistente IA', href: '/app/assistant', icon: Bot, badge: 'Nuevo' },
     ],
   },
   {
-    id: 'sales',
+    id: 'ventas',
     title: 'Ventas',
     items: [
-      { title: 'Pipeline', href: '/app/opportunities/pipeline', icon: Layers },
+      { title: 'Leads', href: '/app/leads', icon: Users },
+      { title: 'Oportunidades', href: '/app/opportunities', icon: Target },
       { title: 'Cotizaciones', href: '/app/quotes', icon: FileText },
-      { title: 'Facturación', href: '/app/settings/billing', icon: Wallet },
+      { title: 'Clientes', href: '/app/customers', icon: Users },
     ],
   },
   {
-    id: 'communication',
-    title: 'Comunicación',
+    id: 'operaciones',
+    title: 'Operaciones',
     items: [
-      { title: 'Email', href: '/app/email', icon: Mail },
-      { title: 'WhatsApp', href: '/app/whatsapp', icon: MessageSquare },
+      { title: 'Centro de Ventas', href: '/app/kanban', icon: Columns3 },
+      { title: 'Tareas', href: '/app/tasks', icon: CheckSquare },
       { title: 'Calendario', href: '/app/calendar', icon: Calendar },
     ],
   },
   {
-    id: 'automation',
-    title: 'Automatización',
+    id: 'comunicacion',
+    title: 'Comunicación',
     items: [
-      { title: 'Workflows', href: '/app/workflows', icon: Workflow },
-      { title: 'Reportes', href: '/app/reports', icon: BarChart3 },
+      { title: 'Email', href: '/app/email', icon: Mail },
+      { title: 'WhatsApp', href: '/app/whatsapp', icon: MessageSquare },
+      { title: 'Campañas', href: '/app/campaigns', icon: Megaphone },
     ],
   },
   {
-    id: 'developers',
-    title: 'Desarrolladores',
+    id: 'automatizacion',
+    title: 'Automatización',
     items: [
-      {
-        title: 'API Docs',
-        href:
-          process.env['NEXT_PUBLIC_API_DOCS_URL'] ||
-          'https://zuclubit-lead-service.fly.dev/reference',
-        icon: BookOpen,
-        isExternal: true,
-      },
+      { title: 'Workflows', href: '/app/workflows', icon: Workflow },
+      { title: 'Servicios', href: '/app/services', icon: Package },
+    ],
+  },
+  {
+    id: 'analisis',
+    title: 'Análisis',
+    items: [
+      { title: 'Analytics', href: '/app/analytics', icon: BarChart3 },
     ],
   },
 ];
@@ -144,8 +144,9 @@ export function MobileSidebar() {
 
   // Section open state
   const [openSections, setOpenSections] = React.useState<string[]>([
-    'main',
-    'sales',
+    'inicio',
+    'ventas',
+    'operaciones',
   ]);
 
   // Close sheet on route change
@@ -198,9 +199,9 @@ export function MobileSidebar() {
         </SheetHeader>
 
         {/* Navigation */}
-        <ScrollArea className="h-[calc(100vh-140px)]">
+        <ScrollArea className="h-[calc(100vh-200px)]">
           <TooltipProvider delayDuration={0}>
-            <nav className="space-y-1 py-3" aria-label="Navegación principal">
+            <nav className="space-y-1 py-3 pb-20" aria-label="Navegación principal">
               {NAVIGATION.map((section) => (
                 <div key={section.id} className="px-2">
                   <NavSectionHeader
@@ -229,7 +230,7 @@ export function MobileSidebar() {
         </ScrollArea>
 
         {/* Footer with Settings */}
-        <div className="absolute bottom-0 left-0 right-0 border-t border-[var(--sidebar-divider)] p-3">
+        <div className="absolute bottom-[calc(var(--bottom-bar-height,64px)+env(safe-area-inset-bottom,0px))] left-0 right-0 border-t border-[var(--sidebar-divider)] p-3 bg-[var(--sidebar-glass-bg)]">
           <NavItemPremium
             title="Configuración"
             href="/app/settings"

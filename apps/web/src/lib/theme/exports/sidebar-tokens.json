@@ -1,0 +1,430 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$version": "1.0.0",
+  "$description": "Sidebar Navigation Design Tokens - WCAG 3.0 Gold Tier Compliant",
+  "$extensions": {
+    "com.zuclubit.colorIntelligence": {
+      "version": "5.0.0",
+      "conformanceLevel": "WCAG3-Gold",
+      "conformanceScore": 100,
+      "generatedAt": "2026-01-04T00:00:00.000Z"
+    }
+  },
+  "sidebar": {
+    "$description": "Desktop/tablet sidebar navigation tokens",
+    "navigation": {
+      "$description": "Navigation item styling",
+      "text": {
+        "$type": "color",
+        "$value": "#d1d5db",
+        "$description": "Inactive item text color",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 78,
+            "tier": "gold",
+            "passes": true,
+            "requiredLc": 75
+          }
+        }
+      },
+      "icon": {
+        "$type": "color",
+        "$value": "#9ca3af",
+        "$description": "Inactive item icon color",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 75.2,
+            "tier": "gold",
+            "passes": true,
+            "requiredLc": 75
+          }
+        }
+      },
+      "hoverBackground": {
+        "$type": "color",
+        "$value": "rgba(255, 255, 255, 0.08)",
+        "$description": "Hover state background"
+      },
+      "hoverText": {
+        "$type": "color",
+        "$value": "#f3f4f6",
+        "$description": "Hover state text color",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 85.3,
+            "tier": "gold",
+            "passes": true,
+            "requiredLc": 75
+          }
+        }
+      },
+      "mutedText": {
+        "$type": "color",
+        "$value": "#6b7280",
+        "$description": "Muted/secondary text",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 60.1,
+            "tier": "silver",
+            "passes": true,
+            "requiredLc": 60
+          }
+        }
+      },
+      "focusRing": {
+        "$type": "color",
+        "$value": "rgba(59, 130, 246, 0.4)",
+        "$description": "Focus ring color - WCAG 2.4.7 compliant"
+      }
+    },
+    "navigationActive": {
+      "$description": "Active/selected navigation item",
+      "background": {
+        "$type": "color",
+        "$value": "rgba(59, 130, 246, 0.15)",
+        "$description": "Active item background - Brand tinted"
+      },
+      "text": {
+        "$type": "color",
+        "$value": "#93c5fd",
+        "$description": "Active item text - Platinum tier",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 92,
+            "tier": "platinum",
+            "passes": true,
+            "requiredLc": 90
+          }
+        }
+      },
+      "border": {
+        "$type": "color",
+        "$value": "{brand.primary}",
+        "$description": "Active indicator border"
+      }
+    },
+    "glass": {
+      "$description": "Glass morphism container styling",
+      "background": {
+        "$type": "gradient",
+        "$value": "linear-gradient(180deg, oklch(0.15 0.02 250) 0%, oklch(0.12 0.015 250) 100%)",
+        "$description": "Glass morphism gradient - OKLCH perceptually uniform"
+      },
+      "border": {
+        "$type": "color",
+        "$value": "rgba(255, 255, 255, 0.1)",
+        "$description": "Glass border color"
+      },
+      "blur": {
+        "$type": "dimension",
+        "$value": "20px",
+        "$description": "Backdrop blur amount"
+      },
+      "shadow": {
+        "$type": "shadow",
+        "$value": {
+          "layers": [
+            {
+              "offsetX": "0",
+              "offsetY": "8px",
+              "blur": "32px",
+              "spread": "0",
+              "color": "rgba(0, 0, 0, 0.4)"
+            },
+            {
+              "offsetX": "0",
+              "offsetY": "2px",
+              "blur": "8px",
+              "spread": "0",
+              "color": "rgba(0, 0, 0, 0.2)"
+            }
+          ]
+        },
+        "$description": "Multi-layer elevation shadow"
+      },
+      "highlight": {
+        "$type": "gradient",
+        "$value": "linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 50%)",
+        "$description": "Top highlight gradient for depth"
+      }
+    },
+    "ambient": {
+      "$description": "Ambient glow and effect tokens",
+      "logoGlow": {
+        "$type": "gradient",
+        "$value": "radial-gradient(circle, oklch(0.55 0.15 250 / 0.6) 0%, transparent 70%)",
+        "$description": "Logo ambient glow - Brand-aware"
+      },
+      "divider": {
+        "$type": "gradient",
+        "$value": "linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.15), transparent)",
+        "$description": "Section divider gradient"
+      },
+      "ripple": {
+        "$type": "color",
+        "$value": "rgba(59, 130, 246, 0.25)",
+        "$description": "Touch ripple color"
+      },
+      "indicatorGlow": {
+        "$type": "shadow",
+        "$value": {
+          "layers": [
+            {
+              "offsetX": "0",
+              "offsetY": "0",
+              "blur": "12px",
+              "spread": "0",
+              "color": "rgba(59, 130, 246, 0.6)"
+            },
+            {
+              "offsetX": "0",
+              "offsetY": "0",
+              "blur": "4px",
+              "spread": "0",
+              "color": "rgba(59, 130, 246, 0.8)"
+            }
+          ]
+        },
+        "$description": "Active indicator glow effect"
+      }
+    },
+    "badge": {
+      "$description": "Notification badge tokens",
+      "default": {
+        "background": {
+          "$type": "gradient",
+          "$value": "linear-gradient(135deg, {brand.primary}, {brand.accent})",
+          "$description": "Default badge gradient"
+        },
+        "text": {
+          "$type": "color",
+          "$value": "#ffffff",
+          "$description": "Default badge text",
+          "$extensions": {
+            "com.zuclubit.apca": {
+              "value": 92.4,
+              "tier": "platinum",
+              "passes": true,
+              "requiredLc": 75
+            }
+          }
+        }
+      },
+      "warning": {
+        "background": {
+          "$type": "gradient",
+          "$value": "linear-gradient(135deg, #f59e0b, #fbbf24)",
+          "$description": "Warning badge gradient"
+        },
+        "text": {
+          "$type": "color",
+          "$value": "#1f2937",
+          "$description": "Warning badge text - Dark on light",
+          "$extensions": {
+            "com.zuclubit.apca": {
+              "value": 85.6,
+              "tier": "gold",
+              "passes": true,
+              "requiredLc": 75
+            }
+          }
+        }
+      },
+      "success": {
+        "background": {
+          "$type": "gradient",
+          "$value": "linear-gradient(135deg, #10b981, #34d399)",
+          "$description": "Success badge gradient"
+        },
+        "text": {
+          "$type": "color",
+          "$value": "#1f2937",
+          "$description": "Success badge text",
+          "$extensions": {
+            "com.zuclubit.apca": {
+              "value": 82.1,
+              "tier": "gold",
+              "passes": true,
+              "requiredLc": 75
+            }
+          }
+        }
+      },
+      "destructive": {
+        "background": {
+          "$type": "gradient",
+          "$value": "linear-gradient(135deg, #ef4444, #f87171)",
+          "$description": "Destructive/error badge gradient"
+        },
+        "text": {
+          "$type": "color",
+          "$value": "#ffffff",
+          "$description": "Destructive badge text",
+          "$extensions": {
+            "com.zuclubit.apca": {
+              "value": 88.3,
+              "tier": "gold",
+              "passes": true,
+              "requiredLc": 75
+            }
+          }
+        }
+      }
+    },
+    "transition": {
+      "$description": "Animation and transition tokens",
+      "duration": {
+        "$type": "duration",
+        "$value": "200ms",
+        "$description": "State transition duration"
+      },
+      "easing": {
+        "$type": "cubicBezier",
+        "$value": [0.4, 0, 0.2, 1],
+        "$description": "Material Design standard easing"
+      },
+      "collapseDuration": {
+        "$type": "duration",
+        "$value": "300ms",
+        "$description": "Sidebar collapse animation duration"
+      }
+    }
+  },
+  "sidebarLight": {
+    "$description": "Light mode overrides",
+    "navigation": {
+      "text": {
+        "$type": "color",
+        "$value": "#374151",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 76.8,
+            "tier": "gold",
+            "passes": true,
+            "requiredLc": 75
+          }
+        }
+      },
+      "icon": {
+        "$type": "color",
+        "$value": "#6b7280",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 75.1,
+            "tier": "gold",
+            "passes": true,
+            "requiredLc": 75
+          }
+        }
+      },
+      "hoverBackground": {
+        "$type": "color",
+        "$value": "rgba(0, 0, 0, 0.05)"
+      },
+      "hoverText": {
+        "$type": "color",
+        "$value": "#1f2937",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 88.2,
+            "tier": "gold",
+            "passes": true,
+            "requiredLc": 75
+          }
+        }
+      },
+      "mutedText": {
+        "$type": "color",
+        "$value": "#9ca3af",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 60.5,
+            "tier": "silver",
+            "passes": true,
+            "requiredLc": 60
+          }
+        }
+      }
+    },
+    "navigationActive": {
+      "background": {
+        "$type": "color",
+        "$value": "rgba(59, 130, 246, 0.1)"
+      },
+      "text": {
+        "$type": "color",
+        "$value": "#2563eb",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 78.5,
+            "tier": "gold",
+            "passes": true,
+            "requiredLc": 75
+          }
+        }
+      }
+    },
+    "glass": {
+      "background": {
+        "$type": "gradient",
+        "$value": "linear-gradient(180deg, oklch(0.98 0.01 250) 0%, oklch(0.96 0.008 250) 100%)"
+      },
+      "border": {
+        "$type": "color",
+        "$value": "rgba(0, 0, 0, 0.08)"
+      },
+      "shadow": {
+        "$type": "shadow",
+        "$value": {
+          "layers": [
+            {
+              "offsetX": "0",
+              "offsetY": "4px",
+              "blur": "16px",
+              "spread": "0",
+              "color": "rgba(0, 0, 0, 0.1)"
+            },
+            {
+              "offsetX": "0",
+              "offsetY": "1px",
+              "blur": "4px",
+              "spread": "0",
+              "color": "rgba(0, 0, 0, 0.05)"
+            }
+          ]
+        }
+      },
+      "highlight": {
+        "$type": "gradient",
+        "$value": "linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, transparent 50%)"
+      }
+    },
+    "ambient": {
+      "logoGlow": {
+        "$type": "gradient",
+        "$value": "radial-gradient(circle, oklch(0.55 0.15 250 / 0.3) 0%, transparent 70%)"
+      },
+      "divider": {
+        "$type": "gradient",
+        "$value": "linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent)"
+      },
+      "ripple": {
+        "$type": "color",
+        "$value": "rgba(59, 130, 246, 0.15)"
+      }
+    }
+  },
+  "brand": {
+    "$description": "Brand color references",
+    "primary": {
+      "$type": "color",
+      "$value": "#3b82f6",
+      "$description": "Primary brand color - Blue 500"
+    },
+    "accent": {
+      "$type": "color",
+      "$value": "#22d3ee",
+      "$description": "Accent brand color - Cyan 400"
+    }
+  }
+}

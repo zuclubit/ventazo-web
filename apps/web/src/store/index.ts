@@ -28,6 +28,7 @@ export {
   useCurrency,
   useLocale,
   useTimezone,
+  useCachedBranding,
   type TenantSettings,
   type TenantFeatures,
 } from './tenant.store';

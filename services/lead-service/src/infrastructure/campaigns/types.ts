@@ -725,6 +725,9 @@ export interface CampaignDashboard {
   totalBudget: number;
   totalSpent: number;
   budgetRemaining: number;
+
+  // Recent campaigns
+  recentCampaigns: Campaign[];
 }
 
 /**

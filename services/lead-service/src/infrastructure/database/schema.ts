@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, integer, timestamp, jsonb, index, boolean, uniqueIndex, real } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, integer, timestamp, jsonb, index, boolean, uniqueIndex, unique, real } from 'drizzle-orm/pg-core';
 
 /**
  * Leads table schema
@@ -55,6 +55,9 @@ export const leads = pgTable(
     tenantStatusIdx: index('leads_tenant_status_idx').on(table.tenantId, table.status),
     tenantOwnerIdx: index('leads_tenant_owner_idx').on(table.tenantId, table.ownerId),
     tenantStageIdx: index('leads_tenant_stage_idx').on(table.tenantId, table.stageId),
+    // Performance optimization: Index for listing leads ordered by creation date
+    // See: docs/PERFORMANCE_REMEDIATION_LOG.md - P2.3 Database Indexes
+    tenantCreatedIdx: index('leads_tenant_created_idx').on(table.tenantId, table.createdAt),
   })
 );
 
@@ -102,19 +105,24 @@ export const tenants = pgTable(
 );
 
 /**
- * Users table - Synced from Supabase Auth
- * Contains additional profile data not stored in Supabase
+ * Users table - Native authentication
+ * Contains user credentials and profile data (no Supabase dependency)
  */
 export const users = pgTable(
   'users',
   {
-    id: uuid('id').primaryKey(), // Same as Supabase Auth user ID
+    id: uuid('id').primaryKey().defaultRandom(),
     email: varchar('email', { length: 255 }).notNull(),
+    passwordHash: varchar('password_hash', { length: 255 }), // bcrypt hash, nullable for OAuth users
     fullName: varchar('full_name', { length: 255 }),
     avatarUrl: varchar('avatar_url', { length: 500 }),
     phone: varchar('phone', { length: 50 }),
     isActive: boolean('is_active').notNull().default(true),
+    emailVerified: boolean('email_verified').notNull().default(false),
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
     metadata: jsonb('metadata').notNull().default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -596,6 +604,9 @@ export const tasks = pgTable(
     tenantStatusIdx: index('tasks_tenant_status_idx').on(table.tenantId, table.status),
     tenantAssignedIdx: index('tasks_tenant_assigned_idx').on(table.tenantId, table.assignedTo),
     tenantDueIdx: index('tasks_tenant_due_idx').on(table.tenantId, table.dueDate),
+    // Performance optimization: Composite index for pending tasks with due dates
+    // See: docs/PERFORMANCE_REMEDIATION_LOG.md - P2.3 Database Indexes
+    tenantStatusDueIdx: index('tasks_tenant_status_due_idx').on(table.tenantId, table.status, table.dueDate),
   })
 );
 
@@ -2265,6 +2276,195 @@ export type WhatsAppTemplateRow = typeof whatsappTemplates.$inferSelect;
 export type NewWhatsAppTemplateRow = typeof whatsappTemplates.$inferInsert;
 export type WhatsAppPhoneNumberRow = typeof whatsappPhoneNumbers.$inferSelect;
 export type NewWhatsAppPhoneNumberRow = typeof whatsappPhoneNumbers.$inferInsert;
+
+// =====================================================
+// FACEBOOK MESSENGER TABLES
+// =====================================================
+
+/**
+ * Messenger Conversations Table
+ * Tracks Facebook Messenger conversation threads
+ */
+export const messengerConversations = pgTable(
+  'messenger_conversations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull(),
+
+    // Facebook Page configuration
+    pageId: varchar('page_id', { length: 100 }).notNull(), // Facebook Page ID
+    pageName: varchar('page_name', { length: 255 }),
+
+    // Contact information (Page-Scoped User ID)
+    psid: varchar('psid', { length: 100 }).notNull(), // Page-Scoped User ID
+    contactName: varchar('contact_name', { length: 255 }),
+    contactProfilePic: text('contact_profile_pic'),
+
+    // Conversation state
+    status: varchar('status', { length: 50 }).notNull().default('active'), // 'active', 'resolved', 'archived', 'blocked'
+    lastMessageAt: timestamp('last_message_at', { withTimezone: true }),
+    lastMessagePreview: text('last_message_preview'),
+    lastMessageDirection: varchar('last_message_direction', { length: 20 }), // 'inbound', 'outbound'
+
+    // Counts
+    unreadCount: integer('unread_count').notNull().default(0),
+    totalMessages: integer('total_messages').notNull().default(0),
+
+    // Assignment
+    assignedTo: uuid('assigned_to'),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }),
+
+    // CRM linkage
+    leadId: uuid('lead_id').references(() => leads.id, { onDelete: 'set null' }),
+    customerId: uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
+    contactId: uuid('contact_id').references(() => leadContacts.id, { onDelete: 'set null' }),
+
+    // Labels and categorization
+    labels: jsonb('labels').notNull().default([]),
+
+    // Conversation window tracking (24-hour window)
+    windowExpiresAt: timestamp('window_expires_at', { withTimezone: true }),
+    isWithinWindow: boolean('is_within_window').notNull().default(true),
+
+    // Timestamps
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+  },
+  (table) => ({
+    tenantIdIdx: index('messenger_conversations_tenant_id_idx').on(table.tenantId),
+    pageIdIdx: index('messenger_conversations_page_id_idx').on(table.pageId),
+    psidIdx: index('messenger_conversations_psid_idx').on(table.psid),
+    statusIdx: index('messenger_conversations_status_idx').on(table.status),
+    lastMessageAtIdx: index('messenger_conversations_last_message_at_idx').on(table.lastMessageAt),
+    assignedToIdx: index('messenger_conversations_assigned_to_idx').on(table.assignedTo),
+    leadIdIdx: index('messenger_conversations_lead_id_idx').on(table.leadId),
+    customerIdIdx: index('messenger_conversations_customer_id_idx').on(table.customerId),
+    unreadCountIdx: index('messenger_conversations_unread_count_idx').on(table.unreadCount),
+    tenantStatusIdx: index('messenger_conversations_tenant_status_idx').on(table.tenantId, table.status),
+    tenantPsidIdx: uniqueIndex('messenger_conversations_tenant_psid_idx').on(table.tenantId, table.pageId, table.psid),
+  })
+);
+
+/**
+ * Messenger Messages Table
+ * Stores individual Facebook Messenger messages
+ */
+export const messengerMessages = pgTable(
+  'messenger_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull(),
+    conversationId: uuid('conversation_id').notNull().references(() => messengerConversations.id, { onDelete: 'cascade' }),
+
+    // Facebook message identifiers
+    fbMessageId: varchar('fb_message_id', { length: 255 }), // Facebook message ID
+    direction: varchar('direction', { length: 20 }).notNull(), // 'inbound', 'outbound'
+
+    // Message content
+    type: varchar('type', { length: 50 }).notNull(), // 'text', 'image', 'video', 'audio', 'file', 'template', 'quick_reply', 'postback', etc.
+    content: text('content'), // Text content or description
+    contentJson: jsonb('content_json'), // Full message content as JSON
+
+    // Attachment information
+    attachmentType: varchar('attachment_type', { length: 50 }), // 'image', 'video', 'audio', 'file', 'template'
+    attachmentUrl: text('attachment_url'),
+    attachmentPayload: jsonb('attachment_payload'), // Full attachment payload
+
+    // Quick replies
+    quickReplies: jsonb('quick_replies'), // Quick reply buttons
+
+    // Template information
+    templateType: varchar('template_type', { length: 50 }), // 'generic', 'button', 'media', 'receipt', etc.
+
+    // Context (for replies)
+    replyToMessageId: varchar('reply_to_message_id', { length: 255 }),
+
+    // Referral tracking (click-to-Messenger ads)
+    referral: jsonb('referral'),
+
+    // Status tracking
+    status: varchar('status', { length: 50 }).notNull().default('sent'), // 'pending', 'sent', 'delivered', 'read', 'failed'
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    failedAt: timestamp('failed_at', { withTimezone: true }),
+
+    // Error tracking
+    errorCode: integer('error_code'),
+    errorMessage: text('error_message'),
+
+    // Timestamps
+    timestamp: timestamp('timestamp', { withTimezone: true }).notNull(), // Original message timestamp
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantIdIdx: index('messenger_messages_tenant_id_idx').on(table.tenantId),
+    conversationIdIdx: index('messenger_messages_conversation_id_idx').on(table.conversationId),
+    fbMessageIdIdx: uniqueIndex('messenger_messages_fb_message_id_idx').on(table.fbMessageId),
+    directionIdx: index('messenger_messages_direction_idx').on(table.direction),
+    typeIdx: index('messenger_messages_type_idx').on(table.type),
+    statusIdx: index('messenger_messages_status_idx').on(table.status),
+    timestampIdx: index('messenger_messages_timestamp_idx').on(table.timestamp),
+    conversationTimestampIdx: index('messenger_messages_conversation_timestamp_idx').on(table.conversationId, table.timestamp),
+    tenantStatusIdx: index('messenger_messages_tenant_status_idx').on(table.tenantId, table.status),
+  })
+);
+
+/**
+ * Messenger Pages Table
+ * Facebook Pages configured for Messenger
+ */
+export const messengerPages = pgTable(
+  'messenger_pages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull(),
+
+    // Facebook Page identifiers
+    pageId: varchar('page_id', { length: 100 }).notNull(), // Facebook Page ID
+    appId: varchar('app_id', { length: 100 }).notNull(),
+
+    // Page details
+    pageName: varchar('page_name', { length: 255 }).notNull(),
+    pageCategory: varchar('page_category', { length: 100 }),
+
+    // Status
+    isActive: boolean('is_active').notNull().default(true),
+    isDefault: boolean('is_default').notNull().default(false),
+
+    // Permissions granted
+    permissionsGranted: jsonb('permissions_granted').notNull().default([]),
+
+    // Access token (encrypted)
+    pageAccessToken: text('page_access_token'), // Should be encrypted
+    tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
+
+    // Webhook configuration
+    webhookVerifyToken: varchar('webhook_verify_token', { length: 255 }),
+
+    // Timestamps
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantIdIdx: index('messenger_pages_tenant_id_idx').on(table.tenantId),
+    pageIdIdx: uniqueIndex('messenger_pages_page_id_idx').on(table.pageId),
+    appIdIdx: index('messenger_pages_app_id_idx').on(table.appId),
+    isActiveIdx: index('messenger_pages_is_active_idx').on(table.isActive),
+    tenantActiveIdx: index('messenger_pages_tenant_active_idx').on(table.tenantId, table.isActive),
+  })
+);
+
+// Messenger type exports
+export type MessengerConversationRow = typeof messengerConversations.$inferSelect;
+export type NewMessengerConversationRow = typeof messengerConversations.$inferInsert;
+export type MessengerMessageRow = typeof messengerMessages.$inferSelect;
+export type NewMessengerMessageRow = typeof messengerMessages.$inferInsert;
+export type MessengerPageRow = typeof messengerPages.$inferSelect;
+export type NewMessengerPageRow = typeof messengerPages.$inferInsert;
 
 /**
  * Payment Customers Table
@@ -7562,3 +7762,570 @@ export type OpportunityRow = typeof opportunities.$inferSelect;
 export type NewOpportunityRow = typeof opportunities.$inferInsert;
 
 // Note: Tasks table is already defined earlier in this file (line ~542)
+
+// ============================================
+// KANBAN ENTERPRISE MODULE
+// Version: 1.0.0
+// ============================================
+
+/**
+ * Kanban Configurations - Board settings per entity type
+ * Stores WIP limits, stage order, collapsed columns, and custom transitions
+ */
+export const kanbanConfigs = pgTable(
+  'kanban_configs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    entityType: varchar('entity_type', { length: 50 }).notNull(), // 'lead', 'opportunity', 'task', 'customer'
+
+    // WIP Limits per stage
+    wipLimits: jsonb('wip_limits').$type<Record<string, {
+      softLimit: number;
+      hardLimit: number;
+      warningThreshold: number;
+    }>>().notNull().default({}),
+
+    // Stage configuration
+    stageOrder: text('stage_order').array().notNull().default([]),
+    collapsedColumns: text('collapsed_columns').array().notNull().default([]),
+
+    // Custom transitions (overrides defaults)
+    transitions: jsonb('transitions').$type<Record<string, 'allowed' | 'warning' | 'requires_data' | 'blocked'>>(),
+
+    // Versioning for optimistic locking
+    version: integer('version').notNull().default(1),
+
+    // Timestamps
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantEntityIdx: index('kanban_configs_tenant_entity_idx').on(table.tenantId, table.entityType),
+    uniqueConfigIdx: uniqueIndex('kanban_configs_unique_idx').on(table.tenantId, table.entityType),
+  })
+);
+
+/**
+ * Kanban Moves - Event sourcing for all item movements
+ * Complete audit trail with undo/redo support
+ */
+export const kanbanMoves = pgTable(
+  'kanban_moves',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Entity reference
+    entityType: varchar('entity_type', { length: 50 }).notNull(),
+    entityId: uuid('entity_id').notNull(),
+
+    // Move details
+    fromStageId: varchar('from_stage_id', { length: 100 }).notNull(),
+    toStageId: varchar('to_stage_id', { length: 100 }).notNull(),
+    previousPosition: integer('previous_position'),
+    newPosition: integer('new_position'),
+
+    // Actor
+    userId: uuid('user_id').notNull().references(() => users.id),
+    reason: text('reason'),
+
+    // Metadata
+    metadata: jsonb('metadata').$type<{
+      ipAddress?: string;
+      userAgent?: string;
+      source?: 'drag' | 'keyboard' | 'dialog' | 'api' | 'automation';
+      validationType?: 'allowed' | 'warning' | 'forced';
+      wipOverride?: boolean;
+      batchId?: string;
+      previousState?: Record<string, unknown>;
+    }>().notNull().default({}),
+
+    // Undo tracking
+    undoneAt: timestamp('undone_at', { withTimezone: true }),
+    undoneBy: uuid('undone_by').references(() => users.id),
+    undoMoveId: uuid('undo_move_id'),
+
+    // Timestamps
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantEntityIdx: index('kanban_moves_tenant_entity_idx').on(table.tenantId, table.entityType, table.entityId),
+    tenantTimeIdx: index('kanban_moves_tenant_time_idx').on(table.tenantId, table.createdAt),
+    userTimeIdx: index('kanban_moves_user_time_idx').on(table.userId, table.createdAt),
+    entityTimeIdx: index('kanban_moves_entity_time_idx').on(table.entityId, table.createdAt),
+    undoMoveIdx: index('kanban_moves_undo_move_idx').on(table.undoMoveId),
+  })
+);
+
+/**
+ * Kanban Snapshots - Periodic board state snapshots
+ * For fast board recovery and time-travel debugging
+ */
+export const kanbanSnapshots = pgTable(
+  'kanban_snapshots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    entityType: varchar('entity_type', { length: 50 }).notNull(),
+
+    // Complete board state
+    boardState: jsonb('board_state').$type<{
+      stages: Array<{
+        id: string;
+        items: Array<{
+          id: string;
+          position: number;
+          stageId: string;
+          score?: number;
+          status?: string;
+        }>;
+      }>;
+      config: {
+        wipLimits: Record<string, number>;
+        collapsedColumns: string[];
+      };
+    }>().notNull(),
+
+    // Versioning
+    version: integer('version').notNull(),
+    moveCount: integer('move_count').notNull().default(0),
+
+    // Reason for snapshot
+    reason: varchar('reason', { length: 100 }), // 'scheduled', 'manual', 'before_bulk_operation'
+
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantEntityVersionIdx: index('kanban_snapshots_tenant_entity_version_idx')
+      .on(table.tenantId, table.entityType, table.version),
+    tenantEntityTimeIdx: index('kanban_snapshots_tenant_entity_time_idx')
+      .on(table.tenantId, table.entityType, table.createdAt),
+  })
+);
+
+/**
+ * Kanban Metrics - Aggregated metrics per stage per period
+ * Used for analytics, bottleneck detection, and reporting
+ */
+export const kanbanMetrics = pgTable(
+  'kanban_metrics',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    entityType: varchar('entity_type', { length: 50 }).notNull(),
+    stageId: varchar('stage_id', { length: 100 }).notNull(),
+
+    // Time period
+    periodStart: timestamp('period_start', { withTimezone: true }).notNull(),
+    periodEnd: timestamp('period_end', { withTimezone: true }).notNull(),
+    periodType: varchar('period_type', { length: 20 }).notNull(), // 'hourly', 'daily', 'weekly'
+
+    // Lead Time Metrics
+    avgLeadTimeSeconds: integer('avg_lead_time_seconds'),
+    medianLeadTimeSeconds: integer('median_lead_time_seconds'),
+    p90LeadTimeSeconds: integer('p90_lead_time_seconds'),
+
+    // Throughput Metrics
+    itemsEntered: integer('items_entered').notNull().default(0),
+    itemsExited: integer('items_exited').notNull().default(0),
+    throughput: integer('throughput').notNull().default(0),
+
+    // WIP Metrics
+    wipBlockedCount: integer('wip_blocked_count').notNull().default(0),
+    wipWarningCount: integer('wip_warning_count').notNull().default(0),
+    peakWipCount: integer('peak_wip_count'),
+    avgWipCount: real('avg_wip_count'),
+
+    // Undo/Redo Metrics
+    undoCount: integer('undo_count').notNull().default(0),
+    redoCount: integer('redo_count').notNull().default(0),
+
+    // Bottleneck Detection
+    bottleneckScore: real('bottleneck_score').notNull().default(0),
+
+    // Extended metadata
+    metadata: jsonb('metadata').$type<{
+      bottleneckScore?: number;
+      userMoves?: Record<string, number>;
+      sourceBreakdown?: Record<string, number>;
+    }>().notNull().default({}),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // Unique constraint for upsert operations
+    uniquePeriod: unique('kanban_metrics_unique_period')
+      .on(table.tenantId, table.entityType, table.stageId, table.periodStart),
+    tenantPeriodIdx: index('kanban_metrics_tenant_period_idx')
+      .on(table.tenantId, table.entityType, table.periodStart),
+    stageTimeIdx: index('kanban_metrics_stage_time_idx')
+      .on(table.tenantId, table.stageId, table.periodStart),
+    periodTypeIdx: index('kanban_metrics_period_type_idx')
+      .on(table.periodType, table.periodStart),
+  })
+);
+
+/**
+ * Kanban Locks - Optimistic locking for concurrent access
+ * Prevents conflicts when multiple users edit the same item
+ */
+export const kanbanLocks = pgTable(
+  'kanban_locks',
+  {
+    entityType: varchar('entity_type', { length: 50 }).notNull(),
+    entityId: uuid('entity_id').notNull(),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+
+    lockedBy: uuid('locked_by').notNull().references(() => users.id),
+    lockedAt: timestamp('locked_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    sessionId: varchar('session_id', { length: 100 }),
+  },
+  (table) => ({
+    pkIdx: uniqueIndex('kanban_locks_pk_idx').on(table.entityType, table.entityId),
+    expiresIdx: index('kanban_locks_expires_idx').on(table.expiresAt),
+    tenantIdx: index('kanban_locks_tenant_idx').on(table.tenantId),
+    lockedByIdx: index('kanban_locks_locked_by_idx').on(table.lockedBy),
+  })
+);
+
+// Kanban type exports
+export type KanbanConfigRow = typeof kanbanConfigs.$inferSelect;
+export type NewKanbanConfigRow = typeof kanbanConfigs.$inferInsert;
+export type KanbanMoveRow = typeof kanbanMoves.$inferSelect;
+export type NewKanbanMoveRow = typeof kanbanMoves.$inferInsert;
+export type KanbanSnapshotRow = typeof kanbanSnapshots.$inferSelect;
+export type NewKanbanSnapshotRow = typeof kanbanSnapshots.$inferInsert;
+export type KanbanMetricRow = typeof kanbanMetrics.$inferSelect;
+export type NewKanbanMetricRow = typeof kanbanMetrics.$inferInsert;
+export type KanbanLockRow = typeof kanbanLocks.$inferSelect;
+export type NewKanbanLockRow = typeof kanbanLocks.$inferInsert;
+
+// ============================================
+// Security Module Tables
+// ============================================
+
+/**
+ * User sessions - Track active user sessions for security
+ * Enables session management, revocation, and security monitoring
+ */
+export const userSessions = pgTable(
+  'user_sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Device and location info
+    deviceInfo: jsonb('device_info').notNull().default({}),
+    ipAddress: varchar('ip_address', { length: 45 }), // IPv4 or IPv6
+    location: varchar('location', { length: 255 }),
+    userAgent: text('user_agent'),
+
+    // Session lifecycle
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+
+    // Revocation tracking
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    revokedBy: uuid('revoked_by').references(() => users.id),
+  },
+  (table) => ({
+    userIdIdx: index('user_sessions_user_id_idx').on(table.userId),
+    tenantIdIdx: index('user_sessions_tenant_id_idx').on(table.tenantId),
+    activeIdx: index('user_sessions_active_idx').on(table.isActive),
+    expiresIdx: index('user_sessions_expires_idx').on(table.expiresAt),
+    userTenantActiveIdx: index('user_sessions_user_tenant_active_idx').on(table.userId, table.tenantId, table.isActive),
+  })
+);
+
+/**
+ * Two-factor authentication - Store 2FA configurations
+ * Supports TOTP, SMS, and email verification methods
+ */
+export const user2FA = pgTable(
+  'user_2fa',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+
+    // 2FA configuration
+    method: varchar('method', { length: 20 }).notNull().default('totp'), // totp, sms, email
+    secretEncrypted: text('secret_encrypted').notNull(), // Encrypted TOTP secret
+    backupCodesEncrypted: text('backup_codes_encrypted'), // Encrypted backup codes JSON
+
+    // Status
+    isEnabled: boolean('is_enabled').notNull().default(false),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+
+    // Setup token for initial verification
+    setupToken: varchar('setup_token', { length: 64 }),
+
+    // Timestamps
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: uniqueIndex('user_2fa_user_id_idx').on(table.userId),
+    isEnabledIdx: index('user_2fa_is_enabled_idx').on(table.isEnabled),
+  })
+);
+
+/**
+ * Security events - Audit trail for security-related actions
+ * Tracks logins, logouts, 2FA changes, session revocations, etc.
+ */
+export const securityEvents = pgTable(
+  'security_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Event details
+    eventType: varchar('event_type', { length: 50 }).notNull(), // login_success, login_failed, logout, 2fa_enabled, etc.
+    description: varchar('description', { length: 500 }).notNull(),
+    success: boolean('success').notNull().default(true),
+
+    // Context
+    ipAddress: varchar('ip_address', { length: 45 }),
+    location: varchar('location', { length: 255 }),
+    userAgent: text('user_agent'),
+    metadata: jsonb('metadata').default({}),
+
+    // Timestamp
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('security_events_user_id_idx').on(table.userId),
+    tenantIdIdx: index('security_events_tenant_id_idx').on(table.tenantId),
+    eventTypeIdx: index('security_events_event_type_idx').on(table.eventType),
+    createdAtIdx: index('security_events_created_at_idx').on(table.createdAt),
+    userTenantCreatedIdx: index('security_events_user_tenant_created_idx').on(table.userId, table.tenantId, table.createdAt),
+  })
+);
+
+// Security type exports
+export type UserSessionRow = typeof userSessions.$inferSelect;
+export type NewUserSessionRow = typeof userSessions.$inferInsert;
+export type User2FARow = typeof user2FA.$inferSelect;
+export type NewUser2FARow = typeof user2FA.$inferInsert;
+export type SecurityEventRow = typeof securityEvents.$inferSelect;
+export type NewSecurityEventRow = typeof securityEvents.$inferInsert;
+
+// ============================================
+// Data Management Module Tables
+// ============================================
+
+/**
+ * Data export jobs - Track data export requests
+ * Supports background processing and download of tenant data
+ */
+export const dataExportJobs = pgTable(
+  'data_export_jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id),
+
+    // Job configuration
+    entities: text('entities').array().notNull(), // ['leads', 'customers', etc.]
+    format: varchar('format', { length: 10 }).notNull(), // json, csv, xlsx
+    dateRangeFrom: timestamp('date_range_from', { withTimezone: true }),
+    dateRangeTo: timestamp('date_range_to', { withTimezone: true }),
+    filters: jsonb('filters'),
+
+    // Job status
+    status: varchar('status', { length: 20 }).notNull().default('queued'), // queued, processing, completed, failed
+    progress: integer('progress').notNull().default(0), // 0-100
+
+    // Output
+    fileUrl: text('file_url'),
+    fileSize: integer('file_size'),
+    errorMessage: text('error_message'),
+
+    // Timestamps
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantIdIdx: index('data_export_jobs_tenant_id_idx').on(table.tenantId),
+    userIdIdx: index('data_export_jobs_user_id_idx').on(table.userId),
+    statusIdx: index('data_export_jobs_status_idx').on(table.status),
+    createdAtIdx: index('data_export_jobs_created_at_idx').on(table.createdAt),
+  })
+);
+
+/**
+ * Data import jobs - Track data import requests
+ * Supports validation, mapping, and background processing
+ */
+export const dataImportJobs = pgTable(
+  'data_import_jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id),
+
+    // Job configuration
+    entityType: varchar('entity_type', { length: 50 }).notNull(), // leads, customers, etc.
+    mode: varchar('mode', { length: 20 }).notNull().default('merge'), // merge, replace, skip
+    mapping: jsonb('mapping'), // Field mapping configuration
+    fileName: varchar('file_name', { length: 255 }),
+
+    // Job status
+    status: varchar('status', { length: 20 }).notNull().default('queued'), // queued, validating, processing, completed, failed
+    progress: integer('progress').notNull().default(0), // 0-100
+
+    // Results
+    totalRecords: integer('total_records').notNull().default(0),
+    processedRecords: integer('processed_records').notNull().default(0),
+    successCount: integer('success_count').notNull().default(0),
+    errorCount: integer('error_count').notNull().default(0),
+    errors: jsonb('errors'), // Array of import errors
+
+    // Timestamps
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantIdIdx: index('data_import_jobs_tenant_id_idx').on(table.tenantId),
+    userIdIdx: index('data_import_jobs_user_id_idx').on(table.userId),
+    statusIdx: index('data_import_jobs_status_idx').on(table.status),
+    createdAtIdx: index('data_import_jobs_created_at_idx').on(table.createdAt),
+  })
+);
+
+// Data Management type exports
+export type DataExportJobRow = typeof dataExportJobs.$inferSelect;
+export type NewDataExportJobRow = typeof dataExportJobs.$inferInsert;
+export type DataImportJobRow = typeof dataImportJobs.$inferSelect;
+export type NewDataImportJobRow = typeof dataImportJobs.$inferInsert;
+
+// ============================================================================
+// Proposal Templates - PDF Layout & Styling Configuration
+// ============================================================================
+
+/**
+ * Proposal Templates - stores reusable PDF layout and styling configurations
+ * Used for customizing quote/proposal PDF generation with dynamic sections,
+ * theming (dark/light), custom colors, fonts, and spacing.
+ */
+export const proposalTemplates = pgTable(
+  'proposal_templates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Template info
+    name: varchar('name', { length: 200 }).notNull(),
+    description: text('description'),
+    isDefault: boolean('is_default').notNull().default(false),
+    isActive: boolean('is_active').notNull().default(true),
+
+    // Layout Configuration (JSON)
+    // Structure: [{ id, type, enabled, order, config }]
+    // Types: cover, summary, details, totals, terms, signature, custom_text
+    sections: jsonb('sections').notNull().default([]),
+
+    // Style Configuration (JSON)
+    // Structure: { theme, colors, fonts, spacing }
+    styles: jsonb('styles').notNull().default({}),
+
+    // Preview thumbnail (base64 data URI or URL)
+    thumbnail: text('thumbnail'),
+
+    // Audit fields
+    createdBy: uuid('created_by').notNull(),
+    updatedBy: uuid('updated_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantIdIdx: index('proposal_templates_tenant_id_idx').on(table.tenantId),
+    isDefaultIdx: index('proposal_templates_is_default_idx').on(table.isDefault),
+    isActiveIdx: index('proposal_templates_is_active_idx').on(table.isActive),
+    tenantNameIdx: uniqueIndex('proposal_templates_tenant_name_idx')
+      .on(table.tenantId, table.name),
+  })
+);
+
+// Proposal template type exports
+export type ProposalTemplateRow = typeof proposalTemplates.$inferSelect;
+export type NewProposalTemplateRow = typeof proposalTemplates.$inferInsert;
+
+// ============================================================================
+// User Tags - Group Labels for User Notification & Mentions
+// ============================================================================
+
+/**
+ * User Tags - Group labels that can be assigned to users
+ * Examples: "Ventas", "Soporte", "Marketing", "Desarrollo"
+ * Used for @GroupName mentions in comments to notify all group members
+ */
+export const userTags = pgTable(
+  'user_tags',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Tag info
+    name: varchar('name', { length: 100 }).notNull(), // e.g., "Ventas", "Soporte"
+    slug: varchar('slug', { length: 100 }).notNull(), // e.g., "ventas", "soporte"
+    description: text('description'),
+
+    // Styling
+    color: varchar('color', { length: 7 }).notNull().default('#6366f1'), // Hex color
+    icon: varchar('icon', { length: 50 }), // Optional lucide icon name
+
+    // Status
+    isActive: boolean('is_active').notNull().default(true),
+
+    // Audit
+    createdBy: uuid('created_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantSlugIdx: uniqueIndex('user_tags_tenant_slug_idx').on(table.tenantId, table.slug),
+    tenantIdIdx: index('user_tags_tenant_id_idx').on(table.tenantId),
+    isActiveIdx: index('user_tags_is_active_idx').on(table.isActive),
+  })
+);
+
+/**
+ * User Tag Assignments - M:N relationship between users and tags
+ * Allows assigning multiple tags to users for group notifications
+ */
+export const userTagAssignments = pgTable(
+  'user_tag_assignments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tagId: uuid('tag_id').notNull().references(() => userTags.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+
+    // Audit
+    assignedBy: uuid('assigned_by').notNull(),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tagUserIdx: uniqueIndex('user_tag_assignments_tag_user_idx').on(table.tagId, table.userId),
+    userIdIdx: index('user_tag_assignments_user_id_idx').on(table.userId),
+    tagIdIdx: index('user_tag_assignments_tag_id_idx').on(table.tagId),
+    tenantIdIdx: index('user_tag_assignments_tenant_id_idx').on(table.tenantId),
+  })
+);
+
+// User Tags type exports
+export type UserTagRow = typeof userTags.$inferSelect;
+export type NewUserTagRow = typeof userTags.$inferInsert;
+export type UserTagAssignmentRow = typeof userTagAssignments.$inferSelect;
+export type NewUserTagAssignmentRow = typeof userTagAssignments.$inferInsert;

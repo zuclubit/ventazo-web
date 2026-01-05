@@ -29,6 +29,8 @@ import { ROLE_PERMISSIONS } from '@/lib/auth/types';
 // Types
 // ============================================
 
+type OnboardingStatus = 'not_started' | 'profile_created' | 'business_created' | 'setup_completed' | 'team_invited' | 'completed';
+
 interface AuthUser {
   id: string;
   email: string;
@@ -37,10 +39,20 @@ interface AuthUser {
   permissions: Permission[];
 }
 
+interface OnboardingState {
+  status: OnboardingStatus;
+  currentStep: string;
+  requiresOnboarding: boolean;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  /** True after the first auth check is complete (prevents SplashScreen on navigation) */
+  hasInitialized: boolean;
+  /** Onboarding state for proper navigation */
+  onboarding: OnboardingState | null;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -82,11 +94,14 @@ export function useAuthContext() {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [onboarding, setOnboarding] = React.useState<OnboardingState | null>(null);
+  // Track if we've done the initial auth check (prevents SplashScreen on navigation)
+  const [hasInitialized, setHasInitialized] = React.useState(false);
 
-  // Get Zustand store setters for syncing
-  const setStoreState = useAuthStore.setState;
-  const setTenant = useTenantStore((state) => state.setTenant);
-  const clearTenant = useTenantStore((state) => state.clearTenant);
+  // Get Zustand store setters for syncing - use stable references
+  const setStoreState = React.useRef(useAuthStore.setState).current;
+  const setTenant = React.useRef(useTenantStore.getState().setTenant).current;
+  const clearTenant = React.useRef(useTenantStore.getState().clearTenant).current;
 
   // Fetch user data and sync with store
   const fetchUser = React.useCallback(async () => {
@@ -103,6 +118,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
         };
 
         setUser(authUser);
+
+        // Set onboarding state from session data
+        setOnboarding({
+          status: userData.onboardingStatus,
+          currentStep: userData.onboardingStep,
+          requiresOnboarding: userData.requiresOnboarding,
+        });
+
+        // Debug log for troubleshooting
+        console.log('[AuthProvider] User loaded with onboarding:', {
+          userId: userData.userId,
+          tenantId: userData.tenantId,
+          onboardingStatus: userData.onboardingStatus,
+          requiresOnboarding: userData.requiresOnboarding,
+        });
 
         // Sync with Zustand store for permission guards
         setStoreState({
@@ -155,6 +185,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       } else {
         setUser(null);
+        setOnboarding(null);
         clearTenant();
 
         // Clear Zustand store
@@ -171,6 +202,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.warn('[AuthProvider] Failed to fetch user:', error);
       setUser(null);
+      setOnboarding(null);
       clearTenant();
 
       // Clear store on error
@@ -185,8 +217,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
     } finally {
       setIsLoading(false);
+      setHasInitialized(true);
     }
-  }, [setStoreState, setTenant, clearTenant]);
+  }, []); // Empty deps - refs are stable
 
   // Logout handler
   const handleLogout = React.useCallback(async () => {
@@ -209,10 +242,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       user,
       isAuthenticated: !!user,
       isLoading,
+      hasInitialized,
+      onboarding,
       refresh: fetchUser,
       logout: handleLogout,
     }),
-    [user, isLoading, fetchUser, handleLogout]
+    [user, isLoading, hasInitialized, onboarding, fetchUser, handleLogout]
   );
 
   // NON-BLOCKING: Always render children immediately
@@ -237,28 +272,44 @@ interface AuthGuardProps {
 /**
  * Requires authentication to render children
  * Redirects to login if not authenticated
+ *
+ * SPA OPTIMIZATION: After initial auth check completes, navigation between
+ * protected routes renders children immediately (no SplashScreen).
+ * This creates the native app feel where the shell persists.
  */
 export function AuthGuard({ children, fallback }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isLoading } = useAuthContext();
+  const { isAuthenticated, isLoading, hasInitialized } = useAuthContext();
 
   React.useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    // Only redirect after initial check is complete
+    if (hasInitialized && !isAuthenticated) {
       const loginUrl = `/login?redirect=${encodeURIComponent(pathname)}`;
       router.push(loginUrl);
     }
-  }, [isLoading, isAuthenticated, pathname, router]);
+  }, [hasInitialized, isAuthenticated, pathname, router]);
 
-  if (isLoading) {
+  // FIRST LOAD: Show splash screen only during initial auth check
+  // This happens once when the app first loads
+  if (!hasInitialized && isLoading) {
     return fallback || <SplashScreen message="Verificando sesion..." variant="branded" />;
   }
 
-  if (!isAuthenticated) {
+  // NAVIGATION: After initialization, if user is authenticated, render immediately
+  // This is the key to SPA-like navigation - no splash on route changes
+  if (hasInitialized && isAuthenticated) {
+    return <>{children}</>;
+  }
+
+  // Waiting for redirect to login (don't flash content)
+  if (hasInitialized && !isAuthenticated) {
     return fallback || null;
   }
 
-  return <>{children}</>;
+  // Edge case: still loading but already initialized (refresh scenario)
+  // Show children if we have a cached auth state, splash otherwise
+  return isAuthenticated ? <>{children}</> : (fallback || null);
 }
 
 // ============================================
@@ -271,28 +322,106 @@ interface GuestGuardProps {
 }
 
 /**
- * Prevents authenticated users from accessing guest-only pages
- * Redirects to app if already authenticated
+ * Get the correct redirect URL based on user's onboarding state
+ * Implements the routing logic:
+ * - If requires onboarding → appropriate onboarding step
+ * - If has tenant and completed onboarding → /app/dashboard
+ * - If no tenant → /onboarding/create-business
+ *
+ * SECURITY: This function is used by GuestGuard to redirect authenticated users
+ * from guest-only pages (login, register) to their appropriate destination.
  */
-// NOTE: We use /app/dashboard instead of /app due to OpenNext routing bug
-export function GuestGuard({ children, redirectTo = '/app/dashboard' }: GuestGuardProps) {
+function getOnboardingAwareRedirect(
+  onboarding: OnboardingState | null,
+  tenantId: string | undefined,
+  fallback: string
+): string {
+  const hasTenant = !!tenantId;
+
+  // If no onboarding state but has tenant, assume completed (legacy/safe default)
+  // This prevents incorrect redirects to onboarding for established users
+  if (!onboarding) {
+    return hasTenant ? fallback : '/onboarding/create-business';
+  }
+
+  const { requiresOnboarding, status, currentStep } = onboarding;
+
+  // CRITICAL: If user has tenant and doesn't explicitly require onboarding,
+  // always send them to the app, not onboarding
+  if (hasTenant && !requiresOnboarding) {
+    return fallback;
+  }
+
+  // If user requires onboarding, redirect to the appropriate step
+  if (requiresOnboarding && status !== 'completed') {
+    switch (currentStep) {
+      case 'signup':
+      case 'create-business':
+        return '/onboarding/create-business';
+      case 'branding':
+      case 'modules':
+      case 'business-hours':
+        return '/onboarding/setup';
+      case 'invite-team':
+        return '/onboarding/invite-team';
+      case 'complete':
+        return '/onboarding/complete';
+      default:
+        // If no tenant, start from create-business
+        // If has tenant, continue with setup
+        return hasTenant ? '/onboarding/setup' : '/onboarding/create-business';
+    }
+  }
+
+  // User has completed onboarding
+  // NOTE: We use /app/dashboard instead of /app due to OpenNext routing bug
+  if (hasTenant) {
+    return fallback;
+  }
+
+  // Fallback: No tenant but doesn't require onboarding (edge case)
+  return '/onboarding/create-business';
+}
+
+/**
+ * Prevents authenticated users from accessing guest-only pages
+ * Redirects to app or onboarding based on user state
+ *
+ * SPA OPTIMIZATION: Uses hasInitialized to prevent splash screen from
+ * appearing after the initial auth check is complete. Once initialized,
+ * we show children immediately while redirect happens in background.
+ */
+export function GuestGuard({ children, redirectTo }: GuestGuardProps) {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuthContext();
+  const { user, isAuthenticated, isLoading, hasInitialized, onboarding } = useAuthContext();
 
   React.useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.push(redirectTo);
-    }
-  }, [isLoading, isAuthenticated, redirectTo, router]);
+    // Only redirect after initial check is complete
+    if (hasInitialized && isAuthenticated) {
+      // Compute the correct redirect based on onboarding state
+      const destination = redirectTo || getOnboardingAwareRedirect(
+        onboarding,
+        user?.tenantId,
+        '/app/dashboard'
+      );
 
-  if (isLoading) {
+      console.log('[GuestGuard] Authenticated user detected, redirecting to:', destination);
+      router.push(destination);
+    }
+  }, [hasInitialized, isAuthenticated, onboarding, user?.tenantId, redirectTo, router]);
+
+  // FIRST LOAD ONLY: Show splash screen during initial auth check
+  // After hasInitialized is true, never show splash again
+  if (!hasInitialized && isLoading) {
     return <SplashScreen message="Verificando sesion..." variant="branded" />;
   }
 
-  if (isAuthenticated) {
+  // After initialization, if authenticated, wait for redirect (don't flash content)
+  if (hasInitialized && isAuthenticated) {
     return null;
   }
 
+  // User is not authenticated, show the guest content (login/register forms)
   return <>{children}</>;
 }
 

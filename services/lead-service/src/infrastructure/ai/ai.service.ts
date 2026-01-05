@@ -1,6 +1,17 @@
 /**
  * AI Service
  * Unified AI service for lead scoring, email generation, and conversational AI
+ *
+ * Supports multiple providers:
+ * - OpenAI: Direct OpenAI API integration
+ * - Gemini: Google Gemini API integration
+ * - Bot-Helper: Native integration with zuclubit-bot-helper (recommended)
+ *
+ * Bot-Helper provides:
+ * - Multi-provider routing (OpenAI, Anthropic, Groq, Google, Mistral)
+ * - Intelligent fallback and cost optimization
+ * - CRM-specific tools and actions
+ * - Budget management and analytics
  */
 
 import { injectable } from 'tsyringe';
@@ -8,6 +19,16 @@ import { DatabasePool } from '@zuclubit/database';
 import { Result } from '@zuclubit/domain';
 import { OpenAIProvider } from './openai.provider';
 import { GeminiProvider } from './gemini.provider';
+import {
+  BotHelperProvider,
+  getBotHelperProvider,
+  CRMAgentRequest,
+  CRMAgentResponse,
+  LeadScoreResponse,
+  EmailGenerationResponse,
+  SentimentAnalysisResponse,
+} from './bot-helper.provider';
+import { getBotHelperConfig } from '../../config/environment';
 import {
   AIProvider,
   IAIProvider,
@@ -35,6 +56,7 @@ import {
 export class AIService {
   private providers: Map<AIProvider, IAIProvider> = new Map();
   private defaultProvider: AIProvider = 'openai';
+  private botHelperProvider: BotHelperProvider | null = null;
 
   constructor(private pool: DatabasePool) {
     // Initialize providers
@@ -51,6 +73,23 @@ export class AIService {
   private configureFromEnv(): void {
     const openaiKey = process.env.OPENAI_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
+
+    // Bot-Helper configuration (native integration with zuclubit-bot-helper)
+    const botHelperConfig = getBotHelperConfig();
+    if (botHelperConfig.isEnabled) {
+      this.botHelperProvider = getBotHelperProvider();
+      this.botHelperProvider.initialize({
+        apiUrl: botHelperConfig.apiUrl,
+        sharedSecret: botHelperConfig.sharedSecret,
+        timeout: botHelperConfig.timeout,
+        preferredProvider: botHelperConfig.preferredProvider,
+        preferredModel: botHelperConfig.preferredModel,
+      });
+      this.providers.set('bot-helper', this.botHelperProvider);
+      // Set bot-helper as default when configured
+      this.defaultProvider = 'bot-helper';
+      console.log('[AIService] Bot-Helper provider initialized as default');
+    }
 
     if (openaiKey) {
       const openai = this.providers.get('openai') as OpenAIProvider;
@@ -71,10 +110,158 @@ export class AIService {
       });
     }
 
-    // Set default provider
+    // Override default provider from environment if specified
     if (process.env.DEFAULT_AI_PROVIDER) {
       this.defaultProvider = process.env.DEFAULT_AI_PROVIDER as AIProvider;
     }
+  }
+
+  // ==================== Bot-Helper Native Methods ====================
+
+  /**
+   * Check if bot-helper integration is available
+   */
+  isBotHelperAvailable(): boolean {
+    return this.botHelperProvider?.isInitialized() ?? false;
+  }
+
+  /**
+   * Get the bot-helper provider for direct access to CRM-specific methods
+   */
+  getBotHelper(): BotHelperProvider | null {
+    return this.botHelperProvider;
+  }
+
+  /**
+   * Process CRM agent request with tool execution via bot-helper
+   * This is the recommended way to interact with AI for CRM operations
+   */
+  async processAgentRequest(
+    request: CRMAgentRequest,
+    toolCallbackUrl?: string
+  ): Promise<Result<CRMAgentResponse>> {
+    if (!this.botHelperProvider?.isInitialized()) {
+      return Result.fail('Bot-Helper provider not initialized');
+    }
+
+    try {
+      const response = await this.botHelperProvider.processAgentRequest(
+        request,
+        toolCallbackUrl
+      );
+      return Result.ok(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return Result.fail(`Agent request failed: ${message}`);
+    }
+  }
+
+  /**
+   * Handle confirmation response for pending actions
+   */
+  async handleConfirmation(
+    requestId: string,
+    decision: 'confirm' | 'cancel' | 'modify',
+    modifications?: Record<string, unknown>
+  ): Promise<Result<CRMAgentResponse>> {
+    if (!this.botHelperProvider?.isInitialized()) {
+      return Result.fail('Bot-Helper provider not initialized');
+    }
+
+    try {
+      const response = await this.botHelperProvider.handleConfirmation(
+        requestId,
+        decision,
+        modifications
+      );
+      return Result.ok(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return Result.fail(`Confirmation handling failed: ${message}`);
+    }
+  }
+
+  /**
+   * AI-powered lead scoring via bot-helper
+   * Uses CRM context for better scoring accuracy
+   */
+  async scoreLeadViaBotHelper(
+    leadData: Record<string, unknown>,
+    tenantId: string
+  ): Promise<Result<LeadScoreResponse>> {
+    if (!this.botHelperProvider?.isInitialized()) {
+      return Result.fail('Bot-Helper provider not initialized');
+    }
+
+    try {
+      const response = await this.botHelperProvider.scoreLead(leadData, tenantId);
+      return Result.ok(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return Result.fail(`Lead scoring failed: ${message}`);
+    }
+  }
+
+  /**
+   * Generate email content via bot-helper
+   */
+  async generateEmailViaBotHelper(
+    type: 'followup' | 'intro' | 'proposal' | 'thankyou' | 'reminder',
+    context: {
+      recipientName: string;
+      recipientCompany?: string;
+      senderName: string;
+      subject?: string;
+      previousInteractions?: string[];
+      customInstructions?: string;
+    },
+    tenantId: string
+  ): Promise<Result<EmailGenerationResponse>> {
+    if (!this.botHelperProvider?.isInitialized()) {
+      return Result.fail('Bot-Helper provider not initialized');
+    }
+
+    try {
+      const response = await this.botHelperProvider.generateEmail(
+        type,
+        context,
+        tenantId
+      );
+      return Result.ok(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return Result.fail(`Email generation failed: ${message}`);
+    }
+  }
+
+  /**
+   * Analyze sentiment via bot-helper
+   */
+  async analyzeSentimentViaBotHelper(
+    text: string,
+    tenantId: string
+  ): Promise<Result<SentimentAnalysisResponse>> {
+    if (!this.botHelperProvider?.isInitialized()) {
+      return Result.fail('Bot-Helper provider not initialized');
+    }
+
+    try {
+      const response = await this.botHelperProvider.analyzeSentiment(text, tenantId);
+      return Result.ok(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return Result.fail(`Sentiment analysis failed: ${message}`);
+    }
+  }
+
+  /**
+   * Health check for bot-helper connection
+   */
+  async checkBotHelperHealth(): Promise<boolean> {
+    if (!this.botHelperProvider) {
+      return false;
+    }
+    return this.botHelperProvider.healthCheck();
   }
 
   /**

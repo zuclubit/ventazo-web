@@ -57,6 +57,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { PageContainer } from '@/components/layout';
 import {
   DATE_RANGE_LABELS,
   DATE_RANGES,
@@ -70,25 +71,12 @@ import {
   type DateRange,
   type Insight,
 } from '@/lib/analytics';
-
-// ============================================
-// Chart Colors - Premium Teal Theme
-// ============================================
-
-const CHART_COLORS = {
-  primary: '#0D9488',    // Teal 600
-  secondary: '#14B8A6',  // Teal 500
-  tertiary: '#F97316',   // Orange 500
-  quaternary: '#EF4444', // Red 500
-  purple: '#8B5CF6',
-  pink: '#EC4899',
-  cyan: '#5EEAD4',       // Teal 300
-  gray: '#6B7A7D',
-};
-
-const FUNNEL_COLORS = ['#0D9488', '#14B8A6', '#2DD4BF', '#5EEAD4', '#99F6E4'];
-
-const PIE_COLORS = [CHART_COLORS.primary, CHART_COLORS.secondary, CHART_COLORS.tertiary, CHART_COLORS.quaternary, CHART_COLORS.purple];
+import {
+  CHART_COLORS,
+  FUNNEL_COLORS,
+  PIE_COLORS,
+  STATUS_CHART_COLORS,
+} from '@/lib/charts';
 
 // ============================================
 // KPI Card Component
@@ -130,40 +118,40 @@ function KPICard({
   };
 
   const content = (
-    <Card className={`backdrop-blur-xl bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.05] transition-all duration-300 ${href ? 'hover:shadow-[0_8px_32px_rgba(13,148,136,0.15)] cursor-pointer hover:-translate-y-0.5' : ''}`}>
+    <Card className={`backdrop-blur-xl bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.05] transition-all duration-300 ${href ? 'hover:shadow-[0_8px_32px_var(--card-shadow-color)] cursor-pointer hover:-translate-y-0.5' : ''}`}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-[#94A3AB] flex items-center gap-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
           {title}
           {tooltip && (
             <TooltipProvider>
               <UITooltip>
                 <TooltipTrigger>
-                  <span className="text-xs text-[#6B7A7D]">?</span>
+                  <span className="text-xs text-muted-foreground/70">?</span>
                 </TooltipTrigger>
-                <TooltipContent className="bg-[#052828] border-white/10 text-white">
+                <TooltipContent className="bg-card border-border text-foreground">
                   <p className="max-w-xs text-xs">{tooltip}</p>
                 </TooltipContent>
               </UITooltip>
             </TooltipProvider>
           )}
         </CardTitle>
-        <div className="rounded-xl bg-gradient-to-br from-[#0D9488]/20 to-[#14B8A6]/10 p-2.5">
-          <Icon className="h-4 w-4 text-[#5EEAD4]" />
+        <div className="rounded-xl bg-gradient-to-br from-[var(--tenant-primary)]/20 to-[var(--tenant-primary)]/10 p-2.5">
+          <Icon className="h-4 w-4 text-[var(--chart-accent)]" />
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-white">{formatValue(value)}</div>
+        <div className="text-2xl font-bold text-foreground">{formatValue(value)}</div>
         {change !== undefined && (
           <div className="flex items-center gap-1 mt-1">
             {change >= 0 ? (
-              <ArrowUpRight className="h-4 w-4 text-[#10B981]" />
+              <ArrowUpRight className="h-4 w-4 text-[var(--status-completed)]" />
             ) : (
-              <ArrowDownRight className="h-4 w-4 text-[#EF4444]" />
+              <ArrowDownRight className="h-4 w-4 text-destructive" />
             )}
-            <span className={`text-sm ${change >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+            <span className={`text-sm ${change >= 0 ? 'text-[var(--status-completed)]' : 'text-destructive'}`}>
               {Math.abs(change).toFixed(1)}%
             </span>
-            {changeLabel && <span className="text-xs text-[#6B7A7D]">{changeLabel}</span>}
+            {changeLabel && <span className="text-xs text-muted-foreground/70">{changeLabel}</span>}
           </div>
         )}
       </CardContent>
@@ -185,15 +173,15 @@ function InsightCard({ insight }: { insight: Insight }) {
   const getInsightColor = (type: Insight['type']) => {
     switch (type) {
       case 'positive':
-        return 'bg-[#10B981]/10 border-[#10B981]/20 text-[#10B981]';
+        return 'bg-[var(--status-completed)]/10 border-[var(--status-completed)]/20 text-[var(--status-completed)]';
       case 'negative':
-        return 'bg-[#EF4444]/10 border-[#EF4444]/20 text-[#EF4444]';
+        return 'bg-destructive/10 border-destructive/20 text-destructive';
       case 'warning':
-        return 'bg-[#F97316]/10 border-[#F97316]/20 text-[#F97316]';
+        return 'bg-[var(--status-pending)]/10 border-[var(--status-pending)]/20 text-[var(--status-pending)]';
       case 'info':
-        return 'bg-[#0D9488]/10 border-[#0D9488]/20 text-[#5EEAD4]';
+        return 'bg-[var(--tenant-primary)]/10 border-[var(--tenant-primary)]/20 text-[var(--chart-accent)]';
       default:
-        return 'bg-white/[0.03] border-white/[0.08] text-[#94A3AB]';
+        return 'bg-white/[0.03] border-white/[0.08] text-muted-foreground';
     }
   };
 
@@ -214,35 +202,155 @@ function InsightCard({ insight }: { insight: Insight }) {
 }
 
 // ============================================
-// Loading Skeleton
+// Loading Skeleton - Layout-Aware (CLS Prevention)
 // ============================================
 
+/**
+ * KPI Card Skeleton - Matches exact dimensions of KPICard
+ * Height: ~96px (pb-2 + content + padding)
+ */
+function KPICardSkeleton() {
+  return (
+    <Card className="backdrop-blur-xl bg-white/[0.03] border-white/[0.08] min-h-[96px]">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-9 w-9 rounded-xl" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-7 w-20 mb-1" />
+        <div className="flex items-center gap-1">
+          <Skeleton className="h-4 w-4 rounded-full" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Chart Card Skeleton - Uses aspect-ratio for consistent sizing
+ */
+function ChartCardSkeleton({ title = true }: { title?: boolean }) {
+  return (
+    <Card className="backdrop-blur-xl bg-white/[0.03] border-white/[0.08]">
+      <CardHeader>
+        {title && (
+          <div className="flex items-center justify-between">
+            <div className="space-y-1.5">
+              <Skeleton className="h-5 w-36" />
+              <Skeleton className="h-3.5 w-48" />
+            </div>
+            <Skeleton className="h-8 w-20 rounded-md" />
+          </div>
+        )}
+      </CardHeader>
+      <CardContent>
+        {/* Use aspect-ratio to prevent CLS */}
+        <div className="w-full aspect-[4/3] relative overflow-hidden rounded-lg">
+          <Skeleton
+            variant="shimmer"
+            className="absolute inset-0"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Stats Card Skeleton - For Quick Stats and similar
+ */
+function StatsCardSkeleton() {
+  return (
+    <Card className="backdrop-blur-xl bg-white/[0.03] border-white/[0.08]">
+      <CardHeader>
+        <Skeleton className="h-5 w-36" />
+        <Skeleton className="h-3.5 w-44" />
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="flex items-center justify-between">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-5 w-12 rounded-full" />
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Insights Card Skeleton
+ */
+function InsightsCardSkeleton() {
+  return (
+    <Card className="backdrop-blur-xl bg-white/[0.03] border-white/[0.08]">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-5 w-5 rounded" />
+          <Skeleton className="h-5 w-20" />
+        </div>
+        <Skeleton className="h-3.5 w-44" />
+      </CardHeader>
+      <CardContent className="space-y-3 max-h-[280px]">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="rounded-xl border border-border/30 p-4 space-y-2"
+          >
+            <div className="flex items-start gap-3">
+              <Skeleton className="h-5 w-5 rounded shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * DashboardSkeleton - Full page loading state
+ * Matches exact layout structure of the dashboard
+ */
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
+      {/* KPI Cards - Row 1 (4 cards) */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
-          <Card key={i}>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-16" />
-            </CardContent>
-          </Card>
+          <KPICardSkeleton key={i} />
         ))}
       </div>
-      <div className="grid gap-6 lg:grid-cols-2">
-        {[1, 2].map((i) => (
-          <Card key={i}>
-            <CardHeader>
-              <Skeleton className="h-5 w-32" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-64 w-full" />
-            </CardContent>
-          </Card>
+
+      {/* KPI Cards - Row 2 (4 cards) */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {[5, 6, 7, 8].map((i) => (
+          <KPICardSkeleton key={i} />
         ))}
+      </div>
+
+      {/* Charts Row 1 (2 charts) */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartCardSkeleton />
+        <ChartCardSkeleton />
+      </div>
+
+      {/* Charts Row 2 (2 charts) */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartCardSkeleton />
+        <ChartCardSkeleton />
+      </div>
+
+      {/* Bottom Section (3 cards) */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <ChartCardSkeleton />
+        <StatsCardSkeleton />
+        <InsightsCardSkeleton />
       </div>
     </div>
   );
@@ -396,68 +504,81 @@ export default function DashboardPage() {
   // Error state
   if (hasError && !overview) {
     return (
-      <div className="flex flex-col gap-6 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground">Vista general de tu CRM</p>
-          </div>
-        </div>
-        <DashboardError
-          message={overviewError?.message || 'Error al cargar los datos del dashboard'}
-          onRetry={() => void refetchOverview()}
-        />
-      </div>
+      <PageContainer>
+        <PageContainer.Header>
+          <PageContainer.HeaderRow>
+            <PageContainer.Title subtitle="Vista general de tu CRM">
+              Dashboard
+            </PageContainer.Title>
+          </PageContainer.HeaderRow>
+        </PageContainer.Header>
+        <PageContainer.Body>
+          <PageContainer.Content scroll="vertical">
+            <DashboardError
+              message={overviewError?.message || 'Error al cargar los datos del dashboard'}
+              onRetry={() => void refetchOverview()}
+            />
+          </PageContainer.Content>
+        </PageContainer.Body>
+      </PageContainer>
     );
   }
 
   // Loading state
   if (isLoading && !overview) {
     return (
-      <div className="flex flex-col gap-6 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground">Vista general de tu CRM</p>
-          </div>
-        </div>
-        <DashboardSkeleton />
-      </div>
+      <PageContainer>
+        <PageContainer.Header>
+          <PageContainer.HeaderRow>
+            <PageContainer.Title subtitle="Vista general de tu CRM">
+              Dashboard
+            </PageContainer.Title>
+          </PageContainer.HeaderRow>
+        </PageContainer.Header>
+        <PageContainer.Body>
+          <PageContainer.Content scroll="vertical">
+            <DashboardSkeleton />
+          </PageContainer.Content>
+        </PageContainer.Body>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Dashboard</h1>
-          <p className="text-[#94A3AB]">Vista general de tu CRM</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Select
-            value={filters.dateRange}
-            onValueChange={(value) => setFilters({ ...filters, dateRange: value as DateRange })}
-          >
-            <SelectTrigger className="w-[160px] glass-input text-white border-white/10">
-              <Filter className="mr-2 h-4 w-4 text-[#5EEAD4]" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-[#052828] border-white/10">
-              {DATE_RANGES.filter((r) => r !== 'custom').map((range) => (
-                <SelectItem key={range} value={range} className="text-white hover:bg-white/10 focus:bg-white/10">
-                  {DATE_RANGE_LABELS[range]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button size="icon" variant="glass" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+    <PageContainer>
+      <PageContainer.Header>
+        <PageContainer.HeaderRow>
+          <PageContainer.Title subtitle="Vista general de tu CRM">
+            Dashboard
+          </PageContainer.Title>
+          <PageContainer.Actions>
+            <Select
+              value={filters.dateRange}
+              onValueChange={(value) => setFilters({ ...filters, dateRange: value as DateRange })}
+            >
+              <SelectTrigger className="w-[160px] glass-input text-foreground border-border/50">
+                <Filter className="mr-2 h-4 w-4 text-[var(--chart-accent)]" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                {DATE_RANGES.filter((r) => r !== 'custom').map((range) => (
+                  <SelectItem key={range} value={range} className="text-foreground hover:bg-accent focus:bg-accent">
+                    {DATE_RANGE_LABELS[range]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="icon" variant="glass" onClick={handleRefresh}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </PageContainer.Actions>
+        </PageContainer.HeaderRow>
+      </PageContainer.Header>
 
-      {/* KPI Cards - Row 1 */}
+      <PageContainer.Body>
+        <PageContainer.Content scroll="vertical">
+          <div className="flex flex-col gap-6">
+            {/* KPI Cards - Row 1 */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KPICard
           change={overview?.leadsChange}
@@ -532,11 +653,11 @@ export default function DashboardPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg text-white">Funnel de Leads</CardTitle>
-                <CardDescription className="text-[#6B7A7D]">Conversión por etapa</CardDescription>
+                <CardTitle className="text-lg text-foreground">Funnel de Leads</CardTitle>
+                <CardDescription className="text-muted-foreground">Conversión por etapa</CardDescription>
               </div>
               <Link href="/app/analytics/leads">
-                <Button size="sm" variant="ghost" className="text-[#5EEAD4] hover:text-[#2DD4BF] hover:bg-white/10">
+                <Button size="sm" variant="ghost" className="text-[var(--chart-accent)] hover:text-[var(--tenant-primary-light)] hover:bg-white/10">
                   Ver más <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </Link>
@@ -568,11 +689,11 @@ export default function DashboardPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg text-white">Pipeline de Oportunidades</CardTitle>
-                <CardDescription className="text-[#6B7A7D]">Valor por etapa (real vs ponderado)</CardDescription>
+                <CardTitle className="text-lg text-foreground">Pipeline de Oportunidades</CardTitle>
+                <CardDescription className="text-muted-foreground">Valor por etapa (real vs ponderado)</CardDescription>
               </div>
               <Link href="/app/analytics/opportunities">
-                <Button size="sm" variant="ghost" className="text-[#5EEAD4] hover:text-[#2DD4BF] hover:bg-white/10">
+                <Button size="sm" variant="ghost" className="text-[var(--chart-accent)] hover:text-[var(--tenant-primary-light)] hover:bg-white/10">
                   Ver más <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </Link>
@@ -601,11 +722,11 @@ export default function DashboardPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg text-white">Productividad Semanal</CardTitle>
-                <CardDescription className="text-[#6B7A7D]">Tareas completadas, pendientes y vencidas</CardDescription>
+                <CardTitle className="text-lg text-foreground">Productividad Semanal</CardTitle>
+                <CardDescription className="text-muted-foreground">Tareas completadas, pendientes y vencidas</CardDescription>
               </div>
               <Link href="/app/analytics/tasks">
-                <Button size="sm" variant="ghost" className="text-[#5EEAD4] hover:text-[#2DD4BF] hover:bg-white/10">
+                <Button size="sm" variant="ghost" className="text-[var(--chart-accent)] hover:text-[var(--tenant-primary-light)] hover:bg-white/10">
                   Ver más <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </Link>
@@ -619,9 +740,9 @@ export default function DashboardPage() {
                 <YAxis fontSize={12} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="completed" fill={CHART_COLORS.secondary} name="Completadas" stackId="a" />
-                <Bar dataKey="pending" fill={CHART_COLORS.tertiary} name="Pendientes" stackId="a" />
-                <Bar dataKey="overdue" fill={CHART_COLORS.quaternary} name="Vencidas" stackId="a" />
+                <Bar dataKey="completed" fill={STATUS_CHART_COLORS.completed} name="Completadas" stackId="a" />
+                <Bar dataKey="pending" fill={STATUS_CHART_COLORS.pending} name="Pendientes" stackId="a" />
+                <Bar dataKey="overdue" fill={STATUS_CHART_COLORS.overdue} name="Vencidas" stackId="a" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -632,11 +753,11 @@ export default function DashboardPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg text-white">Ejecuciones de Workflows</CardTitle>
-                <CardDescription className="text-[#6B7A7D]">Exitosas vs fallidas por semana</CardDescription>
+                <CardTitle className="text-lg text-foreground">Ejecuciones de Workflows</CardTitle>
+                <CardDescription className="text-muted-foreground">Exitosas vs fallidas por semana</CardDescription>
               </div>
               <Link href="/app/analytics/workflows">
-                <Button size="sm" variant="ghost" className="text-[#5EEAD4] hover:text-[#2DD4BF] hover:bg-white/10">
+                <Button size="sm" variant="ghost" className="text-[var(--chart-accent)] hover:text-[var(--tenant-primary-light)] hover:bg-white/10">
                   Ver más <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </Link>
@@ -653,14 +774,14 @@ export default function DashboardPage() {
                 <Line
                   dataKey="success"
                   name="Exitosas"
-                  stroke={CHART_COLORS.secondary}
+                  stroke={CHART_COLORS.primaryLight}
                   strokeWidth={2}
                   type="monotone"
                 />
                 <Line
                   dataKey="failed"
                   name="Fallidas"
-                  stroke={CHART_COLORS.quaternary}
+                  stroke={CHART_COLORS.danger}
                   strokeWidth={2}
                   type="monotone"
                 />
@@ -675,8 +796,8 @@ export default function DashboardPage() {
         {/* Service Distribution */}
         <Card className="backdrop-blur-xl bg-white/[0.03] border-white/[0.08]">
           <CardHeader>
-            <CardTitle className="text-lg text-white">Distribución de Servicios</CardTitle>
-            <CardDescription className="text-[#6B7A7D]">Por tipo de servicio</CardDescription>
+            <CardTitle className="text-lg text-foreground">Distribución de Servicios</CardTitle>
+            <CardDescription className="text-muted-foreground">Por tipo de servicio</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer height={200} width="100%">
@@ -704,29 +825,29 @@ export default function DashboardPage() {
         {/* Quick Stats */}
         <Card className="backdrop-blur-xl bg-white/[0.03] border-white/[0.08]">
           <CardHeader>
-            <CardTitle className="text-lg text-white">Estadísticas Rápidas</CardTitle>
-            <CardDescription className="text-[#6B7A7D]">Métricas clave del período</CardDescription>
+            <CardTitle className="text-lg text-foreground">Estadísticas Rápidas</CardTitle>
+            <CardDescription className="text-muted-foreground">Métricas clave del período</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[#94A3AB]">Win Rate</span>
-              <Badge className="bg-[#0D9488]/20 text-[#5EEAD4] border-0">{(overview?.winRate ?? 0).toFixed(1)}%</Badge>
+              <span className="text-sm text-muted-foreground">Win Rate</span>
+              <Badge className="bg-[var(--tenant-primary)]/20 text-[var(--chart-accent)] border-0">{(overview?.winRate ?? 0).toFixed(1)}%</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[#94A3AB]">Ticket Promedio</span>
-              <Badge className="bg-[#0D9488]/20 text-[#5EEAD4] border-0">${(overview?.avgDealSize ?? 0).toLocaleString()}</Badge>
+              <span className="text-sm text-muted-foreground">Ticket Promedio</span>
+              <Badge className="bg-[var(--tenant-primary)]/20 text-[var(--chart-accent)] border-0">${(overview?.avgDealSize ?? 0).toLocaleString()}</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[#94A3AB]">Tiempo Conversión</span>
-              <Badge className="bg-[#0D9488]/20 text-[#5EEAD4] border-0">{overview?.avgLeadConversionTime ?? 0} días</Badge>
+              <span className="text-sm text-muted-foreground">Tiempo Conversión</span>
+              <Badge className="bg-[var(--tenant-primary)]/20 text-[var(--chart-accent)] border-0">{overview?.avgLeadConversionTime ?? 0} días</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[#94A3AB]">Tareas Completadas</span>
-              <Badge className="bg-[#0D9488]/20 text-[#5EEAD4] border-0">{(overview?.taskCompletionRate ?? 0).toFixed(0)}%</Badge>
+              <span className="text-sm text-muted-foreground">Tareas Completadas</span>
+              <Badge className="bg-[var(--tenant-primary)]/20 text-[var(--chart-accent)] border-0">{(overview?.taskCompletionRate ?? 0).toFixed(0)}%</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[#94A3AB]">Workflows Activos</span>
-              <Badge className="bg-[#0D9488]/20 text-[#5EEAD4] border-0">{overview?.activeWorkflows ?? 0}</Badge>
+              <span className="text-sm text-muted-foreground">Workflows Activos</span>
+              <Badge className="bg-[var(--tenant-primary)]/20 text-[var(--chart-accent)] border-0">{overview?.activeWorkflows ?? 0}</Badge>
             </div>
           </CardContent>
         </Card>
@@ -734,11 +855,11 @@ export default function DashboardPage() {
         {/* Insights */}
         <Card className="backdrop-blur-xl bg-white/[0.03] border-white/[0.08]">
           <CardHeader>
-            <CardTitle className="text-lg text-white flex items-center gap-2">
-              <Zap className="h-5 w-5 text-[#F97316]" />
+            <CardTitle className="text-lg text-foreground flex items-center gap-2">
+              <Zap className="h-5 w-5 text-[var(--status-pending)]" />
               Insights
             </CardTitle>
-            <CardDescription className="text-[#6B7A7D]">Análisis automático de tus datos</CardDescription>
+            <CardDescription className="text-muted-foreground">Análisis automático de tus datos</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 max-h-[280px] overflow-y-auto">
             {insights.length > 0 ? (
@@ -746,7 +867,7 @@ export default function DashboardPage() {
                 <InsightCard key={insight.id} insight={insight} />
               ))
             ) : (
-              <div className="text-center py-8 text-[#6B7A7D]">
+              <div className="text-center py-8 text-muted-foreground">
                 <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">Los insights se generarán con más datos</p>
               </div>
@@ -754,6 +875,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+          </div>
+        </PageContainer.Content>
+      </PageContainer.Body>
+    </PageContainer>
   );
 }

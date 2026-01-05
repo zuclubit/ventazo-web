@@ -14,6 +14,9 @@ import { useOnboardingStore } from '@/store/onboarding.store';
  * - Requires authentication
  * - Syncs auth user data to onboarding store
  * - Middleware handles the primary routing logic
+ *
+ * SPA OPTIMIZATION: Uses hasInitialized to show splash only during
+ * first auth check. After that, content renders immediately.
  */
 export default function OnboardingLayout({
   children,
@@ -21,7 +24,7 @@ export default function OnboardingLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, hasInitialized } = useAuth();
   const { data, updateData } = useOnboardingStore();
 
   // Sync auth user data to onboarding store
@@ -34,20 +37,21 @@ export default function OnboardingLayout({
     }
   }, [isAuthenticated, user, data.userId, updateData]);
 
-  // Redirect to signup if not authenticated
+  // Redirect to signup if not authenticated (only after initial check)
   React.useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (hasInitialized && !isAuthenticated) {
       router.push('/signup');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [hasInitialized, isAuthenticated, router]);
 
-  // Show loading while checking auth
-  if (isLoading) {
+  // FIRST LOAD ONLY: Show splash during initial auth check
+  // After hasInitialized is true, never show splash again
+  if (!hasInitialized && isLoading) {
     return <SplashScreen message="Verificando sesión..." variant="branded" />;
   }
 
-  // Don't render until authenticated
-  if (!isAuthenticated) {
+  // Don't render until authenticated (waiting for redirect)
+  if (hasInitialized && !isAuthenticated) {
     return null;
   }
 

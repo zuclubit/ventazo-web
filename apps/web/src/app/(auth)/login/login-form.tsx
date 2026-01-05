@@ -1,98 +1,76 @@
 'use client';
 
 /**
- * Login Form Component
+ * Login Form Component - SSO Only
  *
- * Handles the actual login form logic with useSearchParams.
- * Wrapped in Suspense by the parent page.
+ * Single Sign-On authentication via Zuclubit SSO.
+ * All users authenticate through the centralized SSO system.
+ *
+ * Flow:
+ * 1. User clicks "Iniciar sesion con Zuclubit"
+ * 2. Redirects to SSO authorization endpoint
+ * 3. SSO authenticates user
+ * 4. SSO redirects back to /api/auth/callback/zuclubit-sso
+ * 5. Callback exchanges code for tokens and creates session
  */
 
 import * as React from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { Mail } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 
 import {
   AuthLayout,
   AuthCard,
   AuthAlert,
-  AuthFormField,
-  PasswordInput,
-  AuthFooterLinks,
-  AuthSubmitButton,
-  SSOButtons,
 } from '@/components/auth';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/i18n/context';
 
 // ============================================
-// Types
+// SSO Configuration
 // ============================================
 
-interface ErrorInfo {
-  title: string;
-  description?: string;
-  hint?: string;
-  isEmailNotConfirmed?: boolean;
+const SSO_CONFIG = {
+  issuerUrl: process.env['NEXT_PUBLIC_SSO_ISSUER_URL'] || 'https://sso.zuclubit.com',
+  clientId: process.env['NEXT_PUBLIC_SSO_CLIENT_ID'] || 'ventazo',
+};
+
+/**
+ * Build SSO authorization URL
+ */
+function buildSSOAuthUrl(redirectTo: string): string {
+  const state = btoa(JSON.stringify({ redirect: redirectTo, ts: Date.now() }));
+
+  const callbackUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/auth/callback/zuclubit-sso`
+    : 'http://localhost:3000/api/auth/callback/zuclubit-sso';
+
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: SSO_CONFIG.clientId,
+    redirect_uri: callbackUrl,
+    scope: 'openid profile email offline_access crm:read crm:write',
+    state,
+  });
+
+  return `${SSO_CONFIG.issuerUrl}/oauth/authorize?${params.toString()}`;
 }
 
 // ============================================
 // Error Message Mapper
 // ============================================
 
-function mapErrorToI18n(
-  error: string | null,
-  urlError: string | null,
-  t: ReturnType<typeof useI18n>['t']
-): ErrorInfo | null {
-  if (error) {
-    const errorLower = error.toLowerCase();
+function getErrorMessage(error: string | null): string | null {
+  if (!error) return null;
 
-    // Email not confirmed
-    if (errorLower.includes('email_not_confirmed') || errorLower.includes('email not confirmed')) {
-      return {
-        title: t.auth.errors.emailNotConfirmed,
-        description: t.auth.errors.emailNotConfirmedDescription,
-        hint: t.auth.errors.emailNotConfirmedHint,
-        isEmailNotConfirmed: true,
-      };
-    }
+  const errorMap: Record<string, string> = {
+    'session_expired': 'Tu sesion ha expirado. Por favor inicia sesion nuevamente.',
+    'access_denied': 'Acceso denegado. Contacta al administrador.',
+    'token_exchange_failed': 'Error al procesar la autenticacion. Intenta de nuevo.',
+    'missing_code': 'Error de autenticacion. Intenta de nuevo.',
+    'invalid_state': 'Sesion invalida. Intenta de nuevo.',
+  };
 
-    // Invalid credentials
-    if (errorLower.includes('invalid') || errorLower.includes('credenciales')) {
-      return { title: t.auth.errors.invalidCredentials };
-    }
-
-    // User not found
-    if (errorLower.includes('user not found')) {
-      return { title: t.auth.errors.userNotFound };
-    }
-
-    // Rate limiting
-    if (errorLower.includes('too many') || errorLower.includes('rate limit')) {
-      return { title: t.auth.errors.tooManyAttempts };
-    }
-
-    // Network error
-    if (errorLower.includes('network') || errorLower.includes('conexión')) {
-      return { title: t.auth.errors.networkError };
-    }
-
-    // Default: show original error
-    return { title: error };
-  }
-
-  // URL-based errors
-  if (urlError === 'session_expired') {
-    return { title: t.auth.errors.sessionExpired };
-  }
-  if (urlError === 'access_denied') {
-    return { title: t.auth.errors.accessDenied };
-  }
-
-  return null;
+  return errorMap[error] || 'Error de autenticacion. Intenta de nuevo.';
 }
 
 // ============================================
@@ -101,234 +79,81 @@ function mapErrorToI18n(
 
 export function LoginForm() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const { t } = useI18n();
 
-  // Local state
   const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [isResending, setIsResending] = React.useState(false);
-  const [resendSuccess, setResendSuccess] = React.useState(false);
 
-  // URL params
-  // NOTE: We use /app/dashboard instead of /app due to OpenNext routing bug
+  // NOTE: We use /app/dashboard instead of /app due to OpenNext routing
   const redirectTo = searchParams.get('redirect') || '/app/dashboard';
   const urlError = searchParams.get('error');
 
-  // Dynamic Zod schema with i18n messages
-  const loginSchema = React.useMemo(
-    () =>
-      z.object({
-        email: z
-          .string()
-          .min(1, t.auth.errors.emailRequired)
-          .email(t.auth.errors.emailInvalid),
-        password: z
-          .string()
-          .min(1, t.auth.errors.passwordRequired)
-          .min(6, t.auth.errors.passwordMinLength),
-      }),
-    [t]
-  );
-
-  type LoginFormData = z.infer<typeof loginSchema>;
-
-  // Form setup
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    getValues,
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-  });
-
-  // Form submission using API Route (better cookie support in Cloudflare Workers)
-  const onSubmit = async (data: LoginFormData) => {
+  const handleSSOLogin = React.useCallback(() => {
     setIsLoading(true);
-    setError(null);
-    setResendSuccess(false);
+    const authUrl = buildSSOAuthUrl(redirectTo);
+    window.location.href = authUrl;
+  }, [redirectTo]);
 
-    try {
-      console.log('[LoginForm] ====== LOGIN STARTED ======');
-      console.log('[LoginForm] Email:', data.email);
-
-      // Call the API Route - this sets the session cookie in the response
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: data.email, password: data.password }),
-        credentials: 'include', // Important: include cookies in request/response
-      });
-
-      const result = await response.json();
-      console.log('[LoginForm] API Response:', JSON.stringify(result));
-
-      if (result.success) {
-        // Determine final redirect URL
-        const finalRedirect = result.redirectTo || redirectTo;
-        console.log('[LoginForm] SUCCESS! Redirecting to:', finalRedirect);
-
-        // Use window.location for a full browser navigation
-        // The cookie was set in the API response, so it will be included
-        window.location.href = finalRedirect;
-
-        // Keep loading state - the page will refresh
-        return;
-      } else {
-        console.log('[LoginForm] LOGIN FAILED:', result.error);
-        setError(result.error || 'Error al iniciar sesión');
-      }
-    } catch (err) {
-      console.error('[LoginForm] EXCEPTION:', err);
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      setError(`Error de conexión: ${errorMessage}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle resend confirmation email
-  const handleResendConfirmation = async () => {
-    const email = getValues('email');
-    if (!email) return;
-
-    setIsResending(true);
-    setResendSuccess(false);
-
-    try {
-      const rawApiUrl = process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
-      const API_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
-      await fetch(`${API_URL}/api/v1/auth/resend-confirmation`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      setResendSuccess(true);
-    } catch {
-      // Always show success to not reveal email status
-      setResendSuccess(true);
-    } finally {
-      setIsResending(false);
-    }
-  };
-
-  // Handle SSO error
-  const handleSSOError = (err: Error) => {
-    setError(err.message || 'Error al conectar con el proveedor');
-  };
-
-  // Map error to i18n message
-  const errorInfo = mapErrorToI18n(error, urlError, t);
+  const errorMessage = getErrorMessage(urlError);
 
   return (
     <AuthLayout variant="premium" showFooter showHero>
       <AuthCard
         title={t.auth.login.title}
-        subtitle={t.auth.login.subtitle}
+        subtitle="Accede con tu cuenta de Zuclubit"
         showLogo={false}
         maxWidth="md"
         variant="premium"
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          {/* Success message for resend */}
-          {resendSuccess && (
-            <AuthAlert
-              type="success"
-              title={t.auth.errors.resendConfirmationSuccess}
-            />
-          )}
-
+        <div className="space-y-6">
           {/* Error Alert */}
-          {errorInfo && !resendSuccess && (
-            <div className="space-y-3">
-              <AuthAlert
-                type="error"
-                title={errorInfo.title}
-                description={errorInfo.description}
-                hint={errorInfo.hint}
-                onDismiss={() => setError(null)}
-              />
-              {/* Resend Confirmation Button */}
-              {errorInfo.isEmailNotConfirmed && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="w-full h-10 rounded-xl backdrop-blur-md bg-white/[0.03] border border-white/[0.08] text-[#0EB58C] hover:bg-white/[0.06] hover:text-white transition-all"
-                  onClick={handleResendConfirmation}
-                  disabled={isResending}
-                >
-                  {isResending ? t.auth.loading.sendingEmail : t.auth.errors.resendConfirmation}
-                </Button>
-              )}
-            </div>
+          {errorMessage && (
+            <AuthAlert type="error" title={errorMessage} />
           )}
 
-          {/* SSO Buttons - Google & Microsoft */}
-          <SSOButtons
-            mode="login"
-            variant="premium"
-            redirectTo={redirectTo}
-            onError={handleSSOError}
-            showDivider
-          />
-
-          {/* Email Field */}
-          <AuthFormField
-            label={t.auth.login.emailLabel}
-            type="email"
-            autoComplete="email"
+          {/* SSO Login Button */}
+          <Button
+            type="button"
+            className="w-full h-12 text-base font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg transition-all duration-200"
+            onClick={handleSSOLogin}
             disabled={isLoading}
-            placeholder={t.auth.login.emailPlaceholder}
-            error={errors.email?.message}
-            startIcon={<Mail className="h-4 w-4" />}
-            size="lg"
-            variant="premium"
-            {...register('email')}
-          />
+          >
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Redirigiendo...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                  <polyline points="10 17 15 12 10 7" />
+                  <line x1="15" y1="12" x2="3" y2="12" />
+                </svg>
+                Iniciar sesion con Zuclubit
+              </span>
+            )}
+          </Button>
 
-          {/* Password Field */}
-          <PasswordInput
-            id="password"
-            label={t.auth.login.passwordLabel}
-            placeholder={t.auth.login.passwordPlaceholder}
-            autoComplete="current-password"
-            disabled={isLoading}
-            error={errors.password?.message}
-            showLabel={t.auth.validation.showPassword}
-            hideLabel={t.auth.validation.hidePassword}
-            forgotPasswordLabel={t.auth.login.forgotPassword}
-            forgotPasswordHref="/forgot-password"
-            variant="premium"
-            size="lg"
-            showIcon
-            {...register('password')}
-          />
+          {/* Info text */}
+          <p className="text-center text-sm text-muted-foreground">
+            Seras redirigido al sistema de autenticacion centralizado de Zuclubit
+          </p>
 
-          {/* Submit Button */}
-          <div className="pt-2">
-            <AuthSubmitButton
-              isLoading={isLoading}
-              loadingText={t.auth.loading.authenticating}
-              className="gradient-button w-full h-12 rounded-xl text-base font-semibold"
+          {/* Help link */}
+          <div className="text-center">
+            <a
+              href="https://sso.zuclubit.com/register"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline"
             >
-              {t.auth.login.submitButton}
-            </AuthSubmitButton>
+              No tienes cuenta? Registrate en Zuclubit
+            </a>
           </div>
-
-          {/* Register Link */}
-          <AuthFooterLinks
-            text={t.auth.login.noAccount}
-            linkText={t.auth.login.registerLink}
-            href="/register"
-            className="text-[#7A8F8F] [&_a]:text-[#0EB58C] [&_a:hover]:text-[#0CA57D]"
-          />
-        </form>
+        </div>
       </AuthCard>
     </AuthLayout>
   );

@@ -4,6 +4,7 @@ import * as React from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Camera, Loader2, Moon, Save, Sun } from 'lucide-react';
+import { ProfilePageSkeleton } from '../components';
 import { useTheme } from 'next-themes';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -140,11 +141,7 @@ export default function ProfilePage() {
   };
 
   if (isProfileLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <ProfilePageSkeleton />;
   }
 
   return (

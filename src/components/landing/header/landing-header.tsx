@@ -45,6 +45,7 @@ export function LandingHeader({
     navigation: [
       { label: t.nav.features, href: '#features' },
       { label: t.nav.ai, href: '#ai' },
+      { label: 'Mundial 2026', href: '#worldcup', highlight: true },
       { label: t.nav.pricing, href: '#pricing' },
       {
         label: t.nav.apiDocs,

@@ -1,0 +1,245 @@
+'use client';
+
+/**
+ * CustomerKanbanColumn - Kanban Column Component v2.0
+ *
+ * Homologated with Opportunities module using shared PipelineColumn component.
+ * Provides consistent visual design across all pipeline views.
+ *
+ * Features:
+ * - Uses shared PipelineColumn for consistency
+ * - Premium glass styling via kanban-column-premium class
+ * - Drop validation feedback (valid/invalid)
+ * - Stage-colored header with MRR total
+ * - Animated card entry
+ *
+ * @module components/kanban/CustomerKanbanColumn
+ */
+
+import * as React from 'react';
+import { useDroppable } from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { Ban } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  PipelineColumnHeader,
+  PipelineColumnEmptyState,
+  COLUMN_TOKENS,
+} from '@/components/pipeline';
+import type { Customer } from '@/lib/customers';
+
+import { CustomerCard } from '../CustomerCard';
+import type { LifecycleStageConfig } from '../../hooks';
+
+// ============================================
+// Types
+// ============================================
+
+export interface LifecycleColumn {
+  /** Lifecycle stage configuration */
+  stage: LifecycleStageConfig;
+  /** Customers in this column */
+  customers: Customer[];
+  /** Count of customers */
+  count: number;
+  /** Total MRR value */
+  totalMrr?: number;
+}
+
+export interface CustomerKanbanColumnProps {
+  /** Column data */
+  column: LifecycleColumn;
+  /** Whether this column is being dragged over */
+  isOver?: boolean;
+  /** Whether the drop is valid (for visual feedback) */
+  isValidDropTarget?: boolean;
+  /** Whether the drop is invalid (for visual feedback) */
+  isInvalidDropTarget?: boolean;
+  /** Message to show when drop is invalid */
+  dropValidationMessage?: string;
+  /** Function to check if a specific customer is being moved */
+  isCustomerMoving?: (customerId: string) => boolean;
+  /** Handler when customer card is clicked */
+  onCustomerClick?: (customer: Customer) => void;
+  /** Handler for edit customer */
+  onCustomerEdit?: (customer: Customer) => void;
+  /** Handler for delete customer */
+  onCustomerDelete?: (customer: Customer) => void;
+  /** Handler for adding new customer to this stage */
+  onAddCustomer?: (stageId: string) => void;
+  /** Additional CSS classes */
+  className?: string;
+}
+
+// ============================================
+// Column Width Configuration (from Design System)
+// ============================================
+
+const COLUMN_STYLE = {
+  width: `clamp(${COLUMN_TOKENS.width.min}, 20vw, ${COLUMN_TOKENS.width.max})`,
+};
+
+// ============================================
+// Component
+// ============================================
+
+export const CustomerKanbanColumn = React.memo(function CustomerKanbanColumn({
+  column,
+  isOver = false,
+  isValidDropTarget = false,
+  isInvalidDropTarget = false,
+  dropValidationMessage,
+  isCustomerMoving,
+  onCustomerClick,
+  onCustomerEdit,
+  onCustomerDelete,
+  onAddCustomer,
+  className,
+}: CustomerKanbanColumnProps) {
+  const { stage, customers, count, totalMrr } = column;
+
+  // DnD Kit droppable hook
+  const { setNodeRef, isOver: dndIsOver } = useDroppable({
+    id: stage.id,
+    data: {
+      type: 'column',
+      stage,
+    },
+  });
+
+  // Combine internal and external isOver states
+  const isDropTarget = isOver || dndIsOver;
+  const isHighlighted = isDropTarget && !isValidDropTarget && !isInvalidDropTarget;
+
+  // Get customer IDs for sortable context
+  const customerIds = React.useMemo(
+    () => customers.map((c) => c.id),
+    [customers]
+  );
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        // Premium glass container (shared with leads/opportunities)
+        'kanban-column-premium',
+        // Flex column layout
+        'flex flex-col',
+        // Full height from parent
+        'h-full',
+        // Never shrink
+        'shrink-0 grow-0',
+        // Relative for overlays
+        'relative',
+        // Transition for drop feedback
+        'transition-all duration-300',
+        // Valid drop target - success ring (uses CSS variable)
+        isValidDropTarget && 'ring-2 ring-[var(--health-excellent)] ring-offset-2 ring-offset-background',
+        // Invalid drop target - error ring with dimming (uses CSS variable)
+        isInvalidDropTarget && 'ring-2 ring-[var(--health-critical)] ring-offset-2 ring-offset-background opacity-75',
+        // Neutral highlight when dragging over
+        isHighlighted && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
+        className
+      )}
+      style={COLUMN_STYLE}
+      data-pipeline-column
+      role="listbox"
+      aria-label={`${stage.label} - ${customers.length} clientes`}
+    >
+      {/* Column Header - Uses shared component */}
+      <div className="shrink-0 sticky top-0 z-10">
+        <PipelineColumnHeader
+          title={stage.label}
+          count={count}
+          color={stage.color}
+          moneyTotal={totalMrr}
+          currency="MXN"
+        />
+      </div>
+
+      {/* Cards Container - Scrollable */}
+      <div
+        className={cn(
+          'flex-1',
+          'min-h-0',
+          'p-2.5 sm:p-3',
+          'pt-2',
+          'overflow-y-auto overflow-x-hidden',
+          '-webkit-overflow-scrolling-touch',
+          'space-y-2.5 sm:space-y-3',
+          'scrollbar-thin'
+        )}
+        role="list"
+      >
+        <SortableContext
+          items={customerIds}
+          strategy={verticalListSortingStrategy}
+        >
+          {customers.length === 0 ? (
+            <PipelineColumnEmptyState
+              stageId={stage.id}
+              stageName={stage.label}
+              stageColor={stage.color}
+              pipelineType="customers"
+              isDropTarget={isHighlighted}
+              size="md"
+            />
+          ) : (
+            customers.map((customer, index) => (
+              <div
+                key={customer.id}
+                className="animate-card-enter"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <CustomerCard
+                  customer={customer}
+                  isDragging={isCustomerMoving?.(customer.id)}
+                  onClick={() => onCustomerClick?.(customer)}
+                  onEdit={() => onCustomerEdit?.(customer)}
+                  onDelete={() => onCustomerDelete?.(customer)}
+                />
+              </div>
+            ))
+          )}
+        </SortableContext>
+
+        {/* Drop indicator when dragging over non-empty column */}
+        {isHighlighted && customers.length > 0 && (
+          <div
+            className={cn(
+              'h-2 rounded-full mx-2',
+              'bg-gradient-to-r from-transparent via-primary/40 to-transparent',
+              'animate-pulse'
+            )}
+            aria-hidden="true"
+          />
+        )}
+      </div>
+
+      {/* Valid Drop Overlay - Success tint (uses CSS variable) */}
+      {isValidDropTarget && (
+        <div
+          className="absolute inset-0 rounded-xl bg-[var(--health-excellent)]/5 pointer-events-none"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Invalid Drop Overlay - Error tint with message (uses CSS variables) */}
+      {isInvalidDropTarget && (
+        <div className="absolute inset-0 rounded-xl bg-[var(--health-critical)]/10 pointer-events-none flex items-center justify-center z-20">
+          <div className="bg-[var(--health-critical-bg)] px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 max-w-[250px] border border-[var(--health-critical-border)]">
+            <Ban className="h-4 w-4 text-[var(--health-critical)] shrink-0" />
+            <span className="text-xs text-[var(--health-critical)] font-medium">
+              {dropValidationMessage || 'Acción no permitida'}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+export default CustomerKanbanColumn;

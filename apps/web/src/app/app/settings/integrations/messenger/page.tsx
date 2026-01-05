@@ -69,7 +69,7 @@ interface HealthStatus {
 // API Functions
 // ============================================
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://zuclubit-lead-service.fly.dev';
+const API_BASE = process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
 
 async function fetchConnectedPages(tenantId: string, token: string): Promise<ConnectedPage[]> {
   const response = await fetch(`${API_BASE}/api/v1/messenger/oauth/pages`, {
@@ -474,7 +474,7 @@ function ConnectedPagesTable({
 
 export default function MessengerIntegrationPage() {
   const { toast } = useToast();
-  const { tenant } = useTenantStore();
+  const { currentTenant } = useTenantStore();
   const [pages, setPages] = React.useState<ConnectedPage[]>([]);
   const [health, setHealth] = React.useState<HealthStatus | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -484,7 +484,7 @@ export default function MessengerIntegrationPage() {
   const token = typeof window !== 'undefined'
     ? localStorage.getItem('accessToken') || ''
     : '';
-  const tenantId = tenant?.id || '';
+  const tenantId = currentTenant?.id || '';
 
   // Check for OAuth callback errors in URL
   React.useEffect(() => {

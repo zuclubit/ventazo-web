@@ -9,6 +9,54 @@ import { container } from 'tsyringe';
 import { AnalyticsService } from '../../infrastructure/analytics';
 import { ReportType, TimeGranularity } from '../../infrastructure/analytics/types';
 
+// ==========================================================================
+// Performance optimization: Dashboard cache
+// See: docs/PERFORMANCE_REMEDIATION_LOG.md - P2.2 Dashboard Optimization
+// ==========================================================================
+
+interface DashboardCacheEntry {
+  data: unknown;
+  expiresAt: number;
+}
+
+// Dashboard cache with 2-minute TTL (shorter than stats since dashboard is more dynamic)
+const DASHBOARD_CACHE_TTL_MS = 120_000; // 2 minutes
+const dashboardCache = new Map<string, DashboardCacheEntry>();
+
+/**
+ * Get cache key for dashboard based on tenant and date range
+ */
+function getDashboardCacheKey(tenantId: string, startDate?: string, endDate?: string): string {
+  const now = new Date();
+  // Normalize to hour for cache key to avoid too many unique keys
+  const normalizedStart = startDate || new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const normalizedEnd = endDate || now.toISOString().slice(0, 13); // Truncate to hour
+  return `dashboard:${tenantId}:${normalizedStart}:${normalizedEnd}`;
+}
+
+/**
+ * Invalidate dashboard cache for a tenant
+ * Export for use by other modules on data mutations
+ */
+export function invalidateDashboardCache(tenantId: string): void {
+  // Invalidate all cache entries for this tenant
+  for (const key of dashboardCache.keys()) {
+    if (key.startsWith(`dashboard:${tenantId}:`)) {
+      dashboardCache.delete(key);
+    }
+  }
+}
+
+// Periodic cache cleanup (every minute)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of dashboardCache.entries()) {
+    if (entry.expiresAt < now) {
+      dashboardCache.delete(key);
+    }
+  }
+}, 60_000);
+
 // JSON Schema for Fastify validation
 const dateRangeJsonSchema = {
   type: 'object',
@@ -141,6 +189,18 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Tenant ID required' });
       }
 
+      // Performance optimization: Check cache first
+      // Use dateRange preset or custom dates as cache key component
+      const cacheKeyDatePart = request.query.dateRange ||
+        `${request.query.startDate || 'default'}:${request.query.endDate || 'now'}`;
+      const overviewCacheKey = `overview:${tenantId}:${cacheKeyDatePart}`;
+
+      const cached = dashboardCache.get(overviewCacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        reply.header('X-Cache', 'HIT');
+        return reply.send(cached.data);
+      }
+
       // Calculate date range based on preset or custom dates
       const now = new Date();
       let startDate: Date;
@@ -193,7 +253,7 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
       };
 
       // Transform to KPI format expected by frontend
-      return reply.send({
+      const responseData = {
         totalLeads: getValue(metrics?.totalLeads),
         newLeads: getValue(metrics?.newLeadsToday ?? metrics?.newLeads),
         qualifiedLeads: getValue(metrics?.qualifiedLeads),
@@ -220,7 +280,16 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         trendData: dashboard.trendData ?? [],
         recentLeads: dashboard.recentLeads ?? [],
         upcomingFollowUps: dashboard.upcomingFollowUps ?? [],
+      };
+
+      // Store in cache
+      dashboardCache.set(overviewCacheKey, {
+        data: responseData,
+        expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
       });
+
+      reply.header('X-Cache', 'MISS');
+      return reply.send(responseData);
     }
   );
 
@@ -535,6 +604,20 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Tenant ID required' });
       }
 
+      // Performance optimization: Check cache first
+      // See: docs/PERFORMANCE_REMEDIATION_LOG.md - P2.2 Dashboard Optimization
+      const cacheKey = getDashboardCacheKey(
+        tenantId,
+        request.query.startDate,
+        request.query.endDate
+      );
+
+      const cached = dashboardCache.get(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        reply.header('X-Cache', 'HIT');
+        return reply.send(cached.data);
+      }
+
       const dateRange = request.query.startDate
         ? {
             startDate: new Date(request.query.startDate),
@@ -550,7 +633,16 @@ export async function analyticsRoutes(fastify: FastifyInstance) {
         return reply.status(500).send({ error: result.error });
       }
 
-      return reply.send(result.getValue());
+      const data = result.getValue();
+
+      // Store in cache
+      dashboardCache.set(cacheKey, {
+        data,
+        expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
+      });
+
+      reply.header('X-Cache', 'MISS');
+      return reply.send(data);
     }
   );
 

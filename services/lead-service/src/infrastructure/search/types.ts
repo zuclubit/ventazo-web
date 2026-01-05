@@ -11,6 +11,9 @@ import { LeadStatusEnum } from '../../domain/value-objects';
 export enum SearchEntityType {
   LEAD = 'lead',
   CONTACT = 'contact',
+  CUSTOMER = 'customer',
+  OPPORTUNITY = 'opportunity',
+  TASK = 'task',
   COMMUNICATION = 'communication',
   ALL = 'all',
 }
@@ -124,9 +127,73 @@ export interface CommunicationSearchResult {
 }
 
 /**
+ * Search Result Item - Customer
+ */
+export interface CustomerSearchResult {
+  type: 'customer';
+  id: string;
+  companyName: string;
+  email: string;
+  phone?: string | null;
+  status: string;
+  tier: string;
+  industry?: string | null;
+  createdAt: Date;
+  relevanceScore: number;
+  highlights?: {
+    field: string;
+    snippet: string;
+  }[];
+}
+
+/**
+ * Search Result Item - Opportunity
+ */
+export interface OpportunitySearchResult {
+  type: 'opportunity';
+  id: string;
+  name: string;
+  value: number;
+  stage: string;
+  probability: number;
+  expectedCloseDate?: Date | null;
+  createdAt: Date;
+  relevanceScore: number;
+  highlights?: {
+    field: string;
+    snippet: string;
+  }[];
+}
+
+/**
+ * Search Result Item - Task
+ */
+export interface TaskSearchResult {
+  type: 'task';
+  id: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  priority: string;
+  dueDate?: Date | null;
+  createdAt: Date;
+  relevanceScore: number;
+  highlights?: {
+    field: string;
+    snippet: string;
+  }[];
+}
+
+/**
  * Combined Search Result
  */
-export type SearchResultItem = LeadSearchResult | ContactSearchResult | CommunicationSearchResult;
+export type SearchResultItem =
+  | LeadSearchResult
+  | ContactSearchResult
+  | CommunicationSearchResult
+  | CustomerSearchResult
+  | OpportunitySearchResult
+  | TaskSearchResult;
 
 /**
  * Search Results Response

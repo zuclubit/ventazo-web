@@ -9,6 +9,9 @@ import {
   LeadSearchResult,
   ContactSearchResult,
   CommunicationSearchResult,
+  CustomerSearchResult,
+  OpportunitySearchResult,
+  TaskSearchResult,
   AutocompleteSuggestion,
   SearchFacets,
   SearchIndexStatus,
@@ -68,6 +71,33 @@ export class SearchService {
         if (commsResult.isSuccess) {
           results.push(...commsResult.getValue().items);
           totalCount += commsResult.getValue().total;
+        }
+      }
+
+      // Search customers
+      if (searchAll || entityTypes.includes(SearchEntityType.CUSTOMER)) {
+        const customersResult = await this.searchCustomers(options, normalizedQuery, limit, offset);
+        if (customersResult.isSuccess) {
+          results.push(...customersResult.getValue().items);
+          totalCount += customersResult.getValue().total;
+        }
+      }
+
+      // Search opportunities
+      if (searchAll || entityTypes.includes(SearchEntityType.OPPORTUNITY)) {
+        const oppsResult = await this.searchOpportunities(options, normalizedQuery, limit, offset);
+        if (oppsResult.isSuccess) {
+          results.push(...oppsResult.getValue().items);
+          totalCount += oppsResult.getValue().total;
+        }
+      }
+
+      // Search tasks
+      if (searchAll || entityTypes.includes(SearchEntityType.TASK)) {
+        const tasksResult = await this.searchTasks(options, normalizedQuery, limit, offset);
+        if (tasksResult.isSuccess) {
+          results.push(...tasksResult.getValue().items);
+          totalCount += tasksResult.getValue().total;
         }
       }
 
@@ -379,6 +409,225 @@ export class SearchService {
   }
 
   /**
+   * Search customers
+   * Note: Production DB uses 'name' and 'company' columns instead of 'company_name'
+   */
+  private async searchCustomers(
+    options: SearchOptions,
+    tsQuery: string,
+    limit: number,
+    offset: number
+  ): Promise<Result<{ items: CustomerSearchResult[]; total: number }>> {
+    try {
+      // Use COALESCE to support both old (company_name) and new (name, company) schemas
+      const whereClause = `
+        WHERE tenant_id = $1
+        AND (
+          to_tsvector('english', COALESCE(name, '') || ' ' || COALESCE(company, '') || ' ' || COALESCE(email, '') || ' ' || COALESCE(phone, ''))
+          @@ to_tsquery('english', $2)
+          OR name ILIKE $3
+          OR company ILIKE $3
+          OR email ILIKE $3
+        )
+      `;
+
+      const values: unknown[] = [options.tenantId, tsQuery, `%${options.query}%`];
+
+      // Count total
+      const countQuery = `SELECT COUNT(*) as total FROM customers ${whereClause}`;
+      const countResult = await this.pool.query(countQuery, values);
+
+      if (countResult.isFailure) {
+        return Result.ok({ items: [], total: 0 }); // Table might not exist
+      }
+
+      const total = parseInt(countResult.getValue().rows[0]?.total as string || '0', 10);
+
+      // Get results - use COALESCE to get name from either column
+      const dataQuery = `
+        SELECT
+          id,
+          COALESCE(name, company) as company_name,
+          email, phone, status,
+          COALESCE(metadata->>'tier', type, 'standard') as tier,
+          industry, created_at,
+          ts_rank(
+            to_tsvector('english', COALESCE(name, '') || ' ' || COALESCE(company, '') || ' ' || COALESCE(email, '') || ' ' || COALESCE(phone, '')),
+            to_tsquery('english', $2)
+          ) as relevance_score
+        FROM customers
+        ${whereClause}
+        ORDER BY relevance_score DESC, created_at DESC
+        LIMIT $4 OFFSET $5
+      `;
+
+      values.push(limit, offset);
+      const dataResult = await this.pool.query(dataQuery, values);
+
+      if (dataResult.isFailure) {
+        return Result.ok({ items: [], total: 0 });
+      }
+
+      const items: CustomerSearchResult[] = dataResult.getValue().rows.map((row: Record<string, unknown>) => ({
+        type: 'customer' as const,
+        id: row.id as string,
+        companyName: row.company_name as string,
+        email: row.email as string,
+        phone: row.phone as string | null,
+        status: row.status as string,
+        tier: row.tier as string || 'standard',
+        industry: row.industry as string | null,
+        createdAt: new Date(row.created_at as string),
+        relevanceScore: parseFloat(row.relevance_score as string) || 0,
+      }));
+
+      return Result.ok({ items, total });
+    } catch {
+      return Result.ok({ items: [], total: 0 }); // Silently fail if table doesn't exist
+    }
+  }
+
+  /**
+   * Search opportunities
+   */
+  private async searchOpportunities(
+    options: SearchOptions,
+    tsQuery: string,
+    limit: number,
+    offset: number
+  ): Promise<Result<{ items: OpportunitySearchResult[]; total: number }>> {
+    try {
+      const whereClause = `
+        WHERE tenant_id = $1
+        AND (
+          to_tsvector('english', COALESCE(name, '') || ' ' || COALESCE(notes, ''))
+          @@ to_tsquery('english', $2)
+          OR name ILIKE $3
+        )
+      `;
+
+      const values: unknown[] = [options.tenantId, tsQuery, `%${options.query}%`];
+
+      // Count total
+      const countQuery = `SELECT COUNT(*) as total FROM opportunities ${whereClause}`;
+      const countResult = await this.pool.query(countQuery, values);
+
+      if (countResult.isFailure) {
+        return Result.ok({ items: [], total: 0 });
+      }
+
+      const total = parseInt(countResult.getValue().rows[0]?.total as string || '0', 10);
+
+      // Get results
+      const dataQuery = `
+        SELECT
+          id, name, value, stage, probability, expected_close_date, created_at,
+          ts_rank(
+            to_tsvector('english', COALESCE(name, '') || ' ' || COALESCE(notes, '')),
+            to_tsquery('english', $2)
+          ) as relevance_score
+        FROM opportunities
+        ${whereClause}
+        ORDER BY relevance_score DESC, created_at DESC
+        LIMIT $4 OFFSET $5
+      `;
+
+      values.push(limit, offset);
+      const dataResult = await this.pool.query(dataQuery, values);
+
+      if (dataResult.isFailure) {
+        return Result.ok({ items: [], total: 0 });
+      }
+
+      const items: OpportunitySearchResult[] = dataResult.getValue().rows.map((row: Record<string, unknown>) => ({
+        type: 'opportunity' as const,
+        id: row.id as string,
+        name: row.name as string,
+        value: Number(row.value) || 0,
+        stage: row.stage as string,
+        probability: Number(row.probability) || 0,
+        expectedCloseDate: row.expected_close_date ? new Date(row.expected_close_date as string) : null,
+        createdAt: new Date(row.created_at as string),
+        relevanceScore: parseFloat(row.relevance_score as string) || 0,
+      }));
+
+      return Result.ok({ items, total });
+    } catch {
+      return Result.ok({ items: [], total: 0 });
+    }
+  }
+
+  /**
+   * Search tasks
+   */
+  private async searchTasks(
+    options: SearchOptions,
+    tsQuery: string,
+    limit: number,
+    offset: number
+  ): Promise<Result<{ items: TaskSearchResult[]; total: number }>> {
+    try {
+      const whereClause = `
+        WHERE tenant_id = $1
+        AND (
+          to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(description, ''))
+          @@ to_tsquery('english', $2)
+          OR title ILIKE $3
+        )
+      `;
+
+      const values: unknown[] = [options.tenantId, tsQuery, `%${options.query}%`];
+
+      // Count total
+      const countQuery = `SELECT COUNT(*) as total FROM tasks ${whereClause}`;
+      const countResult = await this.pool.query(countQuery, values);
+
+      if (countResult.isFailure) {
+        return Result.ok({ items: [], total: 0 });
+      }
+
+      const total = parseInt(countResult.getValue().rows[0]?.total as string || '0', 10);
+
+      // Get results
+      const dataQuery = `
+        SELECT
+          id, title, description, status, priority, due_date, created_at,
+          ts_rank(
+            to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(description, '')),
+            to_tsquery('english', $2)
+          ) as relevance_score
+        FROM tasks
+        ${whereClause}
+        ORDER BY relevance_score DESC, created_at DESC
+        LIMIT $4 OFFSET $5
+      `;
+
+      values.push(limit, offset);
+      const dataResult = await this.pool.query(dataQuery, values);
+
+      if (dataResult.isFailure) {
+        return Result.ok({ items: [], total: 0 });
+      }
+
+      const items: TaskSearchResult[] = dataResult.getValue().rows.map((row: Record<string, unknown>) => ({
+        type: 'task' as const,
+        id: row.id as string,
+        title: row.title as string,
+        description: row.description as string | null,
+        status: row.status as string,
+        priority: row.priority as string,
+        dueDate: row.due_date ? new Date(row.due_date as string) : null,
+        createdAt: new Date(row.created_at as string),
+        relevanceScore: parseFloat(row.relevance_score as string) || 0,
+      }));
+
+      return Result.ok({ items, total });
+    } catch {
+      return Result.ok({ items: [], total: 0 });
+    }
+  }
+
+  /**
    * Get autocomplete suggestions
    */
   async getAutocompleteSuggestions(
@@ -447,6 +696,94 @@ export class SearchService {
               score: 0.9,
             });
           }
+        }
+      }
+
+      // Customers autocomplete - use 'name' and 'company' columns from production schema
+      if (searchAll || entityTypes?.includes(SearchEntityType.CUSTOMER)) {
+        try {
+          const customerQuery = `
+            SELECT id, COALESCE(name, company) as company_name, email,
+                   COALESCE(metadata->>'tier', type, 'standard') as tier
+            FROM customers
+            WHERE tenant_id = $1
+            AND (name ILIKE $2 OR company ILIKE $2 OR email ILIKE $2)
+            LIMIT $3
+          `;
+
+          const customerResult = await this.pool.query(customerQuery, [tenantId, searchPattern, limit]);
+
+          if (customerResult.isSuccess) {
+            for (const row of customerResult.getValue().rows) {
+              suggestions.push({
+                type: SearchEntityType.CUSTOMER,
+                id: row.id as string,
+                text: row.company_name as string,
+                subtitle: `${row.tier || 'standard'} - ${row.email}`,
+                score: 0.95,
+              });
+            }
+          }
+        } catch {
+          // Ignore if table doesn't exist
+        }
+      }
+
+      // Opportunities autocomplete
+      if (searchAll || entityTypes?.includes(SearchEntityType.OPPORTUNITY)) {
+        try {
+          const oppQuery = `
+            SELECT id, name, value, stage
+            FROM opportunities
+            WHERE tenant_id = $1
+            AND name ILIKE $2
+            LIMIT $3
+          `;
+
+          const oppResult = await this.pool.query(oppQuery, [tenantId, searchPattern, limit]);
+
+          if (oppResult.isSuccess) {
+            for (const row of oppResult.getValue().rows) {
+              suggestions.push({
+                type: SearchEntityType.OPPORTUNITY,
+                id: row.id as string,
+                text: row.name as string,
+                subtitle: `$${Number(row.value).toLocaleString()} - ${row.stage}`,
+                score: 0.85,
+              });
+            }
+          }
+        } catch {
+          // Ignore if table doesn't exist
+        }
+      }
+
+      // Tasks autocomplete
+      if (searchAll || entityTypes?.includes(SearchEntityType.TASK)) {
+        try {
+          const taskQuery = `
+            SELECT id, title, status, priority
+            FROM tasks
+            WHERE tenant_id = $1
+            AND title ILIKE $2
+            LIMIT $3
+          `;
+
+          const taskResult = await this.pool.query(taskQuery, [tenantId, searchPattern, limit]);
+
+          if (taskResult.isSuccess) {
+            for (const row of taskResult.getValue().rows) {
+              suggestions.push({
+                type: SearchEntityType.TASK,
+                id: row.id as string,
+                text: row.title as string,
+                subtitle: `${row.priority} - ${row.status}`,
+                score: 0.8,
+              });
+            }
+          }
+        } catch {
+          // Ignore if table doesn't exist
         }
       }
 

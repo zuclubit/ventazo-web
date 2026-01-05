@@ -6,7 +6,7 @@
 /**
  * AI Provider type
  */
-export type AIProvider = 'openai' | 'gemini';
+export type AIProvider = 'openai' | 'gemini' | 'bot-helper';
 
 /**
  * Chat message role

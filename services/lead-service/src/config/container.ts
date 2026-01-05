@@ -20,7 +20,7 @@ import { SearchService } from '../infrastructure/search';
 import { TaskService } from '../infrastructure/tasks';
 import { OpportunityService } from '../infrastructure/opportunities';
 import { CustomerService } from '../infrastructure/customers';
-import { AuthService, InvitationService, OnboardingService, OTPService, TurnstileService } from '../infrastructure/auth';
+import { AuthService, InvitationService, OnboardingService, OTPService, TurnstileService, PasswordService, JwtService } from '../infrastructure/auth';
 import { CalendarService } from '../infrastructure/calendar';
 import { NotesService } from '../infrastructure/notes';
 import { StorageService, ImageService } from '../infrastructure/storage';
@@ -65,8 +65,27 @@ import { AdvancedReportService } from '../infrastructure/advanced-reports';
 import { CustomFieldService } from '../infrastructure/custom-fields';
 import { WorkflowBuilderService } from '../infrastructure/workflow-builder';
 import { IntegrationConnectorService } from '../infrastructure/integration-connectors';
+import { KanbanService } from '../infrastructure/kanban';
+import { SecurityService } from '../infrastructure/security';
+import { DataManagementService } from '../infrastructure/data-management';
+import { UserTagsService } from '../infrastructure/user-tags';
+import { NotificationOrchestrator, NotificationPreferencesService } from '../infrastructure/messaging';
 import { ILeadRepository } from '../domain/repositories';
-import { getDatabaseConfig, getEventsConfig } from './environment';
+
+// AI Agent Services
+import {
+  ToolRegistryService,
+  ToolExecutorService,
+  ConfirmationGateService,
+  AIAuditLoggerService,
+} from '../infrastructure/ai-agent/services';
+import {
+  AIAgentOrchestrator,
+  IntentClassifier,
+  ActionPlanner,
+  ResponseGenerator,
+} from '../infrastructure/ai-agent/orchestrator';
+import { getDatabaseConfig, getEventsConfig, getResendConfig } from './environment';
 
 // Command/Query Bus and Handlers
 import { CommandBus, QueryBus, ICommandBus, IQueryBus } from '../application/common';
@@ -162,8 +181,33 @@ export const setupContainer = async (): Promise<void> => {
     },
   });
 
-  // Register EmailService (singleton)
+  // Register EmailService (singleton) and initialize with Resend config
   container.registerSingleton(EmailService);
+
+  // Initialize EmailService with Resend configuration
+  const resendConfig = getResendConfig();
+  if (resendConfig.isEnabled) {
+    const emailService = container.resolve(EmailService);
+    const emailInitResult = await emailService.initialize({
+      provider: 'resend',
+      from: {
+        email: resendConfig.fromEmail,
+        name: resendConfig.fromName,
+      },
+      resend: {
+        apiKey: resendConfig.apiKey,
+      },
+    });
+
+    if (emailInitResult.isFailure) {
+      console.warn('[Container] EmailService initialization failed:', emailInitResult.error);
+      console.warn('[Container] Email notifications will be disabled');
+    } else {
+      console.log('✓ EmailService initialized with Resend');
+    }
+  } else {
+    console.warn('[Container] RESEND_API_KEY not configured - email notifications disabled');
+  }
 
   // Register QueueService (singleton)
   container.registerSingleton(QueueService);
@@ -242,12 +286,26 @@ export const setupContainer = async (): Promise<void> => {
     },
   });
 
+  // Register PasswordService (singleton for password hashing/validation)
+  container.registerSingleton(PasswordService);
+  container.register('PasswordService', {
+    useFactory: (c) => c.resolve(PasswordService),
+  });
+
+  // Register JwtService (singleton for JWT token generation/validation)
+  container.registerSingleton(JwtService);
+  container.register('JwtService', {
+    useFactory: (c) => c.resolve(JwtService),
+  });
+
   // Register InvitationService
   container.register(InvitationService, {
     useFactory: (c) => {
       const pool = c.resolve(DatabasePool);
       const emailService = c.resolve(EmailService);
-      return new InvitationService(pool, emailService);
+      const passwordService = c.resolve(PasswordService);
+      const jwtService = c.resolve(JwtService);
+      return new InvitationService(pool, emailService, passwordService, jwtService);
     },
   });
   container.register('InvitationService', {
@@ -290,11 +348,30 @@ export const setupContainer = async (): Promise<void> => {
     },
   });
 
-  // Register NotesService
+  // Register NotificationPreferencesService (required by NotificationOrchestrator)
+  container.register(NotificationPreferencesService, {
+    useFactory: (c) => {
+      const pool = c.resolve(DatabasePool);
+      return new NotificationPreferencesService(pool);
+    },
+  });
+
+  // Register NotificationOrchestrator (for dispatching notifications across channels)
+  container.register(NotificationOrchestrator, {
+    useFactory: (c) => {
+      const pool = c.resolve(DatabasePool);
+      const preferencesService = c.resolve(NotificationPreferencesService);
+      return new NotificationOrchestrator(pool, preferencesService);
+    },
+  });
+
+  // Register NotesService (with notification support for @mentions)
   container.register(NotesService, {
     useFactory: (c) => {
       const pool = c.resolve(DatabasePool);
-      return new NotesService(pool);
+      const notificationOrchestrator = c.resolve(NotificationOrchestrator);
+      const userTagsService = c.resolve(UserTagsService);
+      return new NotesService(pool, notificationOrchestrator, userTagsService);
     },
   });
 
@@ -423,6 +500,18 @@ export const setupContainer = async (): Promise<void> => {
   });
   container.register('QuoteService', {
     useFactory: (c) => c.resolve(QuoteService),
+  });
+
+  // Register ProposalTemplateService (PDF Layout/Styling Templates)
+  const { ProposalTemplateService } = await import('../infrastructure/proposals/index.js');
+  container.register(ProposalTemplateService, {
+    useFactory: (c) => {
+      const pool = c.resolve(DatabasePool);
+      return new ProposalTemplateService(pool);
+    },
+  });
+  container.register('ProposalTemplateService', {
+    useFactory: (c) => c.resolve(ProposalTemplateService),
   });
 
   // Register AIService
@@ -791,8 +880,143 @@ export const setupContainer = async (): Promise<void> => {
     useFactory: (c) => c.resolve(IntegrationConnectorService),
   });
 
+  // Register KanbanService (Enterprise Kanban with Event Sourcing)
+  container.register(KanbanService, {
+    useFactory: () => {
+      return new KanbanService(db);
+    },
+  });
+  container.register('KanbanService', {
+    useFactory: (c) => c.resolve(KanbanService),
+  });
+
+  // Register SecurityService (2FA, Sessions, Security Management)
+  container.register(SecurityService, {
+    useFactory: (c) => {
+      const pool = c.resolve(DatabasePool);
+      return new SecurityService(pool);
+    },
+  });
+  container.register('SecurityService', {
+    useFactory: (c) => c.resolve(SecurityService),
+  });
+
+  // Register DataManagementService (Export, Import, Storage)
+  container.register(DataManagementService, {
+    useFactory: (c) => {
+      const pool = c.resolve(DatabasePool);
+      return new DataManagementService(pool);
+    },
+  });
+  container.register('DataManagementService', {
+    useFactory: (c) => c.resolve(DataManagementService),
+  });
+
+  // Register UserTagsService (Group Labels for Notifications & Mentions)
+  container.register(UserTagsService, {
+    useFactory: (c) => {
+      const pool = c.resolve(DatabasePool);
+      return new UserTagsService(pool);
+    },
+  });
+  container.register('UserTagsService', {
+    useFactory: (c) => c.resolve(UserTagsService),
+  });
+
   // Register DatabasePool for injection by token
   container.register('DatabasePool', { useValue: dbPool });
+
+  // ==================== AI Agent Services ====================
+
+  // Register Tool Registry (manages available AI tools)
+  container.registerSingleton(ToolRegistryService);
+  container.register('IToolRegistry', {
+    useFactory: (c) => c.resolve(ToolRegistryService),
+  });
+
+  // Register Tool Executor (executes AI tools)
+  container.register(ToolExecutorService, {
+    useFactory: (c) => {
+      const toolRegistry = c.resolve(ToolRegistryService);
+      return new ToolExecutorService(toolRegistry);
+    },
+  });
+  container.register('IToolExecutor', {
+    useFactory: (c) => c.resolve(ToolExecutorService),
+  });
+
+  // Register Confirmation Gate (Human-in-the-Loop)
+  container.registerSingleton(ConfirmationGateService);
+  container.register('IConfirmationGate', {
+    useFactory: (c) => c.resolve(ConfirmationGateService),
+  });
+
+  // Register AI Audit Logger
+  container.register(AIAuditLoggerService, {
+    useFactory: (c) => {
+      const pool = c.resolve(DatabasePool);
+      return new AIAuditLoggerService(pool);
+    },
+  });
+  container.register('IAIAuditLogger', {
+    useFactory: (c) => c.resolve(AIAuditLoggerService),
+  });
+
+  // Register Intent Classifier
+  container.register(IntentClassifier, {
+    useFactory: (c) => {
+      const aiService = c.resolve(AIService);
+      return new IntentClassifier(aiService);
+    },
+  });
+
+  // Register Action Planner
+  container.register(ActionPlanner, {
+    useFactory: (c) => {
+      const aiService = c.resolve(AIService);
+      const toolRegistry = c.resolve(ToolRegistryService);
+      return new ActionPlanner(aiService, toolRegistry);
+    },
+  });
+
+  // Register Response Generator
+  container.register(ResponseGenerator, {
+    useFactory: (c) => {
+      const aiService = c.resolve(AIService);
+      return new ResponseGenerator(aiService);
+    },
+  });
+
+  // Register AI Agent Orchestrator (main entry point)
+  container.register(AIAgentOrchestrator, {
+    useFactory: (c) => {
+      const pool = c.resolve(DatabasePool);
+      const aiService = c.resolve(AIService);
+      const intentClassifier = c.resolve(IntentClassifier);
+      const actionPlanner = c.resolve(ActionPlanner);
+      const responseGenerator = c.resolve(ResponseGenerator);
+      const toolRegistry = c.resolve(ToolRegistryService);
+      const toolExecutor = c.resolve(ToolExecutorService);
+      const confirmationGate = c.resolve(ConfirmationGateService);
+      const auditLogger = c.resolve(AIAuditLoggerService);
+      return new AIAgentOrchestrator(
+        pool,
+        aiService,
+        intentClassifier,
+        actionPlanner,
+        responseGenerator,
+        toolRegistry,
+        toolExecutor,
+        confirmationGate,
+        auditLogger
+      );
+    },
+  });
+  container.register('AIAgentOrchestrator', {
+    useFactory: (c) => c.resolve(AIAgentOrchestrator),
+  });
+
+  console.log('✓ AI Agent services configured');
 
   // Register Command Bus with handlers
   const commandBus = new CommandBus();

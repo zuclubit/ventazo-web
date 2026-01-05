@@ -20,22 +20,23 @@ const badgeVariants = cva(
           'border-transparent bg-success text-success-foreground hover:bg-success/80',
         warning:
           'border-transparent bg-warning text-warning-foreground hover:bg-warning/80',
-        // Lead score variants - Using CSS Variables
-        hot: 'border-transparent bg-[var(--score-hot-bg)] text-[var(--score-hot)] dark:bg-emerald-900/50 dark:text-emerald-300',
-        warm: 'border-transparent bg-[var(--score-warm-bg)] text-[var(--score-warm)] dark:bg-amber-900/50 dark:text-amber-300',
-        cold: 'border-transparent bg-[var(--score-cold-bg)] text-[var(--score-cold)] dark:bg-red-900/50 dark:text-red-300',
-        // Lead stage variants - Using CSS Variables
-        new: 'border-transparent bg-[var(--stage-new)]/15 text-[var(--stage-new)] dark:bg-blue-900/30 dark:text-blue-300',
+        // Lead score variants - Using CSS Variables (Dark mode handled by globals.css)
+        // SEMANTIC: hot=orange (high priority), warm=amber (medium), cold=gray (low)
+        hot: 'border-transparent bg-[var(--score-hot-bg)] text-[var(--score-hot)]',
+        warm: 'border-transparent bg-[var(--score-warm-bg)] text-[var(--score-warm)]',
+        cold: 'border-transparent bg-[var(--score-cold-bg)] text-[var(--score-cold)]',
+        // Lead stage variants - Using CSS Variables (pipeline-*-bg tokens)
+        new: 'border-transparent bg-[var(--pipeline-new-bg)] text-[var(--pipeline-new-text)]',
         contacted:
-          'border-transparent bg-[var(--stage-contacted)]/15 text-[var(--stage-contacted)] dark:bg-amber-900/30 dark:text-amber-300',
+          'border-transparent bg-[var(--pipeline-contacted-bg)] text-[var(--pipeline-contacted-text)]',
         qualified:
-          'border-transparent bg-[var(--stage-qualified)]/15 text-[var(--stage-qualified)] dark:bg-purple-900/30 dark:text-purple-300',
+          'border-transparent bg-[var(--pipeline-qualified-bg)] text-[var(--pipeline-qualified-text)]',
         proposal:
-          'border-transparent bg-[var(--stage-proposal)]/15 text-[var(--stage-proposal)] dark:bg-teal-900/30 dark:text-teal-300',
+          'border-transparent bg-[var(--pipeline-proposal-bg)] text-[var(--pipeline-proposal-text)]',
         negotiation:
-          'border-transparent bg-[var(--brand-orange)]/15 text-[var(--brand-orange)] dark:bg-orange-900/30 dark:text-orange-300',
+          'border-transparent bg-[var(--pipeline-negotiation-bg)] text-[var(--pipeline-negotiation-text)]',
         won: 'border-transparent bg-[var(--stage-won)] text-white',
-        lost: 'border-transparent bg-[var(--stage-lost)]/80 text-white',
+        lost: 'border-transparent bg-[var(--stage-lost)] text-white opacity-90',
         // VENTAZO 2025 Premium Variants
         'hot-glow': 'border-[var(--hot-orange-border)] bg-[var(--hot-orange)]/15 text-[var(--hot-orange)] shadow-[0_0_12px_var(--hot-orange-glow)]',
         'score-hot': 'score-indicator hot',

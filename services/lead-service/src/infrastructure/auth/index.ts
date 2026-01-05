@@ -34,6 +34,8 @@ export {
   type BulkInvitationRequest,
   type BulkInvitationResult,
   type InvitationWithTenant,
+  type AcceptInvitationWithSignupRequest,
+  type AcceptInvitationWithSignupResponse,
 } from './invitation.service';
 
 export {
@@ -59,3 +61,15 @@ export {
   type TurnstileVerifyRequest,
   type TurnstileVerifyResponse,
 } from './turnstile.service';
+
+export {
+  PasswordService,
+  type PasswordValidationResult,
+} from './password.service';
+
+export {
+  JwtService,
+  type TokenPayload,
+  type TokenPair,
+  type RefreshTokenData,
+} from './jwt.service';

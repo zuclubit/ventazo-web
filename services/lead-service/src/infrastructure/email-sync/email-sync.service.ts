@@ -289,11 +289,12 @@ export class EmailSyncService {
       const jobId = uuidv4();
       const now = new Date();
 
+      // Use actual database column names: job_type, messages_synced, total_messages
       const jobQuery = `
         INSERT INTO email_sync_jobs (
-          id, account_id, tenant_id, type, status,
-          processed_messages, new_messages, updated_messages,
-          started_at, created_at
+          id, account_id, tenant_id, job_type, status,
+          messages_synced, total_messages,
+          started_at, created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
       `;
@@ -306,7 +307,7 @@ export class EmailSyncService {
         'running',
         0,
         0,
-        0,
+        now,
         now,
         now,
       ]);
@@ -328,60 +329,109 @@ export class EmailSyncService {
    * Perform the actual sync
    */
   private async performSync(account: EmailAccount, jobId: string): Promise<void> {
+    let processedMessages = 0;
+    let newMessages = 0;
+    let errorMessages = 0;
+    const errors: string[] = [];
+
     try {
       if (account.provider !== 'google' || !account.accessToken) {
         throw new Error('Invalid account configuration');
       }
 
-      let processedMessages = 0;
-      let newMessages = 0;
+      console.log('[EmailSync] Starting sync for account:', account.email);
+
       let pageToken: string | undefined;
 
       // Sync messages
       do {
+        console.log('[EmailSync] Fetching messages batch, pageToken:', pageToken || 'none');
+
         const response = await this.gmailProvider.listMessages(account.accessToken, {
-          maxResults: 100,
+          maxResults: 50, // Reduced batch size for stability
           pageToken,
         });
 
-        if (!response.messages) break;
+        if (!response.messages) {
+          console.log('[EmailSync] No more messages found');
+          break;
+        }
+
+        console.log('[EmailSync] Got', response.messages.length, 'messages in batch');
 
         for (const msg of response.messages) {
-          const gmailMessage = await this.gmailProvider.getMessage(account.accessToken, msg.id);
-          const emailData = this.gmailProvider.parseMessage(
-            gmailMessage,
-            account.id,
-            account.tenantId
-          );
+          try {
+            // Check if message exists first (use provider_message_id, not external_id)
+            const existingResult = await this.pool.query(
+              `SELECT id FROM email_messages WHERE account_id = $1 AND provider_message_id = $2`,
+              [account.id, msg.id]
+            );
 
-          // Check if message exists
-          const existingResult = await this.pool.query(
-            `SELECT id FROM email_messages WHERE account_id = $1 AND external_id = $2`,
-            [account.id, emailData.externalId]
-          );
+            if (existingResult.isSuccess && existingResult.value?.rows?.[0]) {
+              // Message already exists, skip
+              processedMessages++;
+              continue;
+            }
 
-          if (existingResult.isSuccess && !existingResult.value?.rows?.[0]) {
+            // Get full message
+            const gmailMessage = await this.gmailProvider.getMessage(account.accessToken, msg.id);
+            const emailData = this.gmailProvider.parseMessage(
+              gmailMessage,
+              account.id,
+              account.tenantId
+            );
+
             // Insert new message
             await this.saveEmailMessage(emailData, account.tenantId);
             newMessages++;
+            processedMessages++;
+
+          } catch (msgError) {
+            errorMessages++;
+            const errorMsg = msgError instanceof Error ? msgError.message : 'Unknown error';
+            errors.push(`Message ${msg.id}: ${errorMsg}`);
+            console.error('[EmailSync] Failed to process message:', msg.id, errorMsg);
+
+            // Continue with other messages
+            processedMessages++;
           }
 
-          processedMessages++;
-
-          // Update job progress
-          await this.pool.query(
-            `UPDATE email_sync_jobs SET processed_messages = $1, new_messages = $2 WHERE id = $3`,
-            [processedMessages, newMessages, jobId]
-          );
+          // Update job progress every 10 messages
+          if (processedMessages % 10 === 0) {
+            await this.pool.query(
+              `UPDATE email_sync_jobs SET messages_synced = $1, total_messages = $2, updated_at = NOW() WHERE id = $3`,
+              [newMessages, processedMessages, jobId]
+            );
+          }
         }
 
         pageToken = response.nextPageToken;
       } while (pageToken);
 
-      // Mark job as completed
+      console.log('[EmailSync] Sync completed:', {
+        processed: processedMessages,
+        new: newMessages,
+        errors: errorMessages,
+      });
+
+      // Mark job as completed (even with some errors)
+      const finalStatus = errorMessages > 0 && newMessages === 0 ? 'failed' : 'completed';
       await this.pool.query(
-        `UPDATE email_sync_jobs SET status = 'completed', completed_at = NOW() WHERE id = $1`,
-        [jobId]
+        `UPDATE email_sync_jobs SET
+          status = $1,
+          messages_synced = $2,
+          total_messages = $3,
+          error = $4,
+          completed_at = NOW(),
+          updated_at = NOW()
+        WHERE id = $5`,
+        [
+          finalStatus,
+          newMessages,
+          processedMessages,
+          errors.length > 0 ? errors.slice(0, 5).join('; ') : null,
+          jobId
+        ]
       );
 
       // Update account last sync time
@@ -389,10 +439,20 @@ export class EmailSyncService {
         `UPDATE email_accounts SET last_sync_at = NOW(), updated_at = NOW() WHERE id = $1`,
         [account.id]
       );
+
     } catch (error) {
+      console.error('[EmailSync] Sync failed catastrophically:', error);
+
+      // Use actual column name: error (not error_message)
       await this.pool.query(
-        `UPDATE email_sync_jobs SET status = 'failed', error_message = $1, completed_at = NOW() WHERE id = $2`,
-        [error instanceof Error ? error.message : 'Unknown error', jobId]
+        `UPDATE email_sync_jobs SET
+          status = 'failed',
+          error = $1,
+          messages_synced = $2,
+          completed_at = NOW(),
+          updated_at = NOW()
+        WHERE id = $3`,
+        [error instanceof Error ? error.message : 'Unknown error', newMessages, jobId]
       );
     }
   }
@@ -407,54 +467,75 @@ export class EmailSyncService {
     const id = uuidv4();
     const now = new Date();
 
+    // FIXED: Use actual database column names (not Drizzle schema names)
+    // Mapping: external_id → provider_message_id, external_thread_id → provider_thread_id
+    // from_email → from_address, body/body_plain → body_text
+    // Removed columns that don't exist: snippet, in_reply_to, has_attachments, synced_at
     const query = `
       INSERT INTO email_messages (
-        id, tenant_id, account_id, external_id, external_thread_id,
-        subject, snippet, body, body_html, body_plain,
-        from_email, from_name, to_addresses, cc_addresses, bcc_addresses,
-        message_id, in_reply_to, has_attachments, attachments,
+        id, tenant_id, account_id, provider_message_id, provider_thread_id,
+        subject, body_text, body_html,
+        from_address, from_name, to_addresses, cc_addresses, bcc_addresses,
+        message_id, attachments,
         is_read, is_starred, is_archived, is_draft, is_sent,
-        labels, folder, received_at, synced_at, created_at, updated_at
+        labels, folder, received_at, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-        $11, $12, $13, $14, $15, $16, $17, $18, $19,
-        $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
+        $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+        $21, $22, $23, $24, $25
       )
       RETURNING id
     `;
 
-    await this.pool.query(query, [
+    const values = [
+      id,                                           // $1
+      tenantId,                                     // $2
+      data.accountId,                               // $3
+      data.externalId,                              // $4 → provider_message_id
+      data.externalThreadId || null,                // $5 → provider_thread_id
+      data.subject || '(No Subject)',               // $6
+      data.bodyPlain || data.body || '',            // $7 → body_text
+      data.bodyHtml || null,                        // $8 → body_html
+      data.from?.email || 'unknown@unknown.com',    // $9 → from_address
+      data.from?.name || null,                      // $10 → from_name
+      JSON.stringify(data.to || []),                // $11
+      JSON.stringify(data.cc || []),                // $12
+      JSON.stringify(data.bcc || []),               // $13
+      data.messageId || null,                       // $14
+      JSON.stringify(data.attachments || []),       // $15
+      data.isRead || false,                         // $16
+      data.isStarred || false,                      // $17
+      data.isArchived || false,                     // $18
+      data.isDraft || false,                        // $19
+      data.isSent || false,                         // $20
+      JSON.stringify(data.labels || []),            // $21
+      data.folder || 'INBOX',                       // $22
+      data.receivedAt || now,                       // $23
+      now,                                          // $24 → created_at
+      now,                                          // $25 → updated_at
+    ];
+
+    // Log for debugging
+    console.log('[EmailSync] Saving message:', {
       id,
-      tenantId,
-      data.accountId,
-      data.externalId,
-      data.externalThreadId,
-      data.subject,
-      data.snippet,
-      data.body,
-      data.bodyHtml,
-      data.bodyPlain,
-      data.from?.email,
-      data.from?.name,
-      JSON.stringify(data.to || []),
-      JSON.stringify(data.cc || []),
-      JSON.stringify(data.bcc || []),
-      data.messageId,
-      data.inReplyTo,
-      data.hasAttachments || false,
-      JSON.stringify(data.attachments || []),
-      data.isRead || false,
-      data.isStarred || false,
-      data.isArchived || false,
-      data.isDraft || false,
-      data.isSent || false,
-      JSON.stringify(data.labels || []),
-      data.folder || 'INBOX',
-      data.receivedAt,
-      now,
-      now,
-      now,
-    ]);
+      externalId: data.externalId,
+      subject: data.subject?.substring(0, 50),
+      from: data.from?.email,
+    });
+
+    const result = await this.pool.query(query, values);
+
+    if (result.isFailure) {
+      console.error('[EmailSync] Failed to save message:', result.error);
+      throw new Error(`Failed to save email message: ${result.error}`);
+    }
+
+    if (!result.value?.rows?.[0]) {
+      console.error('[EmailSync] INSERT returned no rows');
+      throw new Error('Failed to save email message: no rows returned');
+    }
+
+    console.log('[EmailSync] Message saved successfully:', id);
 
     // Try to auto-match to CRM entities
     if (data.from?.email) {
@@ -623,7 +704,7 @@ export class EmailSyncService {
       }
 
       if (options.search) {
-        conditions.push(`(subject ILIKE $${paramIndex} OR body_plain ILIKE $${paramIndex})`);
+        conditions.push(`(subject ILIKE $${paramIndex} OR body_text ILIKE $${paramIndex})`);
         values.push(`%${options.search}%`);
         paramIndex++;
       }
@@ -736,22 +817,28 @@ export class EmailSyncService {
 
   /**
    * Map database row to EmailMessage
+   * FIXED: Uses actual DB column names (provider_message_id, from_address, body_text, etc.)
    */
   private mapRowToMessage(row: Record<string, unknown>): EmailMessage {
+    // Parse attachments to check if there are any
+    const attachments = typeof row.attachments === 'string'
+      ? JSON.parse(row.attachments)
+      : row.attachments as EmailMessage['attachments'];
+
     return {
       id: row.id as string,
       tenantId: row.tenant_id as string,
       accountId: row.account_id as string,
-      externalId: row.external_id as string,
-      externalThreadId: row.external_thread_id as string | undefined,
+      externalId: row.provider_message_id as string,  // DB: provider_message_id
+      externalThreadId: row.provider_thread_id as string | undefined,  // DB: provider_thread_id
       threadId: row.thread_id as string | undefined,
       subject: row.subject as string,
-      snippet: row.snippet as string | undefined,
-      body: row.body as string,
+      snippet: undefined,  // Column doesn't exist in DB
+      body: row.body_text as string || '',  // DB: body_text
       bodyHtml: row.body_html as string | undefined,
-      bodyPlain: row.body_plain as string | undefined,
+      bodyPlain: row.body_text as string | undefined,  // DB: body_text
       from: {
-        email: row.from_email as string,
+        email: row.from_address as string,  // DB: from_address
         name: row.from_name as string | undefined,
       },
       to: typeof row.to_addresses === 'string'
@@ -764,12 +851,10 @@ export class EmailSyncService {
         ? JSON.parse(row.bcc_addresses)
         : row.bcc_addresses as EmailMessage['bcc'],
       messageId: row.message_id as string | undefined,
-      inReplyTo: row.in_reply_to as string | undefined,
-      references: row.references as string[] | undefined,
-      hasAttachments: row.has_attachments as boolean,
-      attachments: typeof row.attachments === 'string'
-        ? JSON.parse(row.attachments)
-        : row.attachments as EmailMessage['attachments'],
+      inReplyTo: undefined,  // Column doesn't exist (has in_reply_to_id UUID)
+      references: undefined,  // Column doesn't exist
+      hasAttachments: Array.isArray(attachments) && attachments.length > 0,  // Derived from attachments
+      attachments: attachments || [],
       isRead: row.is_read as boolean,
       isStarred: row.is_starred as boolean,
       isArchived: row.is_archived as boolean,
@@ -781,10 +866,10 @@ export class EmailSyncService {
       folder: row.folder as string,
       linkedEntityType: row.linked_entity_type as EmailMessage['linkedEntityType'],
       linkedEntityId: row.linked_entity_id as string | undefined,
-      isLinkedManually: row.is_linked_manually as boolean,
+      isLinkedManually: false,  // Column doesn't exist
       sentAt: row.sent_at ? new Date(row.sent_at as string) : undefined,
       receivedAt: row.received_at ? new Date(row.received_at as string) : undefined,
-      syncedAt: new Date(row.synced_at as string),
+      syncedAt: new Date(row.created_at as string),  // Use created_at since synced_at doesn't exist
       createdAt: new Date(row.created_at as string),
       updatedAt: new Date(row.updated_at as string),
     };
@@ -792,20 +877,25 @@ export class EmailSyncService {
 
   /**
    * Map database row to EmailSyncJob
+   * Note: Uses actual DB column names: job_type, messages_synced, error
    */
   private mapRowToSyncJob(row: Record<string, unknown>): EmailSyncJob {
     return {
       id: row.id as string,
       accountId: row.account_id as string,
       tenantId: row.tenant_id as string,
-      type: row.type as EmailSyncJob['type'],
+      // DB uses job_type, not type
+      type: (row.job_type || row.type) as EmailSyncJob['type'],
       folder: row.folder as string | undefined,
       status: row.status as EmailSyncJob['status'],
       totalMessages: row.total_messages as number | undefined,
-      processedMessages: row.processed_messages as number,
-      newMessages: row.new_messages as number,
-      updatedMessages: row.updated_messages as number,
-      errorMessage: row.error_message as string | undefined,
+      // DB uses messages_synced, not processed_messages
+      processedMessages: (row.messages_synced || row.processed_messages || 0) as number,
+      // These columns don't exist in DB, provide defaults
+      newMessages: (row.new_messages || 0) as number,
+      updatedMessages: (row.updated_messages || 0) as number,
+      // DB uses error, not error_message
+      errorMessage: (row.error || row.error_message) as string | undefined,
       errorDetails: row.error_details as Record<string, unknown> | undefined,
       startedAt: row.started_at ? new Date(row.started_at as string) : undefined,
       completedAt: row.completed_at ? new Date(row.completed_at as string) : undefined,

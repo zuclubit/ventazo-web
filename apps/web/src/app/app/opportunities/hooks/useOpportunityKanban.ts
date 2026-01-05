@@ -3,12 +3,17 @@
 /**
  * useOpportunityKanban Hook
  *
- * Custom hook that provides opportunity Kanban management including:
- * - Pipeline data fetching
- * - Stage movement with optimistic updates
+ * Enhanced custom hook for opportunity Kanban management:
+ * - Pipeline data fetching with proper state management
+ * - Stage movement with optimistic updates and validation
+ * - Stage transition validation (open → open only, won/lost via dialogs)
+ * - Per-opportunity loading states
+ * - Retry logic with exponential backoff
  * - Win/Lost dialog state management
+ * - Undo capability for recent moves
  *
- * Homologated with useKanbanDragDrop patterns from leads.
+ * Clean Architecture: Frontend presentation logic only.
+ * Backend handles business rules validation.
  */
 
 import * as React from 'react';
@@ -19,9 +24,24 @@ import {
   useUpdateOpportunityStage,
   opportunityQueryKeys,
   type Opportunity,
+  type OpportunityPipelineStage,
   type PipelineColumn,
   type PipelineView,
+  type OpportunityStageType,
 } from '@/lib/opportunities';
+
+// ============================================
+// Constants
+// ============================================
+
+/** Maximum retry attempts for failed moves */
+const MAX_RETRY_ATTEMPTS = 3;
+
+/** Base delay for exponential backoff (ms) */
+const BASE_RETRY_DELAY = 1000;
+
+/** Time window for undo capability (ms) */
+const UNDO_WINDOW_MS = 5000;
 
 // ============================================
 // Types
@@ -29,18 +49,28 @@ import {
 
 export interface UseOpportunityKanbanOptions {
   /** Callback when a move is successful */
-  onMoveSuccess?: () => void;
+  onMoveSuccess?: (opportunityId: string, targetStageId: string) => void;
   /** Callback when a move fails */
-  onMoveError?: (error: Error) => void;
+  onMoveError?: (error: Error, opportunityId: string) => void;
+  /** Callback when trying to move to a terminal stage (won/lost) */
+  onTerminalStageAttempt?: (opportunity: Opportunity, stageType: OpportunityStageType) => void;
+  /** Enable undo capability for recent moves */
+  enableUndo?: boolean;
 }
 
 export interface UseOpportunityKanbanReturn {
   /** Pipeline columns with opportunities */
   columns: PipelineColumn[];
+  /** Pipeline stages for reference */
+  stages: OpportunityPipelineStage[];
   /** Whether the pipeline is loading */
   isLoading: boolean;
-  /** Whether a move operation is in progress */
+  /** Whether any move operation is in progress */
   isMoving: boolean;
+  /** Set of opportunity IDs currently being moved */
+  movingOpportunityIds: Set<string>;
+  /** Check if a specific opportunity is being moved */
+  isOpportunityMoving: (opportunityId: string) => boolean;
   /** Total opportunities count */
   totalOpportunities: number;
   /** Total amount in pipeline */
@@ -53,8 +83,108 @@ export interface UseOpportunityKanbanReturn {
   lostAmount: number;
   /** Move opportunity to a new stage */
   moveToStage: (opportunityId: string, stageId: string) => void;
+  /** Validate if a stage transition is allowed (frontend validation) */
+  canMoveToStage: (opportunityId: string, targetStageId: string) => StageTransitionValidation;
+  /** Get validation message for a stage transition */
+  getTransitionMessage: (opportunityId: string, targetStageId: string) => string | null;
+  /** Undo last move (if within undo window) */
+  undoLastMove: () => void;
+  /** Whether undo is available */
+  canUndo: boolean;
   /** Refetch pipeline data */
   refetchPipeline: () => void;
+}
+
+export interface StageTransitionValidation {
+  /** Whether the transition is allowed */
+  allowed: boolean;
+  /** Reason if not allowed */
+  reason?: string;
+  /** Suggested action if not allowed */
+  suggestedAction?: 'use_win_dialog' | 'use_lost_dialog' | 'reopen_first';
+}
+
+interface UndoState {
+  opportunityId: string;
+  sourceStageId: string;
+  targetStageId: string;
+  timestamp: number;
+}
+
+// ============================================
+// Helper Functions
+// ============================================
+
+/**
+ * Calculate delay for exponential backoff
+ */
+function getRetryDelay(attempt: number): number {
+  return BASE_RETRY_DELAY * Math.pow(2, attempt);
+}
+
+/**
+ * Wait for specified milliseconds
+ */
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Validate stage transition rules
+ *
+ * Business Rules:
+ * - open stages can freely move between each other
+ * - Cannot drag to won/lost stages (must use dialogs)
+ * - Won/lost opportunities cannot be moved (must reopen first)
+ */
+function validateStageTransition(
+  opportunity: Opportunity | undefined,
+  sourceStage: OpportunityPipelineStage | undefined,
+  targetStage: OpportunityPipelineStage | undefined
+): StageTransitionValidation {
+  if (!opportunity || !sourceStage || !targetStage) {
+    return { allowed: false, reason: 'Datos incompletos para validar transición' };
+  }
+
+  // Same stage - no move needed
+  if (sourceStage.id === targetStage.id) {
+    return { allowed: false, reason: 'La oportunidad ya está en esta etapa' };
+  }
+
+  // Check if opportunity is in a terminal state (won/lost)
+  if (opportunity.status === 'won' || opportunity.status === 'lost') {
+    return {
+      allowed: false,
+      reason: `La oportunidad está ${opportunity.status === 'won' ? 'ganada' : 'perdida'}. Debes reabrirla primero.`,
+      suggestedAction: 'reopen_first',
+    };
+  }
+
+  // Cannot drag to won stage - must use dialog
+  if (targetStage.stageType === 'won') {
+    return {
+      allowed: false,
+      reason: 'Usa el botón "Marcar Ganada" para cerrar como ganada',
+      suggestedAction: 'use_win_dialog',
+    };
+  }
+
+  // Cannot drag to lost stage - must use dialog
+  if (targetStage.stageType === 'lost') {
+    return {
+      allowed: false,
+      reason: 'Usa el botón "Marcar Perdida" para cerrar como perdida',
+      suggestedAction: 'use_lost_dialog',
+    };
+  }
+
+  // Open-to-open transitions are allowed
+  if (sourceStage.stageType === 'open' && targetStage.stageType === 'open') {
+    return { allowed: true };
+  }
+
+  // Default: allow (backend will validate further)
+  return { allowed: true };
 }
 
 // ============================================
@@ -64,7 +194,13 @@ export interface UseOpportunityKanbanReturn {
 export function useOpportunityKanban(
   options: UseOpportunityKanbanOptions = {}
 ): UseOpportunityKanbanReturn {
-  const { onMoveSuccess, onMoveError } = options;
+  const {
+    onMoveSuccess,
+    onMoveError,
+    onTerminalStageAttempt,
+    enableUndo = true,
+  } = options;
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -84,22 +220,148 @@ export function useOpportunityKanban(
   // Stage update mutation
   const updateStageMutation = useUpdateOpportunityStage();
 
+  // Per-opportunity loading states
+  const [movingIds, setMovingIds] = React.useState<Set<string>>(new Set());
+
+  // Undo state
+  const [undoState, setUndoState] = React.useState<UndoState | null>(null);
+
+  // Clear undo state after window expires
+  React.useEffect(() => {
+    if (!undoState) return;
+
+    const timeout = setTimeout(() => {
+      setUndoState(null);
+    }, UNDO_WINDOW_MS);
+
+    return () => clearTimeout(timeout);
+  }, [undoState]);
+
+  // Find opportunity by ID
+  const findOpportunityById = React.useCallback(
+    (opportunityId: string): Opportunity | undefined => {
+      for (const column of columns) {
+        const found = column.opportunities.find((opp) => opp.id === opportunityId);
+        if (found) return found;
+      }
+      return undefined;
+    },
+    [columns]
+  );
+
+  // Find stage by ID
+  const findStageById = React.useCallback(
+    (stageId: string): OpportunityPipelineStage | undefined => {
+      return stages.find((s) => s.id === stageId);
+    },
+    [stages]
+  );
+
+  // Find column by opportunity ID
+  const findColumnByOpportunityId = React.useCallback(
+    (opportunityId: string): PipelineColumn | undefined => {
+      return columns.find((column) =>
+        column.opportunities.some((opp) => opp.id === opportunityId)
+      );
+    },
+    [columns]
+  );
+
+  // Validate stage transition
+  const canMoveToStage = React.useCallback(
+    (opportunityId: string, targetStageId: string): StageTransitionValidation => {
+      const opportunity = findOpportunityById(opportunityId);
+      const currentColumn = findColumnByOpportunityId(opportunityId);
+      const targetStage = findStageById(targetStageId);
+
+      return validateStageTransition(
+        opportunity,
+        currentColumn?.stage,
+        targetStage
+      );
+    },
+    [findOpportunityById, findColumnByOpportunityId, findStageById]
+  );
+
+  // Get transition message
+  const getTransitionMessage = React.useCallback(
+    (opportunityId: string, targetStageId: string): string | null => {
+      const validation = canMoveToStage(opportunityId, targetStageId);
+      return validation.allowed ? null : (validation.reason ?? 'Transición no permitida');
+    },
+    [canMoveToStage]
+  );
+
+  // Check if a specific opportunity is being moved
+  const isOpportunityMoving = React.useCallback(
+    (opportunityId: string): boolean => {
+      return movingIds.has(opportunityId);
+    },
+    [movingIds]
+  );
+
+  // Move to stage with retry logic
+  const moveToStageWithRetry = React.useCallback(
+    async (
+      opportunityId: string,
+      targetStageId: string,
+      attempt: number = 0
+    ): Promise<void> => {
+      try {
+        await updateStageMutation.mutateAsync({
+          opportunityId,
+          data: { stageId: targetStageId },
+        });
+      } catch (error) {
+        // Check if we should retry
+        if (attempt < MAX_RETRY_ATTEMPTS - 1) {
+          const delay = getRetryDelay(attempt);
+          await wait(delay);
+          return moveToStageWithRetry(opportunityId, targetStageId, attempt + 1);
+        }
+        throw error;
+      }
+    },
+    [updateStageMutation]
+  );
+
   // Move to stage handler with optimistic update
   const moveToStage = React.useCallback(
     async (opportunityId: string, targetStageId: string) => {
-      // Find current column
-      const currentColumn = columns.find((col) =>
-        col.opportunities.some((opp) => opp.id === opportunityId)
-      );
+      // Find current column and opportunity
+      const currentColumn = findColumnByOpportunityId(opportunityId);
+      const opportunity = findOpportunityById(opportunityId);
 
-      if (!currentColumn) return;
+      if (!currentColumn || !opportunity) return;
 
       // If same stage, do nothing
       if (currentColumn.stage.id === targetStageId) return;
 
       // Find target stage
-      const targetStage = stages.find((s) => s.id === targetStageId);
+      const targetStage = findStageById(targetStageId);
       if (!targetStage) return;
+
+      // Validate transition
+      const validation = canMoveToStage(opportunityId, targetStageId);
+      if (!validation.allowed) {
+        // If attempting to move to terminal stage, trigger callback
+        if (validation.suggestedAction === 'use_win_dialog' || validation.suggestedAction === 'use_lost_dialog') {
+          onTerminalStageAttempt?.(opportunity, targetStage.stageType);
+        }
+
+        toast({
+          title: 'Acción no permitida',
+          description: validation.reason,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Store source for undo
+      const sourceStageId = currentColumn.stage.id;
+
+      // Mark as moving
+      setMovingIds((prev) => new Set(prev).add(opportunityId));
 
       // Optimistic update
       queryClient.setQueryData<PipelineView>(
@@ -115,41 +377,41 @@ export function useOpportunityKanban(
 
           // Find and remove opportunity from source column
           let movedOpportunity: Opportunity | undefined;
-          const sourceColumn = newColumns.find(
+          const sourceCol = newColumns.find(
             (c) => c.stage.id === currentColumn.stage.id
           );
-          if (sourceColumn) {
-            const oppIndex = sourceColumn.opportunities.findIndex(
+          if (sourceCol) {
+            const oppIndex = sourceCol.opportunities.findIndex(
               (o) => o.id === opportunityId
             );
             if (oppIndex !== -1) {
-              [movedOpportunity] = sourceColumn.opportunities.splice(oppIndex, 1);
-              // Recalculate totals (only if opportunity was found)
+              [movedOpportunity] = sourceCol.opportunities.splice(oppIndex, 1);
+              // Recalculate totals
               if (movedOpportunity) {
-                sourceColumn.totalAmount -= movedOpportunity.amount;
-                sourceColumn.totalForecast -=
+                sourceCol.totalAmount -= movedOpportunity.amount;
+                sourceCol.totalForecast -=
                   (movedOpportunity.amount * movedOpportunity.probability) / 100;
+                sourceCol.count--;
               }
             }
           }
 
           // Add to target column
           if (movedOpportunity) {
-            const targetColumn = newColumns.find(
-              (c) => c.stage.id === targetStageId
-            );
-            if (targetColumn) {
+            const targetCol = newColumns.find((c) => c.stage.id === targetStageId);
+            if (targetCol) {
               // Update opportunity's stageId and probability
               movedOpportunity = {
                 ...movedOpportunity,
                 stageId: targetStageId,
                 probability: targetStage.probability,
               };
-              targetColumn.opportunities.push(movedOpportunity);
+              targetCol.opportunities.push(movedOpportunity);
               // Recalculate totals
-              targetColumn.totalAmount += movedOpportunity.amount;
-              targetColumn.totalForecast +=
+              targetCol.totalAmount += movedOpportunity.amount;
+              targetCol.totalForecast +=
                 (movedOpportunity.amount * movedOpportunity.probability) / 100;
+              targetCol.count++;
             }
           }
 
@@ -157,59 +419,115 @@ export function useOpportunityKanban(
         }
       );
 
-      // Call API
+      // Call API with retry
       try {
-        await updateStageMutation.mutateAsync({
-          opportunityId,
-          data: { stageId: targetStageId },
-        });
+        await moveToStageWithRetry(opportunityId, targetStageId);
+
+        // Store undo state
+        if (enableUndo) {
+          setUndoState({
+            opportunityId,
+            sourceStageId,
+            targetStageId,
+            timestamp: Date.now(),
+          });
+        }
 
         toast({
           title: 'Oportunidad movida',
           description: `Movida a "${targetStage.label}" exitosamente.`,
         });
 
-        onMoveSuccess?.();
+        onMoveSuccess?.(opportunityId, targetStageId);
       } catch (error) {
         // Rollback on error
-        queryClient.invalidateQueries({
+        await queryClient.invalidateQueries({
           queryKey: opportunityQueryKeys.pipelineView(),
         });
 
         const errorMessage =
           error instanceof Error ? error.message : 'Error desconocido';
+
         toast({
-          title: 'Error',
-          description: `No se pudo mover la oportunidad: ${errorMessage}`,
+          title: 'Error al mover oportunidad',
+          description: errorMessage,
           variant: 'destructive',
         });
 
         onMoveError?.(
-          error instanceof Error ? error : new Error(errorMessage)
+          error instanceof Error ? error : new Error(errorMessage),
+          opportunityId
         );
+      } finally {
+        // Remove from moving set
+        setMovingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(opportunityId);
+          return next;
+        });
       }
     },
     [
-      columns,
-      stages,
-      queryClient,
-      updateStageMutation,
+      findColumnByOpportunityId,
+      findOpportunityById,
+      findStageById,
+      canMoveToStage,
+      onTerminalStageAttempt,
       toast,
+      queryClient,
+      moveToStageWithRetry,
+      enableUndo,
       onMoveSuccess,
       onMoveError,
     ]
   );
 
+  // Undo last move
+  const undoLastMove = React.useCallback(async () => {
+    if (!undoState) return;
+
+    const { opportunityId, sourceStageId, timestamp } = undoState;
+
+    // Check if still within undo window
+    if (Date.now() - timestamp > UNDO_WINDOW_MS) {
+      setUndoState(null);
+      toast({
+        title: 'No se puede deshacer',
+        description: 'El tiempo para deshacer ha expirado.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Clear undo state immediately
+    setUndoState(null);
+
+    // Move back to source stage
+    await moveToStage(opportunityId, sourceStageId);
+
+    toast({
+      title: 'Movimiento deshecho',
+      description: 'La oportunidad ha sido restaurada a su etapa anterior.',
+    });
+  }, [undoState, moveToStage, toast]);
+
   return {
     columns,
+    stages,
     isLoading,
-    isMoving: updateStageMutation.isPending,
+    isMoving: updateStageMutation.isPending || movingIds.size > 0,
+    movingOpportunityIds: movingIds,
+    isOpportunityMoving,
     totalOpportunities,
     totalAmount,
     totalForecast,
     wonAmount,
     lostAmount,
     moveToStage,
+    canMoveToStage,
+    getTransitionMessage,
+    undoLastMove,
+    canUndo: undoState !== null && Date.now() - undoState.timestamp < UNDO_WINDOW_MS,
     refetchPipeline,
   };
 }

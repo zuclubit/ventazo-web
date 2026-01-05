@@ -9,8 +9,11 @@ import { Result } from '@zuclubit/domain';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
 import { UserRole, TenantMembership } from './types';
+import type { UserProfile } from './auth.service';
 import { EmailService } from '../email/email.service';
 import { EmailTemplate } from '../email/types';
+import { PasswordService } from './password.service';
+import { JwtService } from './jwt.service';
 
 /**
  * Invitation status enum
@@ -82,6 +85,30 @@ export interface InvitationWithTenant extends Invitation {
   };
 }
 
+/**
+ * Accept invitation with signup request
+ */
+export interface AcceptInvitationWithSignupRequest {
+  token: string;
+  password: string;
+  fullName: string;
+  phone?: string;
+}
+
+/**
+ * Accept invitation with signup response
+ */
+export interface AcceptInvitationWithSignupResponse {
+  user: UserProfile;
+  membership: TenantMembership;
+  session: {
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    expiresAt: number;
+  };
+}
+
 @injectable()
 export class InvitationService {
   // Default invitation expiration: 7 days
@@ -89,7 +116,9 @@ export class InvitationService {
 
   constructor(
     @inject('DatabasePool') private readonly pool: DatabasePool,
-    @inject(EmailService) private readonly emailService: EmailService
+    @inject(EmailService) private readonly emailService: EmailService,
+    @inject(PasswordService) private readonly passwordService: PasswordService,
+    @inject(JwtService) private readonly jwtService: JwtService
   ) {}
 
   /**
@@ -275,6 +304,7 @@ export class InvitationService {
           i.token,
           i.status,
           i.invited_by as "invitedBy",
+          COALESCE(u.full_name, u.email, 'Team Admin') as "inviterName",
           i.custom_message as "customMessage",
           i.expires_at as "expiresAt",
           i.accepted_at as "acceptedAt",
@@ -288,6 +318,7 @@ export class InvitationService {
           ) as tenant
         FROM user_invitations i
         JOIN tenants t ON t.id = i.tenant_id
+        LEFT JOIN users u ON u.id = i.invited_by
         WHERE i.token = $1`,
         [token]
       );
@@ -342,7 +373,9 @@ export class InvitationService {
    */
   async acceptInvitation(
     token: string,
-    userId: string
+    userId: string,
+    userEmail?: string,
+    userFullName?: string
   ): Promise<Result<TenantMembership>> {
     try {
       // Get invitation
@@ -374,6 +407,29 @@ export class InvitationService {
       }
 
       const now = new Date();
+
+      // Check if user exists in users table, if not create them
+      const userExistsResult = await this.pool.query<{ id: string }>(
+        `SELECT id FROM users WHERE id = $1`,
+        [userId]
+      );
+
+      if (!userExistsResult.value?.rows.length) {
+        // User doesn't exist in users table, create them
+        const email = userEmail || invitation.email;
+        const createUserResult = await this.pool.query(
+          `INSERT INTO users (id, email, full_name, is_active, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (id) DO NOTHING`,
+          [userId, email, userFullName || null, true, now, now]
+        );
+
+        if (createUserResult.isFailure) {
+          console.error('Failed to create user record:', createUserResult.error);
+          // Try to continue anyway, the user might have been created by another process
+        }
+      }
+
       const membershipId = uuidv4();
 
       // Create tenant membership
@@ -424,6 +480,219 @@ export class InvitationService {
       return Result.ok(membershipResult.value.rows[0]);
     } catch (error) {
       return Result.fail(`Failed to accept invitation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Accept invitation with signup (for new users)
+   * Creates a new user account and accepts the invitation in one step
+   * Email is automatically verified since they received the invitation
+   */
+  async acceptInvitationWithSignup(
+    request: AcceptInvitationWithSignupRequest
+  ): Promise<Result<AcceptInvitationWithSignupResponse>> {
+    try {
+      // 1. Validate invitation token
+      const invitationResult = await this.getInvitationByToken(request.token);
+      if (invitationResult.isFailure || !invitationResult.value) {
+        return Result.fail('Invitación inválida o expirada');
+      }
+
+      const invitation = invitationResult.value;
+
+      // Check if expired
+      if (new Date() > new Date(invitation.expiresAt)) {
+        await this.pool.query(
+          `UPDATE user_invitations SET status = $1, updated_at = $2 WHERE id = $3`,
+          [InvitationStatus.EXPIRED, new Date(), invitation.id]
+        );
+        return Result.fail('Esta invitación ha expirado');
+      }
+
+      // Check if already accepted
+      if (invitation.status === InvitationStatus.ACCEPTED) {
+        return Result.fail('Esta invitación ya ha sido aceptada');
+      }
+
+      // Check if cancelled
+      if (invitation.status === InvitationStatus.CANCELLED) {
+        return Result.fail('Esta invitación ha sido cancelada');
+      }
+
+      // 2. Validate password complexity
+      const passwordValidation = this.passwordService.validatePasswordComplexity(request.password);
+      if (!passwordValidation.isValid) {
+        return Result.fail(passwordValidation.errors.join('. '));
+      }
+
+      // 3. Check if user with this email already exists
+      const existingUserResult = await this.pool.query<{ id: string }>(
+        `SELECT id FROM users WHERE LOWER(email) = LOWER($1)`,
+        [invitation.email]
+      );
+
+      if (existingUserResult.value?.rows.length) {
+        return Result.fail(
+          'Ya existe una cuenta con este correo electrónico. Por favor inicia sesión e intenta aceptar la invitación.'
+        );
+      }
+
+      // 4. Hash password
+      const hashResult = await this.passwordService.hashPassword(request.password);
+      if (hashResult.isFailure) {
+        return Result.fail('Error al procesar la contraseña');
+      }
+
+      const now = new Date();
+      const userId = uuidv4();
+
+      // 5. Create user with verified email (since they received the invitation)
+      const createUserResult = await this.pool.query<UserProfile>(
+        `INSERT INTO users (
+          id, email, password_hash, full_name, phone,
+          is_active, email_verified, email_verified_at,
+          created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING
+          id,
+          email,
+          full_name as "fullName",
+          phone,
+          avatar_url as "avatarUrl",
+          is_active as "isActive",
+          email_verified as "emailVerified",
+          created_at as "createdAt",
+          updated_at as "updatedAt"`,
+        [
+          userId,
+          invitation.email.toLowerCase(),
+          hashResult.value,
+          request.fullName,
+          request.phone || null,
+          true,       // is_active
+          true,       // email_verified (auto-verified from invitation)
+          now,        // email_verified_at
+          now,
+          now,
+        ]
+      );
+
+      if (createUserResult.isFailure || !createUserResult.value?.rows.length) {
+        return Result.fail(createUserResult.error || 'Error al crear la cuenta de usuario');
+      }
+
+      const user = createUserResult.value.rows[0];
+
+      // 6. Create tenant membership
+      const membershipId = uuidv4();
+      const membershipResult = await this.pool.query<TenantMembership>(
+        `INSERT INTO tenant_memberships
+         (id, user_id, tenant_id, role, invited_by, invited_at, accepted_at, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING
+           id,
+           user_id as "userId",
+           tenant_id as "tenantId",
+           role,
+           invited_by as "invitedBy",
+           invited_at as "invitedAt",
+           accepted_at as "acceptedAt",
+           is_active as "isActive",
+           created_at as "createdAt",
+           updated_at as "updatedAt"`,
+        [
+          membershipId,
+          userId,
+          invitation.tenantId,
+          invitation.role,
+          invitation.invitedBy,
+          invitation.createdAt,
+          now,
+          true,
+          now,
+          now,
+        ]
+      );
+
+      if (membershipResult.isFailure || !membershipResult.value?.rows.length) {
+        // Rollback: delete user if membership creation fails
+        await this.pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+        return Result.fail(membershipResult.error || 'Error al crear la membresía del equipo');
+      }
+
+      const membership = membershipResult.value.rows[0];
+
+      // 7. Update invitation status
+      await this.pool.query(
+        `UPDATE user_invitations
+         SET status = $1, accepted_at = $2, accepted_by = $3, updated_at = $4
+         WHERE id = $5`,
+        [InvitationStatus.ACCEPTED, now, userId, now, invitation.id]
+      );
+
+      // 8. Generate session tokens
+      const sessionTokens = await this.jwtService.generateTokenPair(
+        user.id,
+        user.email,
+        invitation.tenantId,
+        invitation.role
+      );
+
+      if (sessionTokens.isFailure) {
+        return Result.fail(sessionTokens.error || 'Error al generar la sesión');
+      }
+
+      // 9. Send notifications
+      await this.sendAcceptedNotification(invitation, userId);
+
+      // Send welcome email to new user
+      await this.sendWelcomeEmail(user, invitation);
+
+      return Result.ok({
+        user: {
+          ...user,
+          tenantId: invitation.tenantId,
+          role: invitation.role,
+        },
+        membership,
+        session: sessionTokens.value!,
+      });
+    } catch (error) {
+      console.error('[InvitationService] acceptInvitationWithSignup error:', error);
+      return Result.fail(
+        `Error al aceptar la invitación: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      );
+    }
+  }
+
+  /**
+   * Send welcome email to new user after invitation signup
+   */
+  private async sendWelcomeEmail(
+    user: UserProfile,
+    invitation: InvitationWithTenant
+  ): Promise<void> {
+    try {
+      const appUrl = process.env.APP_URL || 'http://localhost:3001';
+
+      await this.emailService.send({
+        to: user.email,
+        subject: `¡Bienvenido a ${invitation.tenant.name}!`,
+        template: EmailTemplate.USER_WELCOME,
+        variables: {
+          userName: user.fullName || user.email.split('@')[0],
+          tenantName: invitation.tenant.name,
+          roleName: this.getRoleName(invitation.role as UserRole),
+          loginUrl: `${appUrl}/login`,
+          appName: process.env.APP_NAME || 'Zuclubit CRM',
+          supportEmail: process.env.SUPPORT_EMAIL || 'support@zuclubit.com',
+          currentYear: new Date().getFullYear(),
+        },
+      });
+    } catch (error) {
+      // Log but don't fail the main operation
+      console.error('[InvitationService] Failed to send welcome email:', error);
     }
   }
 
@@ -709,6 +978,7 @@ export class InvitationService {
 
   /**
    * Expire old invitations (cleanup job)
+   * Called by CRON scheduler daily at midnight
    */
   async expireOldInvitations(): Promise<Result<number>> {
     try {
@@ -727,6 +997,79 @@ export class InvitationService {
       return Result.ok(result.value.rows.length);
     } catch (error) {
       return Result.fail(`Failed to expire invitations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Send reminder emails for invitations expiring in 2 days
+   * Called by CRON scheduler daily at 10am
+   */
+  async sendExpirationReminders(): Promise<Result<number>> {
+    try {
+      // Find invitations expiring in approximately 2 days (between 1.5 and 2.5 days from now)
+      const result = await this.pool.query<Invitation & { tenant_name: string }>(
+        `SELECT
+          i.id,
+          i.tenant_id as "tenantId",
+          i.email,
+          i.role,
+          i.token,
+          i.status,
+          i.invited_by as "invitedBy",
+          u.full_name as "inviterName",
+          i.custom_message as "customMessage",
+          i.expires_at as "expiresAt",
+          i.created_at as "createdAt",
+          t.name as tenant_name
+        FROM user_invitations i
+        JOIN tenants t ON t.id = i.tenant_id
+        LEFT JOIN users u ON u.id = i.invited_by
+        WHERE i.status = 'pending'
+          AND i.expires_at > NOW()
+          AND i.expires_at BETWEEN NOW() + INTERVAL '1.5 days' AND NOW() + INTERVAL '2.5 days'`,
+        []
+      );
+
+      if (result.isFailure || !result.value) {
+        return Result.fail(result.error || 'Query failed');
+      }
+
+      const invitations = result.value.rows;
+      let sentCount = 0;
+
+      for (const invitation of invitations) {
+        try {
+          const appUrl = process.env.APP_URL || 'http://localhost:3001';
+          const acceptUrl = `${appUrl}/invite/accept?token=${invitation.token}`;
+
+          await this.emailService.send({
+            to: invitation.email,
+            subject: `Reminder: Your invitation to ${invitation.tenant_name} expires soon`,
+            template: EmailTemplate.INVITATION_REMINDER,
+            variables: {
+              tenantName: invitation.tenant_name,
+              inviterName: invitation.inviterName || 'Your team admin',
+              inviteeName: invitation.email.split('@')[0],
+              acceptUrl,
+              expiresAt: new Date(invitation.expiresAt).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              }),
+              appName: process.env.APP_NAME || 'Zuclubit CRM',
+              currentYear: new Date().getFullYear(),
+            },
+          });
+          sentCount++;
+        } catch (error) {
+          console.error(`Failed to send reminder for invitation ${invitation.id}:`, error);
+        }
+      }
+
+      return Result.ok(sentCount);
+    } catch (error) {
+      return Result.fail(`Failed to send reminders: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }

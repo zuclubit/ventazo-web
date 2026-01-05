@@ -1,20 +1,19 @@
 // ============================================
-// API Client - FASE 2 (Production Ready)
-// With interceptors, retry, and token refresh
+// API Client - Secure BFF Architecture
+// All requests proxied through Next.js API routes
+// Tokens handled server-side (never exposed to client)
 // ============================================
 
 import { type z } from 'zod';
-
-import {
-  getValidAccessToken,
-  clearTokens,
-} from '@/lib/auth/token-manager';
 
 // ============================================
 // Configuration
 // ============================================
 
-const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3000';
+// Use local proxy for all API calls (BFF pattern)
+// The proxy handles authentication and forwards to backend
+const API_PROXY_URL = '/api/proxy';
+
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 const RETRY_STATUS_CODES = [408, 500, 502, 503, 504];
@@ -142,38 +141,49 @@ type ErrorInterceptor = (error: ApiError) => Promise<void>;
 
 /**
  * Build URL with query parameters
- * Properly handles base URL with path prefix (e.g., /api/v1)
+ * Routes all requests through the BFF proxy
  */
 function buildUrl(
   endpoint: string,
   params?: Record<string, string | number | boolean | undefined>
 ): string {
-  let fullUrl: string;
+  // Remove leading slash from endpoint
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
 
-  if (endpoint.startsWith('http')) {
-    // Absolute URL - use as-is
-    fullUrl = endpoint;
-  } else {
-    // Relative URL - concatenate with base URL properly
-    // Remove trailing slash from base and leading slash from endpoint to avoid double slashes
-    const baseWithoutTrailingSlash = API_BASE_URL.replace(/\/$/, '');
-    const endpointWithLeadingSlash = endpoint.startsWith('/')
-      ? endpoint
-      : `/${endpoint}`;
-    fullUrl = `${baseWithoutTrailingSlash}${endpointWithLeadingSlash}`;
+  // Build proxy URL - use relative URL for SSR compatibility
+  const fullUrl = `${API_PROXY_URL}/${cleanEndpoint}`;
+
+  // For client-side, we can use URL with origin
+  // For SSR, we need to handle differently
+  if (typeof window !== 'undefined') {
+    const url = new URL(fullUrl, window.location.origin);
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+
+    return url.toString();
   }
 
-  const url = new URL(fullUrl);
-
+  // For SSR, just return the path with query string
+  let result = fullUrl;
   if (params) {
+    const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        url.searchParams.append(key, String(value));
+        searchParams.append(key, String(value));
       }
     });
+    const queryString = searchParams.toString();
+    if (queryString) {
+      result += `?${queryString}`;
+    }
   }
-
-  return url.toString();
+  return result;
 }
 
 /**
@@ -224,11 +234,18 @@ let isRedirecting = false;
 addErrorInterceptor(async (error) => {
   if (error.isUnauthorized && !isRedirecting) {
     isRedirecting = true;
-    clearTokens();
 
     // Redirect to login if in browser
     if (typeof window !== 'undefined') {
       const currentPath = window.location.pathname;
+
+      // Clear the session cookie via API route before redirecting
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch {
+        // Ignore errors - we'll redirect anyway
+      }
+
       window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&error=session_expired`;
     }
 
@@ -240,7 +257,7 @@ addErrorInterceptor(async (error) => {
 });
 
 // ============================================
-// Tenant ID Getter (for interceptor)
+// Tenant ID Getter (for request interceptor)
 // ============================================
 
 let getTenantIdFromStore: (() => string | null) | null = null;
@@ -252,37 +269,6 @@ let getTenantIdFromStore: (() => string | null) | null = null;
 export function registerTenantGetter(getter: () => string | null): void {
   getTenantIdFromStore = getter;
 }
-
-// ============================================
-// Default Request Interceptor (Tenant Header)
-// ============================================
-
-addRequestInterceptor(async (url, config) => {
-  // If tenant header already set, don't override
-  const headers = config.headers as Record<string, string> | undefined;
-  if (headers?.['x-tenant-id']) {
-    return { url, config };
-  }
-
-  // Get tenant from store if available
-  if (getTenantIdFromStore) {
-    const tenantId = getTenantIdFromStore();
-    if (tenantId) {
-      return {
-        url,
-        config: {
-          ...config,
-          headers: {
-            ...headers,
-            'x-tenant-id': tenantId,
-          },
-        },
-      };
-    }
-  }
-
-  return { url, config };
-});
 
 // ============================================
 // Core Fetch Function
@@ -305,29 +291,27 @@ async function fetchWithInterceptors<T>(
 
   let url = buildUrl(endpoint, params);
 
-  // Build headers
+  // Build headers - simplified since proxy handles auth
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
     ...(customHeaders as Record<string, string>),
   };
 
-  // Add auth header if not skipped
-  if (!skipAuth) {
-    const token = await getValidAccessToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-  }
-
-  // Add tenant header if not skipped and available
+  // Add tenant header if specified (proxy will use it or fall back to session)
   if (!skipTenant && tenantId) {
     headers['x-tenant-id'] = tenantId;
+  } else if (!skipTenant && getTenantIdFromStore) {
+    const storeTenantId = getTenantIdFromStore();
+    if (storeTenantId) {
+      headers['x-tenant-id'] = storeTenantId;
+    }
   }
 
   let requestConfig: RequestInit = {
     ...fetchConfig,
     headers,
+    credentials: 'include', // Important: include cookies for session
   };
 
   // Run request interceptors
@@ -439,7 +423,9 @@ async function fetchWithInterceptors<T>(
 
 export interface ApiClientInstance {
   get: <T>(endpoint: string, config?: RequestConfig) => Promise<T>;
+  getBlob: (endpoint: string, config?: RequestConfig) => Promise<Blob>;
   post: <T>(endpoint: string, data?: unknown, config?: RequestConfig) => Promise<T>;
+  postBlob: (endpoint: string, data?: unknown, config?: RequestConfig) => Promise<Blob>;
   put: <T>(endpoint: string, data?: unknown, config?: RequestConfig) => Promise<T>;
   patch: <T>(endpoint: string, data?: unknown, config?: RequestConfig) => Promise<T>;
   delete: <T>(endpoint: string, config?: RequestConfig) => Promise<T>;
@@ -458,6 +444,68 @@ export function createApiClient(defaultTenantId?: string): ApiClientInstance {
         tenantId: getTenantId(config),
       }),
 
+    getBlob: async (endpoint: string, config?: RequestConfig): Promise<Blob> => {
+      const {
+        params,
+        tenantId,
+        skipTenant = false,
+        timeout = 60000, // Longer timeout for PDF generation
+        headers: customHeaders,
+        ...fetchConfig
+      } = config || {};
+
+      const url = buildUrl(endpoint, params);
+      const headers: Record<string, string> = {
+        Accept: 'application/pdf,application/octet-stream,*/*',
+        ...(customHeaders as Record<string, string>),
+      };
+
+      // Add tenant header
+      const resolvedTenantId = tenantId ?? defaultTenantId;
+      if (!skipTenant && resolvedTenantId) {
+        headers['x-tenant-id'] = resolvedTenantId;
+      } else if (!skipTenant && getTenantIdFromStore) {
+        const storeTenantId = getTenantIdFromStore();
+        if (storeTenantId) {
+          headers['x-tenant-id'] = storeTenantId;
+        }
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const response = await fetch(url, {
+          ...fetchConfig,
+          method: 'GET',
+          headers,
+          credentials: 'include',
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          let errorData: unknown;
+          try {
+            errorData = await response.json();
+          } catch {
+            errorData = await response.text().catch(() => undefined);
+          }
+          throw new ApiError(response.status, response.statusText, errorData);
+        }
+
+        return await response.blob();
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof ApiError) throw error;
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new NetworkError('Request timeout', error);
+        }
+        throw new NetworkError('Failed to fetch blob', error instanceof Error ? error : undefined);
+      }
+    },
+
     post: <T>(
       endpoint: string,
       data?: unknown,
@@ -469,6 +517,74 @@ export function createApiClient(defaultTenantId?: string): ApiClientInstance {
         body: data ? JSON.stringify(data) : undefined,
         tenantId: getTenantId(config),
       } as RequestConfig & { body?: string }),
+
+    postBlob: async (
+      endpoint: string,
+      data?: unknown,
+      config?: RequestConfig
+    ): Promise<Blob> => {
+      const {
+        params,
+        tenantId,
+        skipTenant = false,
+        timeout = 60000, // Longer timeout for PDF generation
+        headers: customHeaders,
+        ...fetchConfig
+      } = config || {};
+
+      const url = buildUrl(endpoint, params);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Accept: 'application/pdf,application/octet-stream,*/*',
+        ...(customHeaders as Record<string, string>),
+      };
+
+      // Add tenant header
+      const resolvedTenantId = tenantId ?? defaultTenantId;
+      if (!skipTenant && resolvedTenantId) {
+        headers['x-tenant-id'] = resolvedTenantId;
+      } else if (!skipTenant && getTenantIdFromStore) {
+        const storeTenantId = getTenantIdFromStore();
+        if (storeTenantId) {
+          headers['x-tenant-id'] = storeTenantId;
+        }
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const response = await fetch(url, {
+          ...fetchConfig,
+          method: 'POST',
+          headers,
+          body: data ? JSON.stringify(data) : undefined,
+          credentials: 'include',
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          let errorData: unknown;
+          try {
+            errorData = await response.json();
+          } catch {
+            errorData = await response.text().catch(() => undefined);
+          }
+          throw new ApiError(response.status, response.statusText, errorData);
+        }
+
+        return await response.blob();
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof ApiError) throw error;
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new NetworkError('Request timeout', error);
+        }
+        throw new NetworkError('Failed to fetch blob', error instanceof Error ? error : undefined);
+      }
+    },
 
     put: <T>(
       endpoint: string,
@@ -589,4 +705,8 @@ export const queryKeys = {
 // Exports
 // ============================================
 
-export { API_BASE_URL };
+// Legacy export for backwards compatibility
+export const API_BASE_URL = API_PROXY_URL;
+
+// For direct backend access (use only in server components/actions)
+export const BACKEND_URL = process.env['API_URL'] || process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';

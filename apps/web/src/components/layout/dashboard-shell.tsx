@@ -115,6 +115,18 @@ interface MainContentProps {
 function MainContent({ children, className }: MainContentProps) {
   const { currentWidth, isMobile } = useSidebar();
 
+  // CRITICAL FIX: Suppress transition during initial hydration
+  // This prevents the animated gap when localStorage state is read
+  const [hasMounted, setHasMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    // Small delay to ensure layout has stabilized after hydration
+    const timer = requestAnimationFrame(() => {
+      setHasMounted(true);
+    });
+    return () => cancelAnimationFrame(timer);
+  }, []);
+
   return (
     <div
       className={cn(
@@ -126,8 +138,9 @@ function MainContent({ children, className }: MainContentProps) {
         'h-full',
         // Prevent any overflow at this level
         'overflow-hidden',
-        // Smooth transition for sidebar toggle
-        'transition-[margin-left] duration-300 ease-in-out',
+        // Smooth transition for sidebar toggle - ONLY after initial mount
+        // This prevents the animated gap during hydration
+        hasMounted && 'transition-[margin-left] duration-300 ease-in-out',
         'motion-reduce:transition-none',
         className
       )}

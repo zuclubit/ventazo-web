@@ -50,6 +50,17 @@ export type {
 export { OpportunityPreviewPanel } from './OpportunityPreviewPanel';
 export type { OpportunityPreviewPanelProps } from './OpportunityPreviewPanel';
 
+// New unified detail sheet (matches LeadDetailSheet pattern)
+export { OpportunityDetailSheet } from './OpportunityDetailSheet';
+export type { OpportunityDetailSheetProps } from './OpportunityDetailSheet';
+
+// ============================================
+// Card Components (V3 - Premium Design)
+// ============================================
+
+export { OpportunityCardV3, OpportunityCardV3Skeleton, OpportunityCardV3Overlay } from './OpportunityCardV3';
+export type { OpportunityCardV3Props } from './OpportunityCardV3';
+
 // ============================================
 // Empty State Components
 // ============================================
@@ -72,8 +83,14 @@ export {
 } from './OpportunitiesSkeleton';
 
 // ============================================
-// Form Components (existing)
+// Form Components
 // ============================================
 
+// Premium Sheet (v1.0 - 2025 World-Class, homologated with LeadFormSheet)
+export { OpportunityFormSheet } from './opportunity-form-sheet';
+export type { OpportunityFormSheetProps } from './opportunity-form-sheet';
+
+// Legacy Dialog (deprecated - use OpportunityFormSheet instead)
 export { OpportunityFormDialog } from './opportunity-form-dialog';
+
 export { WinLostDialog } from './win-lost-dialog';

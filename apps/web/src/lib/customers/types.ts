@@ -256,6 +256,20 @@ export interface PaginationMeta {
   totalPages: number;
 }
 
+/**
+ * Backend response structure for customers list
+ * Note: Backend returns { customers, total, page, limit }
+ */
+export interface CustomersApiResponse {
+  customers: Customer[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/**
+ * Normalized response structure used by frontend hooks
+ */
 export interface CustomersResponse {
   data: Customer[];
   meta: PaginationMeta;
@@ -294,11 +308,12 @@ export const STATUS_LABELS: Record<CustomerStatus, string> = {
   [CustomerStatus.CHURNED]: 'Perdido',
 };
 
+// Customer status colors using CSS variables for theme consistency
 export const STATUS_COLORS: Record<CustomerStatus, string> = {
-  [CustomerStatus.ACTIVE]: 'bg-green-100 text-green-800',
-  [CustomerStatus.INACTIVE]: 'bg-gray-100 text-gray-800',
-  [CustomerStatus.AT_RISK]: 'bg-amber-100 text-amber-800',
-  [CustomerStatus.CHURNED]: 'bg-red-100 text-red-800',
+  [CustomerStatus.ACTIVE]: 'bg-[var(--customer-active-bg)] text-[var(--customer-active)] border border-[var(--customer-active-border)]',
+  [CustomerStatus.INACTIVE]: 'bg-[var(--customer-inactive-bg)] text-[var(--customer-inactive)] border border-[var(--customer-inactive-border)]',
+  [CustomerStatus.AT_RISK]: 'bg-[var(--customer-at-risk-bg)] text-[var(--customer-at-risk)] border border-[var(--customer-at-risk-border)]',
+  [CustomerStatus.CHURNED]: 'bg-[var(--customer-churned-bg)] text-[var(--customer-churned)] border border-[var(--customer-churned-border)]',
 };
 
 export const TYPE_LABELS: Record<CustomerType, string> = {
@@ -313,11 +328,12 @@ export const TIER_LABELS: Record<CustomerTier, string> = {
   [CustomerTier.BASIC]: 'Basic',
 };
 
+// Customer tier colors using CSS variables for theme consistency
 export const TIER_COLORS: Record<CustomerTier, string> = {
-  [CustomerTier.ENTERPRISE]: 'bg-purple-100 text-purple-800',
-  [CustomerTier.PREMIUM]: 'bg-blue-100 text-blue-800',
-  [CustomerTier.STANDARD]: 'bg-gray-100 text-gray-800',
-  [CustomerTier.BASIC]: 'bg-slate-100 text-slate-800',
+  [CustomerTier.ENTERPRISE]: 'bg-[var(--tier-enterprise-bg)] text-[var(--tier-enterprise)] border border-[var(--tier-enterprise-border)]',
+  [CustomerTier.PREMIUM]: 'bg-[var(--tier-premium-bg)] text-[var(--tier-premium)] border border-[var(--tier-premium-border)]',
+  [CustomerTier.STANDARD]: 'bg-[var(--tier-standard-bg)] text-[var(--tier-standard)] border border-[var(--tier-standard-border)]',
+  [CustomerTier.BASIC]: 'bg-[var(--tier-basic-bg)] text-[var(--tier-basic)] border border-[var(--tier-basic-border)]',
 };
 
 export const ACTIVITY_LABELS: Record<CustomerActivityType, string> = {
@@ -336,18 +352,19 @@ export const ACTIVITY_LABELS: Record<CustomerActivityType, string> = {
   revenue_updated: 'Ingreso actualizado',
 };
 
+// Activity colors - decorative, with dark mode support
 export const ACTIVITY_COLORS: Record<CustomerActivityType, string> = {
-  created: 'bg-green-100 text-green-800',
-  updated: 'bg-blue-100 text-blue-800',
-  status_changed: 'bg-amber-100 text-amber-800',
-  assigned: 'bg-purple-100 text-purple-800',
-  note_added: 'bg-cyan-100 text-cyan-800',
-  note_deleted: 'bg-red-100 text-red-800',
-  tag_added: 'bg-indigo-100 text-indigo-800',
-  tag_removed: 'bg-rose-100 text-rose-800',
-  tier_changed: 'bg-violet-100 text-violet-800',
-  converted_from_lead: 'bg-emerald-100 text-emerald-800',
-  opportunity_created: 'bg-teal-100 text-teal-800',
-  opportunity_closed: 'bg-lime-100 text-lime-800',
-  revenue_updated: 'bg-yellow-100 text-yellow-800',
+  created: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  updated: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  status_changed: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  assigned: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  note_added: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+  note_deleted: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  tag_added: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+  tag_removed: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
+  tier_changed: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
+  converted_from_lead: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+  opportunity_created: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
+  opportunity_closed: 'bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-300',
+  revenue_updated: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
 };

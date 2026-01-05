@@ -14,3 +14,16 @@ export type {
   UseOpportunityKanbanReturn,
   WinLostDialogState,
 } from './useOpportunityKanban';
+
+// Theme Hook
+export {
+  useOpportunityTheme,
+  OpportunityThemeProvider,
+  useOpportunityThemeContext,
+} from './useOpportunityTheme';
+export type {
+  OpportunityTheme,
+  ProbabilityTheme,
+  OpportunityCardTheme,
+  PipelineStageConfig,
+} from './useOpportunityTheme';

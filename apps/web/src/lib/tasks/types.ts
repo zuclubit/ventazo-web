@@ -98,11 +98,12 @@ export const PRIORITY_LABELS: Record<TaskPriority, string> = {
   urgent: 'Urgente',
 };
 
+// Priority colors using CSS design tokens (auto light/dark mode)
 export const PRIORITY_COLORS: Record<TaskPriority, string> = {
-  low: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300',
-  medium: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  high: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-  urgent: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+  low: 'bg-[var(--priority-low-bg)] text-[var(--priority-low)] border border-[var(--priority-low-border)]',
+  medium: 'bg-[var(--priority-medium-bg)] text-[var(--priority-medium)] border border-[var(--priority-medium-border)]',
+  high: 'bg-[var(--priority-high-bg)] text-[var(--priority-high)] border border-[var(--priority-high-border)]',
+  urgent: 'bg-[var(--priority-urgent-bg)] text-[var(--priority-urgent)] border border-[var(--priority-urgent-border)]',
 };
 
 export const PRIORITY_ICONS: Record<TaskPriority, string> = {
@@ -120,12 +121,13 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   deferred: 'Diferida',
 };
 
+// Status colors using CSS design tokens (auto light/dark mode)
 export const STATUS_COLORS: Record<TaskStatus, string> = {
-  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-  in_progress: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-  deferred: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300',
+  pending: 'bg-[var(--status-pending-bg)] text-[var(--status-pending)] border border-[var(--status-pending-border)]',
+  in_progress: 'bg-[var(--status-in-progress-bg)] text-[var(--status-in-progress)] border border-[var(--status-in-progress-border)]',
+  completed: 'bg-[var(--status-completed-bg)] text-[var(--status-completed)] border border-[var(--status-completed-border)]',
+  cancelled: 'bg-[var(--status-cancelled-bg)] text-[var(--status-cancelled)] border border-[var(--status-cancelled-border)]',
+  deferred: 'bg-[var(--status-deferred-bg)] text-[var(--status-deferred)] border border-[var(--status-deferred-border)]',
 };
 
 export const STATUS_ICONS: Record<TaskStatus, string> = {
@@ -534,16 +536,18 @@ export function formatDaysUntilDue(dueDate: string | null | undefined): string {
 }
 
 /**
- * Get color for days until due
+ * Get color for days until due (theme-aware via CSS variables)
+ * Uses semantic --due-* tokens from globals.css for proper dark/light mode support
+ * Per Design System Audit 2026
  */
 export function getDueDateColor(dueDate: string | null | undefined, isCompleted: boolean): string {
-  if (isCompleted) return 'text-gray-500';
+  if (isCompleted) return 'text-muted-foreground';
   const days = getDaysUntilDue(dueDate);
-  if (days === null) return 'text-gray-500';
-  if (days < 0) return 'text-red-600 font-medium';
-  if (days === 0) return 'text-orange-600 font-medium';
-  if (days <= 3) return 'text-amber-600';
-  return 'text-gray-600';
+  if (days === null) return 'text-muted-foreground';
+  if (days < 0) return 'text-[var(--due-overdue-text)] font-medium';  // Overdue
+  if (days === 0) return 'text-[var(--due-today-text)] font-medium';  // Due today
+  if (days <= 3) return 'text-[var(--due-soon-text)]';                // Due soon (3 days)
+  return 'text-muted-foreground';                                     // Future
 }
 
 /**
@@ -622,4 +626,167 @@ export function getEntityInfo(task: Task): {
     };
   }
   return null;
+}
+
+// ============================================
+// Kanban Types
+// ============================================
+
+/**
+ * Task Kanban Stage - represents a column in the Kanban board
+ */
+export interface TaskKanbanStage {
+  id: TaskStatus;
+  label: string;
+  color: string;
+  icon: string;
+  order: number;
+}
+
+/**
+ * Task Kanban Column - stage with its tasks
+ */
+export interface TaskKanbanColumn {
+  stage: TaskKanbanStage;
+  tasks: Task[];
+  count: number;
+}
+
+/**
+ * Task Kanban View - complete board data
+ */
+export interface TaskKanbanView {
+  columns: TaskKanbanColumn[];
+  totalTasks: number;
+}
+
+/**
+ * Task view mode toggle
+ */
+export type TaskViewMode = 'list' | 'kanban' | 'calendar';
+
+/**
+ * Kanban stage definitions with colors and order
+ */
+export const TASK_KANBAN_STAGES: TaskKanbanStage[] = [
+  {
+    id: 'pending',
+    label: 'Pendientes',
+    color: '#F59E0B', // Amber
+    icon: 'clock',
+    order: 0,
+  },
+  {
+    id: 'in_progress',
+    label: 'En Progreso',
+    color: '#3B82F6', // Blue
+    icon: 'loader',
+    order: 1,
+  },
+  {
+    id: 'completed',
+    label: 'Completadas',
+    color: '#10B981', // Green
+    icon: 'check-circle',
+    order: 2,
+  },
+  {
+    id: 'deferred',
+    label: 'Diferidas',
+    color: '#6B7280', // Gray
+    icon: 'pause-circle',
+    order: 3,
+  },
+  {
+    id: 'cancelled',
+    label: 'Canceladas',
+    color: '#EF4444', // Red
+    icon: 'x-circle',
+    order: 4,
+  },
+];
+
+/**
+ * Get kanban stage by status
+ */
+export function getKanbanStage(status: TaskStatus): TaskKanbanStage {
+  const stage = TASK_KANBAN_STAGES.find((s) => s.id === status);
+  // Since all TaskStatus values have a corresponding stage, this will always find one
+  // Fallback to pending stage as a safety measure
+  return stage ?? {
+    id: 'pending' as const,
+    label: 'Pendientes',
+    color: '#F59E0B',
+    icon: 'clock',
+    order: 0,
+  };
+}
+
+/**
+ * Group tasks by status into kanban columns
+ */
+export function groupTasksByStatus(tasks: Task[]): TaskKanbanColumn[] {
+  return TASK_KANBAN_STAGES.map((stage) => {
+    const stageTasks = tasks.filter((task) => task.status === stage.id);
+    return {
+      stage,
+      tasks: stageTasks,
+      count: stageTasks.length,
+    };
+  });
+}
+
+/**
+ * Kanban transition validation result
+ */
+export interface TaskKanbanTransitionValidation {
+  allowed: boolean;
+  reason?: string;
+  suggestedAction?: 'use_complete_dialog' | 'use_cancel_dialog' | 'already_there';
+}
+
+/**
+ * Validate if a task can be moved to a target status
+ * Business rules:
+ * - Can always move to pending, in_progress, or deferred
+ * - Moving to completed should use the complete dialog (for outcome tracking)
+ * - Moving to cancelled should use cancel dialog (for reason tracking)
+ */
+export function validateTaskTransition(
+  task: Task | undefined,
+  targetStatus: TaskStatus
+): TaskKanbanTransitionValidation {
+  if (!task) {
+    return { allowed: false, reason: 'Tarea no encontrada' };
+  }
+
+  // Same status - no move needed
+  if (task.status === targetStatus) {
+    return {
+      allowed: false,
+      reason: 'La tarea ya está en este estado',
+      suggestedAction: 'already_there',
+    };
+  }
+
+  // Moving to completed - recommend using dialog for outcome
+  if (targetStatus === 'completed') {
+    return {
+      allowed: true, // Allow direct move but we'll show a simplified completion
+      reason: 'Usa el botón completar para agregar resultado',
+      suggestedAction: 'use_complete_dialog',
+    };
+  }
+
+  // Moving to cancelled - recommend using dialog for reason
+  if (targetStatus === 'cancelled') {
+    return {
+      allowed: true, // Allow direct move
+      reason: 'Usa el menú para cancelar con razón',
+      suggestedAction: 'use_cancel_dialog',
+    };
+  }
+
+  // All other transitions are allowed
+  return { allowed: true };
 }

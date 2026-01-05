@@ -1,0 +1,56 @@
+// tsup.config.ts
+import { defineConfig } from "tsup";
+var tsup_config_default = defineConfig({
+  // Entry points matching package.json exports
+  entry: {
+    // Main entry
+    "index": "index.ts",
+    // Domain layer
+    "domain/index": "domain/index.ts",
+    // Application layer
+    "application/index": "application/index.ts",
+    // Adapters layer
+    "adapters/index": "adapters/index.ts",
+    "adapters/react/index": "adapters/react/index.ts",
+    "adapters/css/index": "adapters/css/index.ts",
+    "adapters/tailwind/index": "adapters/tailwind/index.ts",
+    // Infrastructure layer
+    "infrastructure/index": "infrastructure/index.ts",
+    "infrastructure/audit/index": "infrastructure/audit/index.ts",
+    "infrastructure/exporters/index": "infrastructure/exporters/index.ts",
+    // Components layer
+    "components/index": "components/index.ts",
+    "components/primitives/index": "components/primitives/index.ts",
+    "components/composed/index": "components/composed/index.ts",
+    // Validation layer
+    "validation/index": "validation/index.ts"
+  },
+  // Output formats
+  format: ["esm", "cjs"],
+  // Generate TypeScript declarations
+  dts: true,
+  // Sourcemaps for debugging
+  sourcemap: true,
+  // Clean output directory before build
+  clean: true,
+  // Split chunks for better tree-shaking
+  splitting: true,
+  // Target modern browsers/node
+  target: "es2020",
+  // External dependencies (peer deps)
+  external: ["react", "react-dom"],
+  // Tree-shake for smaller bundles
+  treeshake: true,
+  // Minify production builds
+  minify: process.env.NODE_ENV === "production",
+  // Output configuration
+  outDir: "dist",
+  // Banner for builds
+  banner: {
+    js: "/* @zuclubit/ui-kit - Color Intelligence Design System */"
+  }
+});
+export {
+  tsup_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidHN1cC5jb25maWcudHMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImNvbnN0IF9faW5qZWN0ZWRfZmlsZW5hbWVfXyA9IFwiL1VzZXJzL29zY2FydmFsb2lzL0RvY3VtZW50cy9HaXRodWIvenVjbHViaXQtc21hcnQtY3JtL3BhY2thZ2VzL3VpLWtpdC90c3VwLmNvbmZpZy50c1wiO2NvbnN0IF9faW5qZWN0ZWRfZGlybmFtZV9fID0gXCIvVXNlcnMvb3NjYXJ2YWxvaXMvRG9jdW1lbnRzL0dpdGh1Yi96dWNsdWJpdC1zbWFydC1jcm0vcGFja2FnZXMvdWkta2l0XCI7Y29uc3QgX19pbmplY3RlZF9pbXBvcnRfbWV0YV91cmxfXyA9IFwiZmlsZTovLy9Vc2Vycy9vc2NhcnZhbG9pcy9Eb2N1bWVudHMvR2l0aHViL3p1Y2x1Yml0LXNtYXJ0LWNybS9wYWNrYWdlcy91aS1raXQvdHN1cC5jb25maWcudHNcIjsvKipcbiAqIEBmaWxlb3ZlcnZpZXcgdHN1cCBCdWlsZCBDb25maWd1cmF0aW9uIGZvciBAenVjbHViaXQvdWkta2l0XG4gKlxuICogQ29uZmlndXJlcyB0aGUgYnVpbGQgcHJvY2VzcyBmb3IgdGhlIENvbG9yIEludGVsbGlnZW5jZSBEZXNpZ24gU3lzdGVtLlxuICogR2VuZXJhdGVzIEVTTSwgQ0pTLCBhbmQgVHlwZVNjcmlwdCBkZWNsYXJhdGlvbnMgZm9yIGFsbCBlbnRyeSBwb2ludHMuXG4gKlxuICogQG1vZHVsZSB1aS1raXQvdHN1cC5jb25maWdcbiAqL1xuXG5pbXBvcnQgeyBkZWZpbmVDb25maWcgfSBmcm9tICd0c3VwJztcblxuZXhwb3J0IGRlZmF1bHQgZGVmaW5lQ29uZmlnKHtcbiAgLy8gRW50cnkgcG9pbnRzIG1hdGNoaW5nIHBhY2thZ2UuanNvbiBleHBvcnRzXG4gIGVudHJ5OiB7XG4gICAgLy8gTWFpbiBlbnRyeVxuICAgICdpbmRleCc6ICdpbmRleC50cycsXG5cbiAgICAvLyBEb21haW4gbGF5ZXJcbiAgICAnZG9tYWluL2luZGV4JzogJ2RvbWFpbi9pbmRleC50cycsXG5cbiAgICAvLyBBcHBsaWNhdGlvbiBsYXllclxuICAgICdhcHBsaWNhdGlvbi9pbmRleCc6ICdhcHBsaWNhdGlvbi9pbmRleC50cycsXG5cbiAgICAvLyBBZGFwdGVycyBsYXllclxuICAgICdhZGFwdGVycy9pbmRleCc6ICdhZGFwdGVycy9pbmRleC50cycsXG4gICAgJ2FkYXB0ZXJzL3JlYWN0L2luZGV4JzogJ2FkYXB0ZXJzL3JlYWN0L2luZGV4LnRzJyxcbiAgICAnYWRhcHRlcnMvY3NzL2luZGV4JzogJ2FkYXB0ZXJzL2Nzcy9pbmRleC50cycsXG4gICAgJ2FkYXB0ZXJzL3RhaWx3aW5kL2luZGV4JzogJ2FkYXB0ZXJzL3RhaWx3aW5kL2luZGV4LnRzJyxcblxuICAgIC8vIEluZnJhc3RydWN0dXJlIGxheWVyXG4gICAgJ2luZnJhc3RydWN0dXJlL2luZGV4JzogJ2luZnJhc3RydWN0dXJlL2luZGV4LnRzJyxcbiAgICAnaW5mcmFzdHJ1Y3R1cmUvYXVkaXQvaW5kZXgnOiAnaW5mcmFzdHJ1Y3R1cmUvYXVkaXQvaW5kZXgudHMnLFxuICAgICdpbmZyYXN0cnVjdHVyZS9leHBvcnRlcnMvaW5kZXgnOiAnaW5mcmFzdHJ1Y3R1cmUvZXhwb3J0ZXJzL2luZGV4LnRzJyxcblxuICAgIC8vIENvbXBvbmVudHMgbGF5ZXJcbiAgICAnY29tcG9uZW50cy9pbmRleCc6ICdjb21wb25lbnRzL2luZGV4LnRzJyxcbiAgICAnY29tcG9uZW50cy9wcmltaXRpdmVzL2luZGV4JzogJ2NvbXBvbmVudHMvcHJpbWl0aXZlcy9pbmRleC50cycsXG4gICAgJ2NvbXBvbmVudHMvY29tcG9zZWQvaW5kZXgnOiAnY29tcG9uZW50cy9jb21wb3NlZC9pbmRleC50cycsXG5cbiAgICAvLyBWYWxpZGF0aW9uIGxheWVyXG4gICAgJ3ZhbGlkYXRpb24vaW5kZXgnOiAndmFsaWRhdGlvbi9pbmRleC50cycsXG4gIH0sXG5cbiAgLy8gT3V0cHV0IGZvcm1hdHNcbiAgZm9ybWF0OiBbJ2VzbScsICdjanMnXSxcblxuICAvLyBHZW5lcmF0ZSBUeXBlU2NyaXB0IGRlY2xhcmF0aW9uc1xuICBkdHM6IHRydWUsXG5cbiAgLy8gU291cmNlbWFwcyBmb3IgZGVidWdnaW5nXG4gIHNvdXJjZW1hcDogdHJ1ZSxcblxuICAvLyBDbGVhbiBvdXRwdXQgZGlyZWN0b3J5IGJlZm9yZSBidWlsZFxuICBjbGVhbjogdHJ1ZSxcblxuICAvLyBTcGxpdCBjaHVua3MgZm9yIGJldHRlciB0cmVlLXNoYWtpbmdcbiAgc3BsaXR0aW5nOiB0cnVlLFxuXG4gIC8vIFRhcmdldCBtb2Rlcm4gYnJvd3NlcnMvbm9kZVxuICB0YXJnZXQ6ICdlczIwMjAnLFxuXG4gIC8vIEV4dGVybmFsIGRlcGVuZGVuY2llcyAocGVlciBkZXBzKVxuICBleHRlcm5hbDogWydyZWFjdCcsICdyZWFjdC1kb20nXSxcblxuICAvLyBUcmVlLXNoYWtlIGZvciBzbWFsbGVyIGJ1bmRsZXNcbiAgdHJlZXNoYWtlOiB0cnVlLFxuXG4gIC8vIE1pbmlmeSBwcm9kdWN0aW9uIGJ1aWxkc1xuICBtaW5pZnk6IHByb2Nlc3MuZW52Lk5PREVfRU5WID09PSAncHJvZHVjdGlvbicsXG5cbiAgLy8gT3V0cHV0IGNvbmZpZ3VyYXRpb25cbiAgb3V0RGlyOiAnZGlzdCcsXG5cbiAgLy8gQmFubmVyIGZvciBidWlsZHNcbiAgYmFubmVyOiB7XG4gICAganM6ICcvKiBAenVjbHViaXQvdWkta2l0IC0gQ29sb3IgSW50ZWxsaWdlbmNlIERlc2lnbiBTeXN0ZW0gKi8nLFxuICB9LFxufSk7XG4iXSwKICAibWFwcGluZ3MiOiAiO0FBU0EsU0FBUyxvQkFBb0I7QUFFN0IsSUFBTyxzQkFBUSxhQUFhO0FBQUE7QUFBQSxFQUUxQixPQUFPO0FBQUE7QUFBQSxJQUVMLFNBQVM7QUFBQTtBQUFBLElBR1QsZ0JBQWdCO0FBQUE7QUFBQSxJQUdoQixxQkFBcUI7QUFBQTtBQUFBLElBR3JCLGtCQUFrQjtBQUFBLElBQ2xCLHdCQUF3QjtBQUFBLElBQ3hCLHNCQUFzQjtBQUFBLElBQ3RCLDJCQUEyQjtBQUFBO0FBQUEsSUFHM0Isd0JBQXdCO0FBQUEsSUFDeEIsOEJBQThCO0FBQUEsSUFDOUIsa0NBQWtDO0FBQUE7QUFBQSxJQUdsQyxvQkFBb0I7QUFBQSxJQUNwQiwrQkFBK0I7QUFBQSxJQUMvQiw2QkFBNkI7QUFBQTtBQUFBLElBRzdCLG9CQUFvQjtBQUFBLEVBQ3RCO0FBQUE7QUFBQSxFQUdBLFFBQVEsQ0FBQyxPQUFPLEtBQUs7QUFBQTtBQUFBLEVBR3JCLEtBQUs7QUFBQTtBQUFBLEVBR0wsV0FBVztBQUFBO0FBQUEsRUFHWCxPQUFPO0FBQUE7QUFBQSxFQUdQLFdBQVc7QUFBQTtBQUFBLEVBR1gsUUFBUTtBQUFBO0FBQUEsRUFHUixVQUFVLENBQUMsU0FBUyxXQUFXO0FBQUE7QUFBQSxFQUcvQixXQUFXO0FBQUE7QUFBQSxFQUdYLFFBQVEsUUFBUSxJQUFJLGFBQWE7QUFBQTtBQUFBLEVBR2pDLFFBQVE7QUFBQTtBQUFBLEVBR1IsUUFBUTtBQUFBLElBQ04sSUFBSTtBQUFBLEVBQ047QUFDRixDQUFDOyIsCiAgIm5hbWVzIjogW10KfQo=

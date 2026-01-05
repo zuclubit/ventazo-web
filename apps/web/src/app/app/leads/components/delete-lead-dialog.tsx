@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -13,8 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import { useDeleteLead, type Lead } from '@/lib/leads';
+import type { Lead } from '@/lib/leads';
+import { useOptimisticDelete } from '../hooks/useOptimisticDelete';
 
 // ============================================
 // Props
@@ -30,28 +30,31 @@ interface DeleteLeadDialogProps {
 // Component
 // ============================================
 
+/**
+ * DeleteLeadDialog - Optimistic delete with undo capability
+ *
+ * P0 Fix: Uses optimistic delete pattern from useLeadsKanban.ts
+ * - Dialog closes immediately on confirm
+ * - Card is removed from view instantly (optimistic)
+ * - Undo toast appears with 5 second window
+ * - API call happens after undo window expires
+ * - Rollback on API error
+ *
+ * @see docs/LEAD_KANBAN_ACTIONS_AUDIT.md
+ * @see docs/REMEDIATION_PLAN.md
+ */
 export function DeleteLeadDialog({ lead, open, onClose }: DeleteLeadDialogProps) {
-  const { toast } = useToast();
-  const deleteLead = useDeleteLead();
+  const { deleteWithUndo, isPending } = useOptimisticDelete();
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!lead) return;
-
-    try {
-      await deleteLead.mutateAsync(lead.id);
-      toast({
-        title: 'Lead eliminado',
-        description: 'El lead ha sido eliminado correctamente.',
-      });
-      onClose();
-    } catch (error) {
-      console.error('Failed to delete lead:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudo eliminar el lead.',
-        variant: 'destructive',
-      });
-    }
+    // deleteWithUndo handles:
+    // 1. Optimistic removal from cache
+    // 2. Calls onClose immediately (dialog closes)
+    // 3. Shows undo toast with 5s window
+    // 4. Schedules API delete after undo window
+    // 5. Rollback on error
+    deleteWithUndo(lead, onClose);
   };
 
   return (
@@ -63,8 +66,7 @@ export function DeleteLeadDialog({ lead, open, onClose }: DeleteLeadDialogProps)
             Eliminar Lead
           </DialogTitle>
           <DialogDescription>
-            Esta accion no se puede deshacer. El lead y todos sus datos asociados
-            (notas, actividad) seran eliminados permanentemente.
+            El lead sera eliminado. Tendras 5 segundos para deshacer esta accion.
           </DialogDescription>
         </DialogHeader>
 
@@ -80,25 +82,18 @@ export function DeleteLeadDialog({ lead, open, onClose }: DeleteLeadDialogProps)
 
         <DialogFooter>
           <Button
-            disabled={deleteLead.isPending}
+            disabled={isPending}
             variant="outline"
             onClick={onClose}
           >
             Cancelar
           </Button>
           <Button
-            disabled={deleteLead.isPending}
+            disabled={isPending}
             variant="destructive"
             onClick={handleDelete}
           >
-            {deleteLead.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Eliminando...
-              </>
-            ) : (
-              'Eliminar Lead'
-            )}
+            Eliminar Lead
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -61,3 +61,23 @@ export function getUserId(request: FastifyRequest): string {
   // Return 'system' as fallback for system operations
   return 'system';
 }
+
+/**
+ * Get session ID from request
+ * Helper function to extract session ID from decorated request or headers
+ */
+export function getSessionId(request: FastifyRequest): string | undefined {
+  // Try to get from decorated request (if auth middleware has set it)
+  const decoratedRequest = request as FastifyRequest & { sessionId?: string };
+  if (decoratedRequest.sessionId) {
+    return decoratedRequest.sessionId;
+  }
+
+  // Fallback: try to get from header
+  const sessionId = request.headers['x-session-id'] as string;
+  if (sessionId) {
+    return sessionId;
+  }
+
+  return undefined;
+}

@@ -1,11 +1,11 @@
 /**
  * Authentication Middleware for Fastify
- * JWT verification and user context extraction with database-backed role lookup
+ * Native JWT verification and user context extraction with database-backed role lookup
+ * No Supabase Auth dependency
  */
 
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { container } from 'tsyringe';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   AuthUser,
   UserRole,
@@ -14,35 +14,24 @@ import {
   getPermissionsForRole,
 } from '../../infrastructure/auth';
 import { AuthService } from '../../infrastructure/auth/auth.service';
-import { getAuthConfig } from '../../config/environment';
+import { JwtService, TokenPayload } from '../../infrastructure/auth/jwt.service';
+
+// Native JWT service singleton
+let jwtService: JwtService | null = null;
+
+function getJwtService(): JwtService {
+  if (!jwtService) {
+    jwtService = new JwtService();
+  }
+  return jwtService;
+}
 
 // Extend FastifyRequest to include auth context
 declare module 'fastify' {
   interface FastifyRequest {
     auth?: AuthContext;
-    supabaseUser?: {
-      id: string;
-      email: string;
-      app_metadata: Record<string, unknown>;
-      user_metadata: Record<string, unknown>;
-    };
+    tokenPayload?: TokenPayload;
   }
-}
-
-// Supabase client singleton
-let supabaseAdmin: SupabaseClient | null = null;
-
-function getSupabaseAdmin(): SupabaseClient {
-  if (!supabaseAdmin) {
-    const config = getAuthConfig();
-    supabaseAdmin = createClient(config.supabaseUrl, config.supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
-  }
-  return supabaseAdmin;
 }
 
 /**
@@ -68,7 +57,7 @@ function getAuthService(): AuthService | null {
 }
 
 /**
- * Authentication hook - Validates JWT and extracts user
+ * Authentication hook - Validates JWT and extracts user (Native JWT)
  * Use as preHandler on protected routes
  */
 export async function authenticate(
@@ -86,26 +75,23 @@ export async function authenticate(
   }
 
   try {
-    const supabase = getSupabaseAdmin();
+    const jwt = getJwtService();
 
-    // Verify JWT and get user
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Verify JWT using native service
+    const verifyResult = await jwt.verifyAccessToken(token);
 
-    if (error || !user) {
+    if (verifyResult.isFailure || !verifyResult.value) {
       return reply.status(401).send({
         statusCode: 401,
         error: 'Unauthorized',
-        message: error?.message || 'Invalid or expired token',
+        message: verifyResult.error || 'Invalid or expired token',
       });
     }
 
-    // Store Supabase user on request for later use
-    request.supabaseUser = {
-      id: user.id,
-      email: user.email || '',
-      app_metadata: user.app_metadata || {},
-      user_metadata: user.user_metadata || {},
-    };
+    const tokenPayload = verifyResult.value;
+
+    // Store token payload on request for later use
+    request.tokenPayload = tokenPayload;
 
     // Get tenant ID from header
     const tenantId = request.headers['x-tenant-id'] as string;
@@ -127,12 +113,16 @@ export async function authenticate(
       });
     }
 
+    const userId = tokenPayload.sub!;
+
     // Try to get role from database via AuthService
     let role: UserRole = UserRole.SALES_REP;
+    let userFullName: string | undefined;
+    let userAvatarUrl: string | undefined;
     const authService = getAuthService();
 
     if (authService) {
-      const membershipResult = await authService.getTenantMembership(user.id, tenantId);
+      const membershipResult = await authService.getTenantMembership(userId, tenantId);
 
       if (membershipResult.isSuccess && membershipResult.value) {
         const membership = membershipResult.value;
@@ -163,27 +153,32 @@ export async function authenticate(
           message: 'You are not a member of this tenant',
         });
       }
-      // If lookup failed, fall back to metadata role
+
+      // Get user profile for metadata
+      const userResult = await authService.getUserById(userId);
+      if (userResult.isSuccess && userResult.value) {
+        userFullName = userResult.value.fullName || undefined;
+        userAvatarUrl = userResult.value.avatarUrl || undefined;
+      }
     }
 
-    // Fallback: use role from app_metadata if database lookup didn't work
-    if (!authService) {
-      const roleFromMetadata = user.app_metadata?.role as string | undefined;
-      if (roleFromMetadata && Object.values(UserRole).includes(roleFromMetadata as UserRole)) {
-        role = roleFromMetadata as UserRole;
+    // Fallback: use role from token if database lookup didn't work
+    if (!authService && tokenPayload.role) {
+      if (Object.values(UserRole).includes(tokenPayload.role as UserRole)) {
+        role = tokenPayload.role as UserRole;
       }
     }
 
     // Create authenticated user context
     const authUser: AuthUser = {
-      id: user.id,
-      email: user.email || '',
+      id: userId,
+      email: tokenPayload.email,
       tenantId,
       role,
       permissions: getPermissionsForRole(role),
       metadata: {
-        fullName: user.user_metadata?.full_name as string | undefined,
-        avatarUrl: user.user_metadata?.avatar_url as string | undefined,
+        fullName: userFullName,
+        avatarUrl: userAvatarUrl,
       },
     };
 
@@ -192,7 +187,7 @@ export async function authenticate(
 
     // Update last login (fire and forget)
     if (authService) {
-      authService.updateLastLogin(user.id).catch(() => {
+      authService.updateLastLogin(userId).catch(() => {
         // Silently ignore errors updating last login
       });
     }
@@ -207,7 +202,7 @@ export async function authenticate(
 }
 
 /**
- * Authentication without tenant requirement
+ * Authentication without tenant requirement (Native JWT)
  * Used for onboarding endpoints where user creates their first tenant
  */
 export async function authenticateWithoutTenant(
@@ -225,38 +220,48 @@ export async function authenticateWithoutTenant(
   }
 
   try {
-    const supabase = getSupabaseAdmin();
+    const jwt = getJwtService();
 
-    // Verify JWT and get user
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Verify JWT using native service
+    const verifyResult = await jwt.verifyAccessToken(token);
 
-    if (error || !user) {
+    if (verifyResult.isFailure || !verifyResult.value) {
       return reply.status(401).send({
         statusCode: 401,
         error: 'Unauthorized',
-        message: error?.message || 'Invalid or expired token',
+        message: verifyResult.error || 'Invalid or expired token',
       });
     }
 
-    // Store Supabase user on request for later use
-    request.supabaseUser = {
-      id: user.id,
-      email: user.email || '',
-      app_metadata: user.app_metadata || {},
-      user_metadata: user.user_metadata || {},
-    };
+    const tokenPayload = verifyResult.value;
+
+    // Store token payload on request for later use
+    request.tokenPayload = tokenPayload;
+
+    // Get user profile for metadata
+    let userFullName: string | undefined;
+    let userAvatarUrl: string | undefined;
+    const authService = getAuthService();
+
+    if (authService) {
+      const userResult = await authService.getUserById(tokenPayload.sub!);
+      if (userResult.isSuccess && userResult.value) {
+        userFullName = userResult.value.fullName || undefined;
+        userAvatarUrl = userResult.value.avatarUrl || undefined;
+      }
+    }
 
     // Create authenticated user context WITHOUT tenant
     // This is used for onboarding where user doesn't have a tenant yet
     const authUser: AuthUser = {
-      id: user.id,
-      email: user.email || '',
+      id: tokenPayload.sub!,
+      email: tokenPayload.email,
       tenantId: '', // Empty - user doesn't have a tenant yet
       role: UserRole.OWNER, // Will be owner of the new tenant
       permissions: getPermissionsForRole(UserRole.OWNER),
       metadata: {
-        fullName: user.user_metadata?.full_name as string | undefined,
-        avatarUrl: user.user_metadata?.avatar_url as string | undefined,
+        fullName: userFullName,
+        avatarUrl: userAvatarUrl,
       },
     };
 
@@ -273,7 +278,87 @@ export async function authenticateWithoutTenant(
 }
 
 /**
- * Optional authentication - Does not fail if no token
+ * Internal API Key authentication - For secure server-to-server communication
+ * Used for the /oauth/exchange endpoint where frontend server sends verified OAuth user data
+ *
+ * SECURITY: This replaces the previous authenticateOAuth which required SUPABASE_JWT_SECRET.
+ * Now we use a simple API key since the frontend server (Next.js) has already verified
+ * the OAuth flow via Supabase's exchangeCodeForSession() - a secure server-to-server call.
+ *
+ * The INTERNAL_API_KEY should be:
+ * - At least 32 characters
+ * - Shared only between frontend server and backend server
+ * - Never exposed to client-side JavaScript
+ */
+export async function authenticateInternalAPI(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  // Get API key from header
+  const apiKey = request.headers['x-internal-api-key'] as string;
+
+  if (!apiKey) {
+    return reply.status(401).send({
+      statusCode: 401,
+      error: 'Unauthorized',
+      message: 'Missing internal API key',
+    });
+  }
+
+  // Validate API key
+  const expectedApiKey = process.env.INTERNAL_API_KEY;
+
+  if (!expectedApiKey) {
+    request.log.error('INTERNAL_API_KEY not configured');
+    return reply.status(500).send({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      message: 'Server-to-server authentication not configured',
+    });
+  }
+
+  // SECURITY: Minimum key length validation
+  if (expectedApiKey.length < 32) {
+    request.log.error('INTERNAL_API_KEY is too short (minimum 32 characters)');
+    return reply.status(500).send({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      message: 'Server configuration error',
+    });
+  }
+
+  // Constant-time comparison to prevent timing attacks
+  if (!timingSafeEqual(apiKey, expectedApiKey)) {
+    request.log.warn('Invalid internal API key attempt');
+    return reply.status(401).send({
+      statusCode: 401,
+      error: 'Unauthorized',
+      message: 'Invalid API key',
+    });
+  }
+
+  // API key is valid - the actual user context will be created from request body
+  // in the route handler (since the verified user data comes from the frontend server)
+  request.log.info('Internal API authentication successful');
+}
+
+/**
+ * Constant-time string comparison to prevent timing attacks
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+/**
+ * Optional authentication - Does not fail if no token (Native JWT)
  * Useful for endpoints that behave differently for authenticated vs anonymous users
  */
 export async function optionalAuthenticate(
@@ -287,33 +372,32 @@ export async function optionalAuthenticate(
   }
 
   try {
-    const supabase = getSupabaseAdmin();
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const jwt = getJwtService();
+    const verifyResult = await jwt.verifyAccessToken(token);
 
-    if (error || !user) {
+    if (verifyResult.isFailure || !verifyResult.value) {
       return; // Invalid token, continue without auth
     }
 
+    const tokenPayload = verifyResult.value;
     const tenantId = request.headers['x-tenant-id'] as string;
     if (!tenantId) {
       return; // No tenant, continue without auth
     }
 
-    const roleFromMetadata = user.app_metadata?.role as string | undefined;
-    const role = (roleFromMetadata as UserRole) || UserRole.VIEWER;
+    // Use role from token or fallback to VIEWER
+    const role = (tokenPayload.role as UserRole) || UserRole.VIEWER;
 
     const authUser: AuthUser = {
-      id: user.id,
-      email: user.email || '',
+      id: tokenPayload.sub!,
+      email: tokenPayload.email,
       tenantId,
       role,
       permissions: getPermissionsForRole(role),
-      metadata: {
-        fullName: user.user_metadata?.full_name as string | undefined,
-        avatarUrl: user.user_metadata?.avatar_url as string | undefined,
-      },
+      metadata: {},
     };
 
+    request.tokenPayload = tokenPayload;
     request.auth = new AuthContext(authUser);
   } catch {
     // Silently continue without auth on any error

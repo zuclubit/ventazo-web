@@ -18,11 +18,14 @@ import {
 import {
   authenticate,
   authenticateWithoutTenant,
+  authenticateInternalAPI,
   optionalAuthenticate,
   requirePermission,
   requireRole,
   getAuthUser,
 } from '../middlewares/auth.middleware';
+import { JwtService } from '../../infrastructure/auth/jwt.service';
+import { StorageService } from '../../infrastructure/storage/storage.service';
 
 // Validation schemas
 const inviteUserSchema = z.object({
@@ -1519,6 +1522,121 @@ export const tenantRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * Upload tenant logo
+   */
+  fastify.post('/logo', {
+    preHandler: [
+      authenticate,
+      requireRole(UserRole.ADMIN, UserRole.OWNER),
+    ],
+    schema: {
+      tags: ['Tenant'],
+      summary: 'Upload tenant logo',
+      description: 'Upload a new logo for the tenant',
+      consumes: ['multipart/form-data'],
+    },
+  }, async (request, reply) => {
+    const user = getAuthUser(request);
+
+    try {
+      // Handle multipart form data
+      const data = await request.file();
+      if (!data) {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'No file uploaded',
+        });
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+      if (!allowedTypes.includes(data.mimetype)) {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Invalid file type. Allowed types: JPEG, PNG, WebP, SVG',
+        });
+      }
+
+      // Validate file size (5MB max)
+      const fileBuffer = await data.toBuffer();
+      if (fileBuffer.length > 5 * 1024 * 1024) {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'File size exceeds 5MB limit',
+        });
+      }
+
+      // Try to use StorageService if available
+      try {
+        const storageService = container.resolve(StorageService);
+
+        if (storageService.isConfigured()) {
+          const uploadResult = await storageService.uploadFile(
+            user.tenantId,
+            user.id,
+            {
+              entityType: 'tenant',
+              entityId: user.tenantId,
+              file: {
+                buffer: fileBuffer,
+                originalName: data.filename || 'logo.png',
+                mimeType: data.mimetype,
+                size: fileBuffer.length,
+              },
+              category: 'image',
+              isPublic: true,
+            }
+          );
+
+          if (uploadResult.isSuccess && uploadResult.value) {
+            // Update tenant branding with new logo URL
+            const authService = container.resolve(AuthService);
+            await authService.updateTenantBranding(user.tenantId, {
+              logo: uploadResult.value.storageUrl || '',
+            });
+
+            return {
+              success: true,
+              data: {
+                url: uploadResult.value.storageUrl,
+                id: uploadResult.value.id,
+              },
+            };
+          }
+        }
+      } catch {
+        // Storage service not available, fall back to base64 data URL
+      }
+
+      // Fallback: Convert to base64 data URL
+      const base64 = fileBuffer.toString('base64');
+      const dataUrl = `data:${data.mimetype};base64,${base64}`;
+
+      // Update tenant branding with data URL
+      const authService = container.resolve(AuthService);
+      await authService.updateTenantBranding(user.tenantId, {
+        logo: dataUrl,
+      });
+
+      return {
+        success: true,
+        data: {
+          url: dataUrl,
+        },
+      };
+    } catch (error) {
+      return reply.status(500).send({
+        statusCode: 500,
+        error: 'Internal Server Error',
+        message: error instanceof Error ? error.message : 'Failed to upload logo',
+      });
+    }
+  });
+
+  /**
    * Get tenant modules configuration
    */
   fastify.get('/modules', {
@@ -1796,51 +1914,111 @@ export const userSyncRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
-   * OAuth Sync - Sync user from OAuth provider and return complete user state
-   * Used by frontend after OAuth authentication to:
-   * 1. Sync user to backend database
-   * 2. Get tenant memberships
-   * 3. Get onboarding status
-   * 4. Return complete state for smart redirects
+   * OAuth Exchange - Exchange verified OAuth user data for native JWT tokens
+   *
+   * SECURITY ARCHITECTURE:
+   * This endpoint uses INTERNAL_API_KEY instead of SUPABASE_JWT_SECRET.
+   *
+   * Flow:
+   * 1. User authenticates via OAuth (Google/Microsoft) through Supabase
+   * 2. Frontend server receives OAuth code and calls exchangeCodeForSession()
+   *    - This is a secure server-to-server call that verifies the OAuth flow
+   * 3. Frontend server calls this endpoint with:
+   *    - X-Internal-API-Key header (shared secret between frontend/backend servers)
+   *    - Verified user data (userId, email, etc.) in request body
+   * 4. Backend trusts this data because it's authenticated via INTERNAL_API_KEY
+   * 5. Backend generates native JWT tokens and returns complete user state
+   *
+   * Benefits:
+   * - Eliminates SUPABASE_JWT_SECRET dependency
+   * - Simpler architecture (no JWT verification, just API key)
+   * - The OAuth verification already happened in step 2
    */
-  const oauthSyncSchema = z.object({
-    email: z.string().email(),
+  const oauthExchangeSchema = z.object({
+    // User data verified by frontend via exchangeCodeForSession()
+    userId: z.string().uuid('Invalid user ID'),
+    email: z.string().email('Invalid email'),
     fullName: z.string().optional(),
     avatarUrl: z.string().url().optional().nullable(),
     provider: z.string().optional(),
   });
 
-  fastify.post('/oauth/sync', {
-    preHandler: [authenticateWithoutTenant],
+  fastify.post('/oauth/exchange', {
+    preHandler: [authenticateInternalAPI],
     schema: {
       tags: ['Auth'],
-      summary: 'OAuth user sync',
-      description: 'Syncs OAuth user and returns complete state including tenants and onboarding status',
-      body: toJsonSchema(oauthSyncSchema),
+      summary: 'Exchange OAuth user data for native tokens',
+      description: 'Exchanges verified OAuth user data (from frontend server) for native JWT tokens. Requires X-Internal-API-Key header.',
+      body: toJsonSchema(oauthExchangeSchema),
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            user: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                email: { type: 'string' },
+                fullName: { type: 'string' },
+              },
+            },
+            tenants: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                  slug: { type: 'string' },
+                  role: { type: 'string' },
+                },
+              },
+            },
+            onboarding: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                status: { type: 'string' },
+                currentStep: { type: 'string' },
+                completedSteps: { type: 'array', items: { type: 'string' } },
+              },
+            },
+            tokens: {
+              type: 'object',
+              properties: {
+                accessToken: { type: 'string' },
+                refreshToken: { type: 'string' },
+                expiresIn: { type: 'number' },
+                expiresAt: { type: 'number' },
+              },
+            },
+          },
+        },
+      },
     },
   }, async (request, reply) => {
-    const user = getAuthUser(request);
-    const body = oauthSyncSchema.parse(request.body);
+    const body = oauthExchangeSchema.parse(request.body);
     const authService = container.resolve(AuthService);
     const onboardingService = container.resolve(OnboardingService);
+    const jwtService = new JwtService();
 
     try {
       // 1. Sync user to backend database
       const syncResult = await authService.syncUserFromSupabase({
-        supabaseUserId: user.id,
-        email: body.email || user.email,
+        supabaseUserId: body.userId,
+        email: body.email,
         fullName: body.fullName,
         avatarUrl: body.avatarUrl || undefined,
         metadata: body.provider ? { oauthProvider: body.provider } : undefined,
       });
 
       if (syncResult.isFailure) {
-        console.error('[OAuth Sync] User sync failed:', syncResult.error);
+        request.log.warn({ error: syncResult.error }, 'User sync failed, user may already exist');
         // Continue anyway - user may already exist
       }
 
       // 2. Get user's tenant memberships
-      const tenantsResult = await authService.getUserTenants(user.id);
+      const tenantsResult = await authService.getUserTenants(body.userId);
       const tenants = tenantsResult.isSuccess && tenantsResult.value?.memberships
         ? tenantsResult.value.memberships.map(m => ({
             id: m.tenantId,
@@ -1853,7 +2031,7 @@ export const userSyncRoutes: FastifyPluginAsync = async (fastify) => {
       // 3. Get onboarding status
       let onboarding = null;
       try {
-        const onboardingResult = await onboardingService.getOnboardingStatus(user.id);
+        const onboardingResult = await onboardingService.getOnboardingStatus(body.userId);
         if (onboardingResult.isSuccess && onboardingResult.value) {
           onboarding = {
             status: onboardingResult.value.status,
@@ -1862,26 +2040,93 @@ export const userSyncRoutes: FastifyPluginAsync = async (fastify) => {
           };
         }
       } catch (onboardingError) {
-        console.warn('[OAuth Sync] Could not fetch onboarding status:', onboardingError);
+        request.log.warn({ error: onboardingError }, 'Could not fetch onboarding status');
       }
 
-      // 4. Return complete user state
+      // 4. Generate native JWT tokens
+      // Use first tenant if available, otherwise leave tenantId empty
+      const firstTenant = tenants[0];
+      const tenantId = firstTenant?.id || '';
+      const role = firstTenant?.role || 'owner';
+
+      const tokenResult = await jwtService.generateTokenPair(
+        body.userId,
+        body.email,
+        tenantId,
+        role
+      );
+
+      if (tokenResult.isFailure) {
+        request.log.error({ error: tokenResult.error }, 'Token generation failed');
+        return reply.status(500).send({
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Failed to generate authentication tokens',
+        });
+      }
+
+      const tokens = tokenResult.value!;
+
+      request.log.info({ userId: body.userId, email: body.email }, 'OAuth exchange successful');
+
+      // 5. Return complete user state with native tokens
       return {
         user: {
-          id: user.id,
-          email: user.email,
+          id: body.userId,
+          email: body.email,
           fullName: syncResult.isSuccess ? syncResult.value?.fullName : body.fullName,
         },
         tenants,
         onboarding,
+        tokens: {
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresIn: tokens.expiresIn,
+          expiresAt: tokens.expiresAt,
+        },
       };
     } catch (error) {
-      console.error('[OAuth Sync] Error:', error);
+      request.log.error({ error }, 'OAuth exchange failed');
       return reply.status(500).send({
         statusCode: 500,
         error: 'Internal Server Error',
-        message: 'Failed to sync OAuth user',
+        message: 'Failed to process OAuth exchange',
       });
     }
+  });
+
+  // ============================================
+  // DEPRECATED: /oauth/sync
+  // Kept for backwards compatibility during migration
+  // Will be removed in future version
+  // ============================================
+  const oauthSyncSchema = z.object({
+    email: z.string().email(),
+    fullName: z.string().optional(),
+    avatarUrl: z.string().url().optional().nullable(),
+    provider: z.string().optional(),
+  });
+
+  fastify.post('/oauth/sync', {
+    preHandler: [authenticateInternalAPI],
+    schema: {
+      tags: ['Auth'],
+      summary: '[DEPRECATED] Use /oauth/exchange instead',
+      description: 'DEPRECATED: This endpoint now requires X-Internal-API-Key. Use /oauth/exchange with userId in body.',
+      deprecated: true,
+      body: toJsonSchema(oauthSyncSchema),
+    },
+  }, async (request, reply) => {
+    // Return deprecation error
+    return reply.status(410).send({
+      statusCode: 410,
+      error: 'Gone',
+      message: 'This endpoint is deprecated. Use POST /api/v1/auth/oauth/exchange with X-Internal-API-Key header and userId in body.',
+      migration: {
+        newEndpoint: '/api/v1/auth/oauth/exchange',
+        requiredHeaders: ['X-Internal-API-Key'],
+        bodyChanges: 'Add userId (UUID) to request body',
+      },
+    });
   });
 };

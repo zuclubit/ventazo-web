@@ -55,6 +55,8 @@ import {
 } from '@/lib/opportunities';
 import { sanitizeOpportunityData, sanitizeTags } from '@/lib/security/form-sanitizer';
 import { cn } from '@/lib/utils';
+import { AttachmentSection } from '@/components/ui/attachment-section';
+import { Separator } from '@/components/ui/separator';
 
 // ============================================
 // Form Schema Factory
@@ -70,7 +72,7 @@ const createOpportunityFormSchema = (t: ReturnType<typeof useI18n>['t']) => z.ob
   probability: z.number().min(0).max(100),
   expectedCloseDate: z.date().optional().nullable(),
   tags: z.string().optional(),
-  source: z.enum(['lead_conversion', 'direct', 'referral', 'upsell', 'cross_sell', '']).optional(),
+  source: z.enum(['lead_conversion', 'direct', 'referral', 'upsell', 'cross_sell', '__none__']).optional(),
 });
 
 type OpportunityFormValues = z.infer<ReturnType<typeof createOpportunityFormSchema>>;
@@ -122,8 +124,9 @@ export function OpportunityFormDialog({
   const createOpportunity = useCreateOpportunity();
   const updateOpportunity = useUpdateOpportunity();
 
-  // Pipeline stages
-  const { data: stages } = usePipelineStages();
+  // Pipeline stages - ensure it's always an array
+  const { data: stagesData } = usePipelineStages();
+  const stages = Array.isArray(stagesData) ? stagesData : [];
 
   // Form
   const form = useForm<OpportunityFormValues>({
@@ -138,13 +141,32 @@ export function OpportunityFormDialog({
       probability: 50,
       expectedCloseDate: null,
       tags: '',
-      source: '',
+      source: '__none__',
     },
   });
 
-  // Reset form when opportunity changes
+  // Track if we've initialized the form for a new opportunity
+  const lastOpportunityId = React.useRef<string | null>(null);
+  const hasInitializedEmpty = React.useRef(false);
+
+  // Reset tracking refs when dialog closes
   React.useEffect(() => {
-    if (opportunity) {
+    if (!open) {
+      lastOpportunityId.current = null;
+      hasInitializedEmpty.current = false;
+    }
+  }, [open]);
+
+  // Reset form when opportunity changes (or when creating new)
+  React.useEffect(() => {
+    if (!open) return; // Don't run when dialog is closed
+
+    const currentId = opportunity?.id ?? null;
+
+    if (opportunity && currentId !== lastOpportunityId.current) {
+      // Editing: reset with opportunity data
+      lastOpportunityId.current = currentId;
+      hasInitializedEmpty.current = false;
       form.reset({
         name: opportunity.name,
         description: opportunity.description ?? '',
@@ -157,23 +179,28 @@ export function OpportunityFormDialog({
           ? new Date(opportunity.expectedCloseDate)
           : null,
         tags: opportunity.tags.join(', '),
-        source: (opportunity.source as '' | 'lead_conversion' | 'direct' | 'referral' | 'upsell' | 'cross_sell') ?? '',
+        source: (opportunity.source as '__none__' | 'lead_conversion' | 'direct' | 'referral' | 'upsell' | 'cross_sell') ?? '__none__',
       });
-    } else {
+    } else if (!opportunity && !hasInitializedEmpty.current) {
+      // Creating new: reset to empty form only once
+      lastOpportunityId.current = null;
+      hasInitializedEmpty.current = true;
+      const defaultStage = stages?.[0];
       form.reset({
         name: '',
         description: '',
-        stageId: stages?.[0]?.id ?? '',
+        stageId: defaultStage?.id ?? '',
         priority: 'medium',
         amount: 0,
         currency: 'USD',
-        probability: stages?.[0]?.probability ?? 50,
+        probability: defaultStage?.probability ?? 50,
         expectedCloseDate: null,
         tags: '',
-        source: '',
+        source: '__none__',
       });
     }
-  }, [opportunity, form, stages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opportunity?.id, open]);
 
   // Handle stage change (auto-update probability)
   const handleStageChange = (stageId: string) => {
@@ -214,7 +241,7 @@ export function OpportunityFormDialog({
       currency: sanitizedValues.currency,
       probability: sanitizedValues.probability,
       expectedCloseDate: sanitizedValues.expectedCloseDate?.toISOString(),
-      source: sanitizedValues.source || undefined,
+      source: sanitizedValues.source && sanitizedValues.source !== '__none__' ? sanitizedValues.source : undefined,
       tags: sanitizedTagsArray,
     };
 
@@ -254,7 +281,7 @@ export function OpportunityFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? t.opportunities.editOpportunity : t.opportunities.newOpportunity}
@@ -318,17 +345,23 @@ export function OpportunityFormDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {stages?.map((stage) => (
-                          <SelectItem key={stage.id} value={stage.id}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="h-2 w-2 rounded-full"
-                                style={{ backgroundColor: stage.color }}
-                              />
-                              {stage.label} ({stage.probability}%)
-                            </div>
+                        {stages.length > 0 ? (
+                          stages.map((stage) => (
+                            <SelectItem key={stage.id} value={stage.id}>
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="h-2 w-2 rounded-full"
+                                  style={{ backgroundColor: stage.color }}
+                                />
+                                {stage.label} ({stage.probability}%)
+                              </div>
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="__loading__" disabled>
+                            Cargando etapas...
                           </SelectItem>
-                        ))}
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -483,14 +516,14 @@ export function OpportunityFormDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>{t.opportunities.form.fields.source.label}</FormLabel>
-                  <Select value={field.value || ''} onValueChange={field.onChange}>
+                  <Select value={field.value || '__none__'} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={t.opportunities.form.fields.source.placeholder} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">{t.opportunities.source.unspecified}</SelectItem>
+                      <SelectItem value="__none__">{t.opportunities.source.unspecified}</SelectItem>
                       {OPPORTUNITY_SOURCE.map((source) => (
                         <SelectItem key={source} value={source}>
                           {t.opportunities.source[source as keyof typeof t.opportunities.source] || source}
@@ -523,6 +556,23 @@ export function OpportunityFormDialog({
                 </FormItem>
               )}
             />
+
+            {/* Attachments - Only show if editing (opportunity already has ID) */}
+            {isEditing && opportunity?.id && (
+              <>
+                <Separator className="my-4" />
+                <AttachmentSection
+                  entityType="opportunity"
+                  entityId={opportunity.id}
+                  title="Documentos de la Oportunidad"
+                  description="Adjunta propuestas, presentaciones o documentos del negocio"
+                  category="proposal"
+                  accessLevel="team"
+                  view="compact"
+                  compact
+                />
+              </>
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>

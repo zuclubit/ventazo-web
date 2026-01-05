@@ -16,6 +16,7 @@ import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { container } from 'tsyringe';
 import { z } from 'zod';
 import { CampaignService } from './campaign.service';
+import { optionalAuthenticate } from '../../presentation/middlewares/auth.middleware';
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -102,12 +103,12 @@ const createCampaignSchema = z.object({
   settings: campaignSettingsSchema,
   tags: z.array(z.string()).optional(),
   folderId: z.string().uuid().optional(),
-  ownerId: z.string().uuid(),
+  // ownerId is optional in request - will be auto-assigned from authenticated user
   ownerName: z.string().optional(),
   customFields: z.record(z.unknown()).optional(),
 });
 
-const updateCampaignSchema = createCampaignSchema.partial().omit({ type: true, ownerId: true });
+const updateCampaignSchema = createCampaignSchema.partial().omit({ type: true });
 
 const searchCampaignsSchema = z.object({
   search: z.string().optional(),
@@ -280,22 +281,400 @@ const createTriggerSchema = z.object({
 export async function campaignRoutes(fastify: FastifyInstance, _options: FastifyPluginOptions): Promise<void> {
   const campaignService = container.resolve(CampaignService);
 
-  const getContext = (request: any) => ({
-    tenantId: request.headers['x-tenant-id'] as string || 'default-tenant',
-    userId: request.headers['x-user-id'] as string || 'system',
+  // Apply authentication to all routes in this plugin
+  fastify.addHook('preHandler', optionalAuthenticate);
+
+  const getContext = (request: any) => {
+    // Get userId from authenticated context (set by auth middleware)
+    const authUser = request.auth?.user;
+    return {
+      tenantId: request.headers['x-tenant-id'] as string || 'default-tenant',
+      userId: authUser?.id || request.headers['x-user-id'] as string || 'system',
+    };
+  };
+
+  // ============================================================================
+  // IMPORTANT: Specific routes MUST be registered BEFORE parameterized routes
+  // Otherwise Fastify will match /dashboard as /:campaignId with campaignId="dashboard"
+  // ============================================================================
+
+  // ============================================================================
+  // DASHBOARD & STATS ENDPOINTS (MUST be before /:campaignId)
+  // ============================================================================
+
+  // Get dashboard stats
+  fastify.get('/dashboard', async (request, reply) => {
+    const { tenantId } = getContext(request);
+
+    const result = await campaignService.getDashboard(tenantId);
+
+    if (result.isFailure) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // Get stats (alias for frontend compatibility)
+  fastify.get('/stats', async (request, reply) => {
+    const { tenantId } = getContext(request);
+
+    const result = await campaignService.getDashboard(tenantId);
+
+    if (result.isFailure) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    // Transform to match frontend expected format
+    const data = result.value;
+    return {
+      totalCampaigns: data?.totalCampaigns ?? 0,
+      activeCampaigns: data?.activeCampaigns ?? 0,
+      scheduledCampaigns: data?.scheduledCampaigns ?? 0,
+      totalSent: data?.totalSent ?? 0,
+      avgOpenRate: data?.averageOpenRate ?? 0,
+      avgClickRate: data?.averageClickRate ?? 0,
+      recentCampaigns: data?.recentCampaigns ?? [],
+    };
   });
 
   // ============================================================================
-  // CAMPAIGN ENDPOINTS
+  // TEMPLATE ENDPOINTS (MUST be before /:campaignId)
   // ============================================================================
+
+  // Create template
+  fastify.post('/templates', async (request, reply) => {
+    const { tenantId, userId } = getContext(request);
+    const input = createTemplateSchema.parse(request.body);
+
+    const result = await campaignService.createEmailTemplate(tenantId, userId, input);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.status(201).send(result.value);
+  });
+
+  // Get templates
+  fastify.get('/templates', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const { type, category } = request.query as { type?: string; category?: string };
+
+    const result = await campaignService.getEmailTemplates(tenantId, { type, category });
+
+    if (result.isFailure) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // ============================================================================
+  // FOLDER ENDPOINTS (MUST be before /:campaignId)
+  // ============================================================================
+
+  // Create folder
+  fastify.post('/folders', async (request, reply) => {
+    const { tenantId, userId } = getContext(request);
+    const input = createFolderSchema.parse(request.body);
+
+    const result = await campaignService.createFolder(tenantId, userId, input);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.status(201).send(result.value);
+  });
+
+  // Get folders
+  fastify.get('/folders', async (request, reply) => {
+    const { tenantId } = getContext(request);
+
+    const result = await campaignService.getFolders(tenantId);
+
+    if (result.isFailure) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // ============================================================================
+  // AUDIENCE ENDPOINTS (MUST be before /:campaignId)
+  // ============================================================================
+
+  // Create audience
+  fastify.post('/audiences', async (request, reply) => {
+    const { tenantId, userId } = getContext(request);
+    const input = createAudienceSchema.parse(request.body);
+
+    const result = await campaignService.createAudience(tenantId, userId, input);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.status(201).send(result.value);
+  });
+
+  // Get all audiences
+  fastify.get('/audiences', async (request, reply) => {
+    const { tenantId } = getContext(request);
+
+    const result = await campaignService.getAudiences(tenantId);
+
+    if (result.isFailure) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // Get audience by ID
+  fastify.get('/audiences/:audienceId', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const { audienceId } = request.params as { audienceId: string };
+
+    const result = await campaignService.getAudienceById(tenantId, audienceId);
+
+    if (result.isFailure) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    if (!result.value) {
+      return reply.status(404).send({ error: 'Audience not found' });
+    }
+
+    return result.value;
+  });
+
+  // ============================================================================
+  // SUPPRESSION LIST ENDPOINTS (MUST be before /:campaignId)
+  // ============================================================================
+
+  // Check suppression
+  fastify.get('/suppression/check', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const { email } = z.object({ email: z.string().email() }).parse(request.query);
+
+    const result = await campaignService.isEmailSuppressed(tenantId, email);
+
+    if (result.isFailure) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    return { suppressed: result.value };
+  });
+
+  // Create suppression list
+  fastify.post('/suppression-lists', async (request, reply) => {
+    const { tenantId, userId } = getContext(request);
+    const input = createSuppressionListSchema.parse(request.body);
+
+    const result = await campaignService.createSuppressionList(tenantId, userId, input);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.status(201).send(result.value);
+  });
+
+  // Add to suppression list
+  fastify.post('/suppression-lists/:listId/entries', async (request, reply) => {
+    const { tenantId, userId } = getContext(request);
+    const { listId } = request.params as { listId: string };
+    const { entries } = addToSuppressionSchema.parse(request.body);
+
+    const result = await campaignService.addToSuppressionList(tenantId, userId, listId, entries);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return { added: result.value };
+  });
+
+  // ============================================================================
+  // A/B TEST GLOBAL ENDPOINTS (MUST be before /:campaignId)
+  // ============================================================================
+
+  // Start A/B test
+  fastify.post('/ab-tests/:testId/start', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const { testId } = request.params as { testId: string };
+
+    const result = await campaignService.startAbTest(tenantId, testId);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // Declare A/B test winner
+  fastify.post('/ab-tests/:testId/winner', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const { testId } = request.params as { testId: string };
+    const { winnerId, declaredBy } = z.object({
+      winnerId: z.string().uuid(),
+      declaredBy: z.enum(['automatic', 'manual']),
+    }).parse(request.body);
+
+    const result = await campaignService.declareAbTestWinner(tenantId, testId, winnerId, declaredBy);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // ============================================================================
+  // SEND TRACKING ENDPOINTS (MUST be before /:campaignId)
+  // ============================================================================
+
+  // Update send status
+  fastify.patch('/sends/:sendId/status', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const { sendId } = request.params as { sendId: string };
+    const input = updateSendStatusSchema.parse(request.body);
+    const { status, ...additionalData } = input;
+
+    const result = await campaignService.updateSendStatus(tenantId, sendId, status, additionalData);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // Record click
+  fastify.post('/sends/:sendId/clicks', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const { sendId } = request.params as { sendId: string };
+    const { campaignId } = z.object({ campaignId: z.string().uuid() }).parse(request.query);
+    const input = recordClickSchema.parse(request.body);
+
+    const result = await campaignService.recordClick(tenantId, sendId, campaignId, input);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.status(201).send(result.value);
+  });
+
+  // Record conversion
+  fastify.post('/sends/:sendId/conversions', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const { sendId } = request.params as { sendId: string };
+    const { campaignId } = z.object({ campaignId: z.string().uuid() }).parse(request.query);
+    const input = recordConversionSchema.parse(request.body);
+
+    const result = await campaignService.recordConversion(tenantId, sendId, campaignId, input);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.status(201).send(result.value);
+  });
+
+  // ============================================================================
+  // RECIPIENT PREVIEW ENDPOINTS (NEW - for frontend compatibility)
+  // ============================================================================
+
+  // Preview recipients based on filters
+  fastify.post('/preview-recipients', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const filters = z.object({
+      entityType: z.enum(['customer', 'lead', 'all']),
+      status: z.array(z.string()).optional(),
+      tier: z.array(z.string()).optional(),
+      tags: z.array(z.string()).optional(),
+      limit: z.number().int().min(1).max(100).default(10),
+    }).parse(request.body);
+
+    // Get preview of recipients based on filters
+    const result = await campaignService.previewRecipients(tenantId, filters);
+
+    if (result.isFailure) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // Count recipients based on filters
+  fastify.post('/count-recipients', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const filters = z.object({
+      entityType: z.enum(['customer', 'lead', 'all']),
+      status: z.array(z.string()).optional(),
+      tier: z.array(z.string()).optional(),
+      tags: z.array(z.string()).optional(),
+    }).parse(request.body);
+
+    const result = await campaignService.countRecipients(tenantId, filters);
+
+    if (result.isFailure) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    return { count: result.value };
+  });
+
+  // ============================================================================
+  // CAMPAIGN CRUD ENDPOINTS (parameterized - MUST be AFTER specific routes)
+  // ============================================================================
+
+  // Search campaigns
+  fastify.get('/', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const filters = searchCampaignsSchema.parse(request.query);
+    const { page, limit, ...searchFilters } = filters;
+
+    const result = await campaignService.searchCampaigns(
+      tenantId,
+      {
+        ...searchFilters,
+        startDateFrom: searchFilters.startDateFrom ? new Date(searchFilters.startDateFrom) : undefined,
+        startDateTo: searchFilters.startDateTo ? new Date(searchFilters.startDateTo) : undefined,
+      },
+      { page, limit }
+    );
+
+    if (result.isFailure) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    return result.value;
+  });
 
   // Create campaign
   fastify.post('/', async (request, reply) => {
     const { tenantId, userId } = getContext(request);
+
+    // Validate that we have a proper userId (should be a UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+      return reply.status(401).send({
+        statusCode: 401,
+        error: 'Unauthorized',
+        message: 'Authentication required to create campaigns',
+      });
+    }
+
     const input = createCampaignSchema.parse(request.body);
 
     const result = await campaignService.createCampaign(tenantId, userId, {
       ...input,
+      ownerId: userId, // Auto-assign owner from authenticated user
       startDate: input.startDate ? new Date(input.startDate) : undefined,
       endDate: input.endDate ? new Date(input.endDate) : undefined,
     });
@@ -320,29 +699,6 @@ export async function campaignRoutes(fastify: FastifyInstance, _options: Fastify
 
     if (!result.value) {
       return reply.status(404).send({ error: 'Campaign not found' });
-    }
-
-    return result.value;
-  });
-
-  // Search campaigns
-  fastify.get('/', async (request, reply) => {
-    const { tenantId } = getContext(request);
-    const filters = searchCampaignsSchema.parse(request.query);
-    const { page, limit, ...searchFilters } = filters;
-
-    const result = await campaignService.searchCampaigns(
-      tenantId,
-      {
-        ...searchFilters,
-        startDateFrom: searchFilters.startDateFrom ? new Date(searchFilters.startDateFrom) : undefined,
-        startDateTo: searchFilters.startDateTo ? new Date(searchFilters.startDateTo) : undefined,
-      },
-      { page, limit }
-    );
-
-    if (result.isFailure) {
-      return reply.status(500).send({ error: result.error });
     }
 
     return result.value;
@@ -396,16 +752,13 @@ export async function campaignRoutes(fastify: FastifyInstance, _options: Fastify
     return reply.status(204).send();
   });
 
-  // ============================================================================
-  // AUDIENCE ENDPOINTS
-  // ============================================================================
-
-  // Create audience
-  fastify.post('/audiences', async (request, reply) => {
+  // Duplicate campaign (NEW - for frontend compatibility)
+  fastify.post('/:campaignId/duplicate', async (request, reply) => {
     const { tenantId, userId } = getContext(request);
-    const input = createAudienceSchema.parse(request.body);
+    const { campaignId } = request.params as { campaignId: string };
+    const { name } = z.object({ name: z.string().optional() }).parse(request.body);
 
-    const result = await campaignService.createAudience(tenantId, userId, input);
+    const result = await campaignService.duplicateCampaign(tenantId, userId, campaignId, name);
 
     if (result.isFailure) {
       return reply.status(400).send({ error: result.error });
@@ -414,39 +767,50 @@ export async function campaignRoutes(fastify: FastifyInstance, _options: Fastify
     return reply.status(201).send(result.value);
   });
 
-  // Get audience by ID
-  fastify.get('/audiences/:audienceId', async (request, reply) => {
+  // Pause campaign (convenience endpoint for frontend)
+  fastify.post('/:campaignId/pause', async (request, reply) => {
     const { tenantId } = getContext(request);
-    const { audienceId } = request.params as { audienceId: string };
+    const { campaignId } = request.params as { campaignId: string };
 
-    const result = await campaignService.getAudienceById(tenantId, audienceId);
+    const result = await campaignService.updateCampaignStatus(tenantId, campaignId, 'paused');
 
     if (result.isFailure) {
-      return reply.status(500).send({ error: result.error });
-    }
-
-    if (!result.value) {
-      return reply.status(404).send({ error: 'Audience not found' });
+      return reply.status(400).send({ error: result.error });
     }
 
     return result.value;
   });
 
-  // Get all audiences
-  fastify.get('/audiences', async (request, reply) => {
+  // Resume campaign (convenience endpoint for frontend)
+  fastify.post('/:campaignId/resume', async (request, reply) => {
     const { tenantId } = getContext(request);
+    const { campaignId } = request.params as { campaignId: string };
 
-    const result = await campaignService.getAudiences(tenantId);
+    const result = await campaignService.updateCampaignStatus(tenantId, campaignId, 'active');
 
     if (result.isFailure) {
-      return reply.status(500).send({ error: result.error });
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // Cancel campaign (convenience endpoint for frontend)
+  fastify.post('/:campaignId/cancel', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const { campaignId } = request.params as { campaignId: string };
+
+    const result = await campaignService.updateCampaignStatus(tenantId, campaignId, 'cancelled');
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
     }
 
     return result.value;
   });
 
   // ============================================================================
-  // MESSAGE ENDPOINTS
+  // CAMPAIGN NESTED ENDPOINTS (require /:campaignId - must be after parameterized routes)
   // ============================================================================
 
   // Create message
@@ -481,11 +845,7 @@ export async function campaignRoutes(fastify: FastifyInstance, _options: Fastify
     return result.value;
   });
 
-  // ============================================================================
-  // A/B TEST ENDPOINTS
-  // ============================================================================
-
-  // Create A/B test
+  // Create A/B test for campaign
   fastify.post('/:campaignId/ab-tests', async (request, reply) => {
     const { tenantId, userId } = getContext(request);
     const { campaignId } = request.params as { campaignId: string };
@@ -499,42 +859,6 @@ export async function campaignRoutes(fastify: FastifyInstance, _options: Fastify
 
     return reply.status(201).send(result.value);
   });
-
-  // Start A/B test
-  fastify.post('/ab-tests/:testId/start', async (request, reply) => {
-    const { tenantId } = getContext(request);
-    const { testId } = request.params as { testId: string };
-
-    const result = await campaignService.startAbTest(tenantId, testId);
-
-    if (result.isFailure) {
-      return reply.status(400).send({ error: result.error });
-    }
-
-    return result.value;
-  });
-
-  // Declare A/B test winner
-  fastify.post('/ab-tests/:testId/winner', async (request, reply) => {
-    const { tenantId } = getContext(request);
-    const { testId } = request.params as { testId: string };
-    const { winnerId, declaredBy } = z.object({
-      winnerId: z.string().uuid(),
-      declaredBy: z.enum(['automatic', 'manual']),
-    }).parse(request.body);
-
-    const result = await campaignService.declareAbTestWinner(tenantId, testId, winnerId, declaredBy);
-
-    if (result.isFailure) {
-      return reply.status(400).send({ error: result.error });
-    }
-
-    return result.value;
-  });
-
-  // ============================================================================
-  // SENDING & TRACKING ENDPOINTS
-  // ============================================================================
 
   // Record send
   fastify.post('/:campaignId/messages/:messageId/sends', async (request, reply) => {
@@ -550,168 +874,6 @@ export async function campaignRoutes(fastify: FastifyInstance, _options: Fastify
 
     return reply.status(201).send(result.value);
   });
-
-  // Update send status
-  fastify.patch('/sends/:sendId/status', async (request, reply) => {
-    const { tenantId } = getContext(request);
-    const { sendId } = request.params as { sendId: string };
-    const input = updateSendStatusSchema.parse(request.body);
-    const { status, ...additionalData } = input;
-
-    const result = await campaignService.updateSendStatus(tenantId, sendId, status, additionalData);
-
-    if (result.isFailure) {
-      return reply.status(400).send({ error: result.error });
-    }
-
-    return result.value;
-  });
-
-  // Record click
-  fastify.post('/sends/:sendId/clicks', async (request, reply) => {
-    const { tenantId } = getContext(request);
-    const { sendId } = request.params as { sendId: string };
-    const { campaignId } = z.object({ campaignId: z.string().uuid() }).parse(request.query);
-    const input = recordClickSchema.parse(request.body);
-
-    const result = await campaignService.recordClick(tenantId, sendId, campaignId, input);
-
-    if (result.isFailure) {
-      return reply.status(400).send({ error: result.error });
-    }
-
-    return reply.status(201).send(result.value);
-  });
-
-  // Record conversion
-  fastify.post('/sends/:sendId/conversions', async (request, reply) => {
-    const { tenantId } = getContext(request);
-    const { sendId } = request.params as { sendId: string };
-    const { campaignId } = z.object({ campaignId: z.string().uuid() }).parse(request.query);
-    const input = recordConversionSchema.parse(request.body);
-
-    const result = await campaignService.recordConversion(tenantId, sendId, campaignId, input);
-
-    if (result.isFailure) {
-      return reply.status(400).send({ error: result.error });
-    }
-
-    return reply.status(201).send(result.value);
-  });
-
-  // ============================================================================
-  // SUPPRESSION LIST ENDPOINTS
-  // ============================================================================
-
-  // Create suppression list
-  fastify.post('/suppression-lists', async (request, reply) => {
-    const { tenantId, userId } = getContext(request);
-    const input = createSuppressionListSchema.parse(request.body);
-
-    const result = await campaignService.createSuppressionList(tenantId, userId, input);
-
-    if (result.isFailure) {
-      return reply.status(400).send({ error: result.error });
-    }
-
-    return reply.status(201).send(result.value);
-  });
-
-  // Add to suppression list
-  fastify.post('/suppression-lists/:listId/entries', async (request, reply) => {
-    const { tenantId, userId } = getContext(request);
-    const { listId } = request.params as { listId: string };
-    const { entries } = addToSuppressionSchema.parse(request.body);
-
-    const result = await campaignService.addToSuppressionList(tenantId, userId, listId, entries);
-
-    if (result.isFailure) {
-      return reply.status(400).send({ error: result.error });
-    }
-
-    return { added: result.value };
-  });
-
-  // Check suppression
-  fastify.get('/suppression/check', async (request, reply) => {
-    const { tenantId } = getContext(request);
-    const { email } = z.object({ email: z.string().email() }).parse(request.query);
-
-    const result = await campaignService.isEmailSuppressed(tenantId, email);
-
-    if (result.isFailure) {
-      return reply.status(500).send({ error: result.error });
-    }
-
-    return { suppressed: result.value };
-  });
-
-  // ============================================================================
-  // TEMPLATE ENDPOINTS
-  // ============================================================================
-
-  // Create template
-  fastify.post('/templates', async (request, reply) => {
-    const { tenantId, userId } = getContext(request);
-    const input = createTemplateSchema.parse(request.body);
-
-    const result = await campaignService.createEmailTemplate(tenantId, userId, input);
-
-    if (result.isFailure) {
-      return reply.status(400).send({ error: result.error });
-    }
-
-    return reply.status(201).send(result.value);
-  });
-
-  // Get templates
-  fastify.get('/templates', async (request, reply) => {
-    const { tenantId } = getContext(request);
-    const { type, category } = request.query as { type?: string; category?: string };
-
-    const result = await campaignService.getEmailTemplates(tenantId, { type, category });
-
-    if (result.isFailure) {
-      return reply.status(500).send({ error: result.error });
-    }
-
-    return result.value;
-  });
-
-  // ============================================================================
-  // FOLDER ENDPOINTS
-  // ============================================================================
-
-  // Create folder
-  fastify.post('/folders', async (request, reply) => {
-    const { tenantId, userId } = getContext(request);
-    const input = createFolderSchema.parse(request.body);
-
-    const result = await campaignService.createFolder(tenantId, userId, input);
-
-    if (result.isFailure) {
-      return reply.status(400).send({ error: result.error });
-    }
-
-    return reply.status(201).send(result.value);
-  });
-
-  // Get folders
-  fastify.get('/folders', async (request, reply) => {
-    const { tenantId } = getContext(request);
-
-    const result = await campaignService.getFolders(tenantId);
-
-    if (result.isFailure) {
-      return reply.status(500).send({ error: result.error });
-    }
-
-    return result.value;
-  });
-
-  // ============================================================================
-  // ANALYTICS ENDPOINTS
-  // ============================================================================
 
   // Get campaign analytics
   fastify.get('/:campaignId/analytics', async (request, reply) => {
@@ -740,23 +902,6 @@ export async function campaignRoutes(fastify: FastifyInstance, _options: Fastify
     return result.value;
   });
 
-  // Get dashboard
-  fastify.get('/dashboard', async (request, reply) => {
-    const { tenantId } = getContext(request);
-
-    const result = await campaignService.getDashboard(tenantId);
-
-    if (result.isFailure) {
-      return reply.status(500).send({ error: result.error });
-    }
-
-    return result.value;
-  });
-
-  // ============================================================================
-  // AUTOMATION ENDPOINTS
-  // ============================================================================
-
   // Create trigger
   fastify.post('/:campaignId/triggers', async (request, reply) => {
     const { tenantId } = getContext(request);
@@ -781,6 +926,76 @@ export async function campaignRoutes(fastify: FastifyInstance, _options: Fastify
 
     if (result.isFailure) {
       return reply.status(500).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // Get campaign recipients
+  fastify.get('/:campaignId/recipients', async (request, reply) => {
+    const { tenantId } = getContext(request);
+    const { campaignId } = request.params as { campaignId: string };
+    const { page, limit } = z.object({
+      page: z.coerce.number().int().min(1).default(1),
+      limit: z.coerce.number().int().min(1).max(100).default(20),
+    }).parse(request.query);
+
+    const result = await campaignService.getCampaignRecipients(tenantId, campaignId, { page, limit });
+
+    if (result.isFailure) {
+      return reply.status(500).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // Send campaign (schedule or send now)
+  fastify.post('/:campaignId/send', async (request, reply) => {
+    const { tenantId, userId } = getContext(request);
+    const { campaignId } = request.params as { campaignId: string };
+    const { sendNow, scheduledAt } = z.object({
+      sendNow: z.boolean().optional().default(false),
+      scheduledAt: z.string().datetime().optional(),
+    }).parse(request.body);
+
+    const result = await campaignService.sendCampaign(tenantId, userId, campaignId, { sendNow, scheduledAt });
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // Schedule campaign
+  fastify.post('/:campaignId/schedule', async (request, reply) => {
+    const { tenantId, userId } = getContext(request);
+    const { campaignId } = request.params as { campaignId: string };
+    const { scheduledAt } = z.object({
+      scheduledAt: z.string().datetime(),
+    }).parse(request.body);
+
+    const result = await campaignService.scheduleCampaign(tenantId, userId, campaignId, scheduledAt);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return result.value;
+  });
+
+  // Test campaign (send test email)
+  fastify.post('/:campaignId/test', async (request, reply) => {
+    const { tenantId, userId } = getContext(request);
+    const { campaignId } = request.params as { campaignId: string };
+    const { testRecipients } = z.object({
+      testRecipients: z.array(z.string().email()).min(1).max(5),
+    }).parse(request.body);
+
+    const result = await campaignService.sendTestCampaign(tenantId, userId, campaignId, testRecipients);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
     }
 
     return result.value;

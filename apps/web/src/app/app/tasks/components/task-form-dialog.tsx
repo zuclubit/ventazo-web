@@ -54,6 +54,8 @@ import {
   PRIORITY_LABELS,
 } from '@/lib/tasks';
 import { cn } from '@/lib/utils';
+import { AttachmentSection } from '@/components/ui/attachment-section';
+import { Separator } from '@/components/ui/separator';
 
 // ============================================
 // Form Schema
@@ -199,7 +201,7 @@ export function TaskFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl mx-2 sm:mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? 'Editar Tarea' : 'Nueva Tarea'}
@@ -248,8 +250,8 @@ export function TaskFormDialog({
               )}
             />
 
-            {/* Type & Priority Row */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Type & Priority Row - Stack on mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="type"
@@ -301,8 +303,8 @@ export function TaskFormDialog({
               />
             </div>
 
-            {/* Due Date & Reminder Row */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Due Date & Reminder Row - Stack on mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Due Date */}
               <FormField
                 control={form.control}
@@ -408,11 +410,37 @@ export function TaskFormDialog({
               )}
             />
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>
+            {/* Attachments - Only show if editing (task already has ID) */}
+            {isEditing && task?.id && (
+              <>
+                <Separator className="my-4" />
+                <AttachmentSection
+                  entityType="task"
+                  entityId={task.id}
+                  title="Archivos Adjuntos"
+                  description="Adjunta documentos, capturas de pantalla o archivos relevantes"
+                  category="document"
+                  accessLevel="team"
+                  view="compact"
+                  compact
+                />
+              </>
+            )}
+
+            <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="w-full sm:w-auto min-h-[44px]"
+              >
                 Cancelar
               </Button>
-              <Button disabled={isPending} type="submit">
+              <Button
+                disabled={isPending}
+                type="submit"
+                className="w-full sm:w-auto min-h-[44px]"
+              >
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isEditing ? 'Guardar Cambios' : 'Crear Tarea'}
               </Button>

@@ -2,6 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   BROWSER COMPATIBILITY FALLBACKS
+   Design System Audit 2026
+
+   color-mix() support: Chrome 111+, Firefox 113+, Safari 16.2+
+   These fallbacks provide graceful degradation for older browsers.
+   ============================================ */
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  :root {
+    /* Glow effects fallback to solid colors with opacity */
+    --tenant-primary-glow: rgba(14, 181, 140, 0.25);
+    --tenant-accent-glow: rgba(94, 234, 212, 0.25);
+    --glow-primary-soft: rgba(14, 181, 140, 0.15);
+    --glow-primary-medium: rgba(14, 181, 140, 0.25);
+    --glow-primary-intense: rgba(14, 181, 140, 0.40);
+    --glow-primary: rgba(14, 181, 140, 0.20);
+    --glow-accent: rgba(94, 234, 212, 0.15);
+    --glow-accent-intense: rgba(94, 234, 212, 0.25);
+
+    /* Glass effects fallback */
+    --glass-bg: rgba(5, 40, 40, 0.50);
+    --glass-bg-light: rgba(5, 40, 40, 0.35);
+    --glass-bg-dark: rgba(5, 40, 40, 0.70);
+    --glass-border-hover: rgba(14, 181, 140, 0.30);
+
+    /* Card effects fallback */
+    --card-bg: rgba(5, 40, 40, 0.75);
+    --card-bg-hover: rgba(5, 40, 40, 0.85);
+    --card-bg-elevated: rgba(5, 40, 40, 0.80);
+    --card-bg-subtle: rgba(5, 40, 40, 0.60);
+    --card-border-hover: rgba(14, 181, 140, 0.35);
+    --card-border-active: rgba(14, 181, 140, 0.50);
+
+    /* Kanban effects fallback */
+    --kanban-card-border-hover: rgba(14, 181, 140, 0.25);
+    --kanban-card-shadow-hover: 0 4px 12px rgba(14, 181, 140, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
+    --kanban-card-shadow-dragging: 0 8px 32px rgba(14, 181, 140, 0.20), 0 4px 16px rgba(0, 0, 0, 0.12);
+    --kanban-drop-border: rgba(14, 181, 140, 0.50);
+    --kanban-drop-shadow: 0 0 0 3px rgba(14, 181, 140, 0.15), 0 0 30px rgba(14, 181, 140, 0.20);
+    --kanban-drop-bg: rgba(14, 181, 140, 0.05);
+  }
+
+  .dark {
+    /* Glow effects fallback for dark mode */
+    --tenant-primary-glow: rgba(14, 181, 140, 0.25);
+    --tenant-accent-glow: rgba(94, 234, 212, 0.25);
+    --glow-primary-soft: rgba(14, 181, 140, 0.15);
+    --glow-primary-medium: rgba(14, 181, 140, 0.25);
+    --glow-primary-intense: rgba(14, 181, 140, 0.40);
+  }
+}
+
 @layer base {
   :root {
     /* ============================================
@@ -67,12 +119,14 @@
     --radius: 0.75rem; /* 12px */
 
     /* ============================================
-       SIDEBAR LAYOUT SYSTEM
+       SIDEBAR LAYOUT SYSTEM - Fluid Responsive
+       Using clamp() for intelligent scaling across breakpoints
+       Formula: clamp(min, preferred, max)
        ============================================ */
-    --sidebar-width: 280px;
-    --sidebar-collapsed-width: 72px;
-    --sidebar-expanded-width: 280px;
-    --sidebar-tablet-width: 240px;
+    --sidebar-width: clamp(256px, 18vw, 280px);
+    --sidebar-collapsed-width: clamp(64px, 5vw, 72px);
+    --sidebar-expanded-width: clamp(256px, 18vw, 280px);
+    --sidebar-tablet-width: clamp(220px, 25vw, 260px);
 
     /* Sidebar - Deep Green */
     --sidebar-background: 179 100% 12%; /* #003C3B */
@@ -88,15 +142,15 @@
        SIDEBAR PREMIUM 2025 - Glass Neumorphic
        ============================================ */
 
-    /* Premium Sidebar Dimensions */
-    --sidebar-header-height: 72px;
-    --sidebar-footer-height: 64px;
-    --sidebar-item-height: 44px;
-    --sidebar-item-gap: 4px;
-    --sidebar-section-gap: 16px;
-    --sidebar-icon-size: 22px;
-    --sidebar-padding-x: 16px;
-    --sidebar-padding-y: 12px;
+    /* Premium Sidebar Dimensions - Fluid Responsive */
+    --sidebar-header-height: clamp(64px, 8vh, 72px);
+    --sidebar-footer-height: clamp(56px, 7vh, 64px);
+    --sidebar-item-height: 44px; /* WCAG 2.5.5 touch target - keep fixed */
+    --sidebar-item-gap: clamp(2px, 0.5vh, 4px);
+    --sidebar-section-gap: clamp(12px, 1.5vh, 16px);
+    --sidebar-icon-size: clamp(20px, 1.4vw, 24px);
+    --sidebar-padding-x: clamp(12px, 1vw, 16px);
+    --sidebar-padding-y: clamp(8px, 0.8vh, 12px);
 
     /* Premium Sidebar Colors (Light) */
     --sidebar-glass-bg: rgba(0, 60, 59, 0.95);
@@ -107,7 +161,12 @@
     --sidebar-text-accent: #5EEAD4;
     --sidebar-hover-bg: rgba(255, 255, 255, 0.08);
     --sidebar-active-bg: rgba(14, 181, 140, 0.18);
+    --sidebar-active-bg-hover: rgba(14, 181, 140, 0.25);
+    --sidebar-active-text: #5EEAD4;
     --sidebar-active-border: #0EB58C;
+    --sidebar-text: #FFFFFF;
+    --sidebar-text-hover: #FFFFFF;
+    --sidebar-tooltip-bg: rgba(0, 60, 59, 0.98);
     --sidebar-divider: rgba(255, 255, 255, 0.08);
 
     /* Neumorphic Shadows (Light) */
@@ -126,10 +185,10 @@
     --ripple-color: rgba(14, 181, 140, 0.3);
     --ripple-duration: 600ms;
 
-    /* Mobile Bottom Bar */
-    --bottom-bar-height: 64px;
+    /* Mobile Bottom Bar - Fluid Responsive */
+    --bottom-bar-height: clamp(56px, 8vh, 72px);
     --bottom-bar-bg: rgba(0, 60, 59, 0.98);
-    --bottom-bar-blur: 16px;
+    --bottom-bar-blur: clamp(12px, 2vw, 20px);
 
     /* ============================================
        VENTAZO BRAND SPECIFIC VARIABLES
@@ -150,41 +209,333 @@
     --tenant-sidebar: var(--ventazo-dark);
     --tenant-surface: #052828;
 
+    /* RGB values for rgba() usage - CRITICAL for dynamic theming */
+    /* #0EB58C = rgb(14, 181, 140) */
+    --tenant-primary-rgb: 14, 181, 140;
+    /* #5EEAD4 = rgb(94, 234, 212) */
+    --tenant-accent-rgb: 94, 234, 212;
+
     /* Computed foregrounds (set by provider) */
     --tenant-primary-foreground: #FFFFFF;
     --tenant-accent-foreground: #1C1C1E;
 
-    /* Primary variations */
+    /* Primary variations - DYNAMIC (updated by TenantThemeProvider) */
     --tenant-primary-hover: #0A9D79;
     --tenant-primary-light: #A7F3D0;
     --tenant-primary-lighter: #D1FAE5;
-    --tenant-primary-glow: rgba(14, 181, 140, 0.25);
+    /* CRITICAL: glow uses color-mix for true dynamic behavior */
+    --tenant-primary-glow: color-mix(in srgb, var(--tenant-primary) 25%, transparent);
 
-    /* Accent variations */
+    /* Accent variations - DYNAMIC */
     --tenant-accent-hover: #2DD4BF;
     --tenant-accent-light: #CCFBF1;
-    --tenant-accent-glow: rgba(94, 234, 212, 0.25);
+    --tenant-accent-glow: color-mix(in srgb, var(--tenant-accent) 25%, transparent);
 
     /* Surface variations */
     --tenant-surface-light: #0A3D3C;
     --tenant-surface-border: #1A5D5C;
 
     /* ============================================
-       KANBAN DYNAMIC THEMING SYSTEM v4.0
-       All values set dynamically by useKanbanTheme hook
-       Fallbacks use Ventazo brand defaults
+       ONBOARDING PAGES - Premium Dark Theme
+       ============================================ */
+    --onboarding-text-muted: #7A8F8F;
+    --onboarding-text-secondary: #B8C4C4;
+    --onboarding-text-label: #E8ECEC;
+    --onboarding-bg-dark: #001A1A;
+
+    /* ============================================
+       SETTINGS MODULE - Category Colors (Light Mode)
+       Used by settings-config.ts for dynamic icons/backgrounds
+       ============================================ */
+    --settings-profile-icon: #3b82f6;
+    --settings-profile-bg: #eff6ff;
+    --settings-notifications-icon: #f59e0b;
+    --settings-notifications-bg: #fffbeb;
+    --settings-branding-icon: #8b5cf6;
+    --settings-branding-bg: #f5f3ff;
+    --settings-team-icon: #10b981;
+    --settings-team-bg: #ecfdf5;
+    --settings-billing-icon: #ef4444;
+    --settings-billing-bg: #fef2f2;
+    --settings-messaging-icon: #06b6d4;
+    --settings-messaging-bg: #ecfeff;
+    --settings-proposals-icon: #8b5cf6;
+    --settings-proposals-bg: #f5f3ff;
+    --settings-integrations-icon: #ec4899;
+    --settings-integrations-bg: #fdf2f8;
+    --settings-pipeline-icon: #f97316;
+    --settings-pipeline-bg: #fff7ed;
+    --settings-activity-icon: #64748b;
+    --settings-activity-bg: #f8fafc;
+    --settings-security-icon: #6366f1;
+    --settings-security-bg: #eef2ff;
+    --settings-data-icon: #14b8a6;
+    --settings-data-bg: #f0fdfa;
+
+    /* ============================================
+       OPPORTUNITY MODULE - Static Semantic Colors
+       Used by useOpportunityTheme.tsx as defaults
+       ============================================ */
+    /* Probability tiers (closing likelihood) */
+    --prob-high-base: #059669;
+    --prob-high-light: #34D399;
+    --prob-high-dark: #047857;
+    --prob-high-text: #FFFFFF;
+    --prob-medium-base: #F59E0B;
+    --prob-medium-light: #FBBF24;
+    --prob-medium-dark: #D97706;
+    --prob-medium-text: #78350F;
+    --prob-low-base: #6B7280;
+    --prob-low-light: #9CA3AF;
+    --prob-low-dark: #4B5563;
+    --prob-low-text: #FFFFFF;
+    /* Status semantic colors */
+    --opp-status-won-text: #059669;
+    --opp-status-lost-text: #DC2626;
+    --opp-status-stalled-text: #D97706;
+    /* Priority colors */
+    --opp-priority-critical-text: #DC2626;
+    --opp-priority-high-text: #EA580C;
+    --opp-priority-low-text: #4B5563;
+    /* Action colors */
+    --action-whatsapp: #25D366;
+    --action-email: #3B82F6;
+    --action-win: #10B981;
+    --action-lost: #EF4444;
+    --action-warning: #F59E0B;
+
+    /* ============================================
+       QUOTES MODULE - Status Colors
+       Used by useQuoteTheme.tsx as defaults
+       ============================================ */
+    --quote-status-draft: #64748B;
+    --quote-status-pending: #F59E0B;
+    --quote-status-sent: #3B82F6;
+    --quote-status-viewed: #8B5CF6;
+    --quote-status-accepted: #10B981;
+    --quote-status-rejected: #EF4444;
+    --quote-status-expired: #6B7280;
+    --quote-status-revised: #06B6D4;
+    /* Urgency text colors */
+    --quote-urgency-expired-text: #DC2626;
+    --quote-urgency-critical-text: #D97706;
+    --quote-urgency-warning-text: #CA8A04;
+    --quote-urgency-warning: #EAB308;
+
+    /* Quote Status BG/Border/Text - Light Mode */
+    --quote-draft-bg: rgba(100, 116, 139, 0.1);
+    --quote-draft-border: rgba(100, 116, 139, 0.25);
+    --quote-draft-text: #475569;
+    --quote-pending-bg: rgba(245, 158, 11, 0.1);
+    --quote-pending-border: rgba(245, 158, 11, 0.25);
+    --quote-pending-text: #B45309;
+    --quote-sent-bg: rgba(59, 130, 246, 0.1);
+    --quote-sent-border: rgba(59, 130, 246, 0.25);
+    --quote-sent-text: #1D4ED8;
+    --quote-viewed-bg: rgba(139, 92, 246, 0.1);
+    --quote-viewed-border: rgba(139, 92, 246, 0.25);
+    --quote-viewed-text: #6D28D9;
+    --quote-accepted-bg: rgba(16, 185, 129, 0.1);
+    --quote-accepted-border: rgba(16, 185, 129, 0.25);
+    --quote-accepted-text: #059669;
+    --quote-rejected-bg: rgba(239, 68, 68, 0.1);
+    --quote-rejected-border: rgba(239, 68, 68, 0.25);
+    --quote-rejected-text: #DC2626;
+    --quote-expired-bg: rgba(107, 114, 128, 0.1);
+    --quote-expired-border: rgba(107, 114, 128, 0.25);
+    --quote-expired-text: #4B5563;
+    --quote-revised-bg: rgba(6, 182, 212, 0.1);
+    --quote-revised-border: rgba(6, 182, 212, 0.25);
+    --quote-revised-text: #0891B2;
+
+    /* ============================================
+       TASKS MODULE - Status/Priority/Type Colors
+       Used by TaskDetailSheet, TaskCard, TaskKanban
+       ============================================ */
+    /* Task Status - Pending (Amber) */
+    --task-status-pending: #F59E0B;
+    --task-status-pending-bg: rgba(245, 158, 11, 0.1);
+    --task-status-pending-text: #92400E;
+    --task-status-pending-border: rgba(245, 158, 11, 0.3);
+    /* Task Status - In Progress (Blue) */
+    --task-status-in-progress: #3B82F6;
+    --task-status-in-progress-bg: rgba(59, 130, 246, 0.1);
+    --task-status-in-progress-text: #1E40AF;
+    --task-status-in-progress-border: rgba(59, 130, 246, 0.3);
+    /* Task Status - Completed (Emerald) */
+    --task-status-completed: #10B981;
+    --task-status-completed-hover: #059669;
+    --task-status-completed-bg: rgba(16, 185, 129, 0.1);
+    --task-status-completed-text: #065F46;
+    --task-status-completed-border: rgba(16, 185, 129, 0.3);
+    /* Task Status - Cancelled (Red) */
+    --task-status-cancelled: #EF4444;
+    --task-status-cancelled-bg: rgba(239, 68, 68, 0.1);
+    --task-status-cancelled-text: #991B1B;
+    --task-status-cancelled-border: rgba(239, 68, 68, 0.3);
+    /* Task Status - Deferred (Violet) */
+    --task-status-deferred: #8B5CF6;
+    --task-status-deferred-bg: rgba(139, 92, 246, 0.1);
+    --task-status-deferred-text: #5B21B6;
+    --task-status-deferred-border: rgba(139, 92, 246, 0.3);
+
+    /* Task Priority */
+    --task-priority-low: #64748B;
+    --task-priority-low-bg: rgba(100, 116, 139, 0.1);
+    --task-priority-low-text: #475569;
+    --task-priority-medium: #3B82F6;
+    --task-priority-medium-bg: rgba(59, 130, 246, 0.1);
+    --task-priority-medium-text: #1D4ED8;
+    --task-priority-high: #F59E0B;
+    --task-priority-high-bg: rgba(245, 158, 11, 0.1);
+    --task-priority-high-text: #B45309;
+    --task-priority-urgent: #EF4444;
+    --task-priority-urgent-bg: rgba(239, 68, 68, 0.1);
+    --task-priority-urgent-text: #DC2626;
+
+    /* Task Types */
+    --task-type-call: #22C55E;
+    --task-type-call-bg: rgba(34, 197, 94, 0.1);
+    --task-type-email: #3B82F6;
+    --task-type-email-bg: rgba(59, 130, 246, 0.1);
+    --task-type-meeting: #A855F7;
+    --task-type-meeting-bg: rgba(168, 85, 247, 0.1);
+    --task-type-follow-up: #F97316;
+    --task-type-follow-up-bg: rgba(249, 115, 22, 0.1);
+    --task-type-demo: #06B6D4;
+    --task-type-demo-bg: rgba(6, 182, 212, 0.1);
+    --task-type-proposal: #6366F1;
+    --task-type-proposal-bg: rgba(99, 102, 241, 0.1);
+
+    /* Task Activity Types */
+    --task-activity-created: #22C55E;
+    --task-activity-created-bg: rgba(34, 197, 94, 0.1);
+    --task-activity-updated: #3B82F6;
+    --task-activity-updated-bg: rgba(59, 130, 246, 0.1);
+    --task-activity-completed: #10B981;
+    --task-activity-completed-bg: rgba(16, 185, 129, 0.1);
+    --task-activity-cancelled: #EF4444;
+    --task-activity-cancelled-bg: rgba(239, 68, 68, 0.1);
+    --task-activity-deferred: #8B5CF6;
+    --task-activity-deferred-bg: rgba(139, 92, 246, 0.1);
+    --task-activity-reassigned: #A855F7;
+    --task-activity-reassigned-bg: rgba(168, 85, 247, 0.1);
+    --task-activity-status-changed: #6366F1;
+    --task-activity-status-changed-bg: rgba(99, 102, 241, 0.1);
+    --task-activity-priority-changed: #F97316;
+    --task-activity-priority-changed-bg: rgba(249, 115, 22, 0.1);
+    --task-activity-due-date-changed: #F59E0B;
+    --task-activity-due-date-changed-bg: rgba(245, 158, 11, 0.1);
+
+    /* ============================================
+       TASK DUE DATE & URGENCY SYSTEM
+       Semantic tokens for due date states
+       REDUCES visual noise - subtle indicators only
+       ============================================ */
+    /* Due Date: Overdue (>0 days past) - SUBTLE red, not aggressive */
+    --due-overdue: #DC2626;
+    --due-overdue-bg: rgba(220, 38, 38, 0.05);
+    --due-overdue-border: rgba(220, 38, 38, 0.12);
+    --due-overdue-text: #B91C1C;
+    /* Due Date: Today - Orange/Amber warning */
+    --due-today: #EA580C;
+    --due-today-bg: rgba(234, 88, 12, 0.06);
+    --due-today-border: rgba(234, 88, 12, 0.15);
+    --due-today-text: #C2410C;
+    /* Due Date: Soon (1-3 days) - Yellow/Amber subtle */
+    --due-soon: #D97706;
+    --due-soon-bg: rgba(217, 119, 6, 0.05);
+    --due-soon-border: rgba(217, 119, 6, 0.12);
+    --due-soon-text: #B45309;
+    /* Due Date: Future (>3 days) - Neutral */
+    --due-future: var(--muted-foreground);
+    --due-future-bg: transparent;
+    --due-future-border: transparent;
+
+    /* Urgency Hierarchy (for visual weight) */
+    --urgency-none: var(--muted-foreground);
+    --urgency-low: #3B82F6;
+    --urgency-medium: #F59E0B;
+    --urgency-high: #EA580C;
+    --urgency-critical: #DC2626;
+
+    /* ============================================
+       CUSTOMER MODULE - Tier Colors
+       Used by CustomerTierBadge for tier styling
+       ============================================ */
+    /* Enterprise - Purple (highest tier) */
+    --tier-enterprise: #8B5CF6;
+    --tier-enterprise-light: #A78BFA;
+    --tier-enterprise-bg: rgba(139, 92, 246, 0.1);
+    --tier-enterprise-border: rgba(139, 92, 246, 0.25);
+    /* Premium - Blue */
+    --tier-premium: #3B82F6;
+    --tier-premium-light: #60A5FA;
+    --tier-premium-bg: rgba(59, 130, 246, 0.1);
+    --tier-premium-border: rgba(59, 130, 246, 0.25);
+    /* Standard - Gray */
+    --tier-standard: #6B7280;
+    --tier-standard-light: #9CA3AF;
+    --tier-standard-bg: rgba(107, 114, 128, 0.1);
+    --tier-standard-border: rgba(107, 114, 128, 0.25);
+    /* Basic - Stone (lowest tier) */
+    --tier-basic: #78716C;
+    --tier-basic-light: #A8A29E;
+    --tier-basic-bg: rgba(120, 113, 108, 0.1);
+    --tier-basic-border: rgba(120, 113, 108, 0.25);
+
+    /* ============================================
+       CALENDAR MODULE - Event Colors
+       Used by CalendarGrid for event color coding
+       ============================================ */
+    --cal-event-lead: #8B5CF6;        /* Purple for leads */
+    --cal-event-customer: #10B981;    /* Green for customers */
+    --cal-event-opportunity: #F59E0B; /* Amber for opportunities */
+    --cal-event-task: #3B82F6;        /* Blue for tasks */
+    --cal-event-confirmed: #6366F1;   /* Indigo for confirmed */
+    --cal-event-tentative: #94A3B8;   /* Slate for tentative */
+    --cal-event-cancelled: #EF4444;   /* Red for cancelled */
+
+    /* ============================================
+       INTEGRATION PROVIDERS - OAuth Connection Colors
+       Used by ConnectedCalendarCard, ConnectEmailCard, etc.
+       ============================================ */
+    /* Google */
+    --integration-google: #4285F4;
+    --integration-google-light: #669DF6;
+    --integration-google-bg: rgba(66, 133, 244, 0.1);
+    --integration-google-text: #1A73E8;
+    /* Microsoft */
+    --integration-microsoft: #0078D4;
+    --integration-microsoft-light: #2D7FD8;
+    --integration-microsoft-bg: rgba(0, 120, 212, 0.1);
+    --integration-microsoft-text: #0067B8;
+    /* Generic Status - Connected (green) */
+    --integration-status-connected: #22C55E;
+    --integration-status-connected-bg: rgba(34, 197, 94, 0.1);
+    --integration-status-connected-hover: #16A34A;
+    /* Warning/Expired (amber) */
+    --integration-status-warning: #F59E0B;
+    --integration-status-warning-bg: rgba(245, 158, 11, 0.1);
+    --integration-status-warning-border: rgba(245, 158, 11, 0.25);
+    --integration-status-warning-text: #B45309;
+
+    /* ============================================
+       KANBAN DYNAMIC THEMING SYSTEM v4.1
+       All values DERIVE from --tenant-* variables
+       useKanbanTheme hook updates --tenant-* which cascades here
        ============================================ */
 
-    /* Card states - tenant-derived */
-    --kanban-card-border-hover: rgba(14, 181, 140, 0.25);
+    /* Card states - DYNAMIC from tenant-primary */
+    --kanban-card-border-hover: color-mix(in srgb, var(--tenant-primary) 25%, transparent);
     --kanban-card-border-selected: var(--tenant-primary);
-    --kanban-card-shadow-hover: 0 4px 12px rgba(14, 181, 140, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
-    --kanban-card-shadow-dragging: 0 8px 32px rgba(14, 181, 140, 0.2), 0 4px 16px rgba(0, 0, 0, 0.12);
+    --kanban-card-shadow-hover: 0 4px 12px color-mix(in srgb, var(--tenant-primary) 12%, transparent), 0 2px 4px rgba(0, 0, 0, 0.08);
+    --kanban-card-shadow-dragging: 0 8px 32px color-mix(in srgb, var(--tenant-primary) 20%, transparent), 0 4px 16px rgba(0, 0, 0, 0.12);
 
-    /* Drop zone - tenant-derived */
-    --kanban-drop-border: rgba(14, 181, 140, 0.5);
-    --kanban-drop-shadow: 0 0 0 3px rgba(14, 181, 140, 0.15), 0 0 30px rgba(14, 181, 140, 0.2);
-    --kanban-drop-bg: rgba(14, 181, 140, 0.05);
+    /* Drop zone - DYNAMIC from tenant-primary */
+    --kanban-drop-border: color-mix(in srgb, var(--tenant-primary) 50%, transparent);
+    --kanban-drop-shadow: 0 0 0 3px color-mix(in srgb, var(--tenant-primary) 15%, transparent), 0 0 30px color-mix(in srgb, var(--tenant-primary) 20%, transparent);
+    --kanban-drop-bg: color-mix(in srgb, var(--tenant-primary) 5%, transparent);
 
     /* Score badge gradients - temperature-based with tenant blend */
     --score-hot-gradient: linear-gradient(135deg, #EA580C 0%, #F97316 50%, #FB923C 100%);
@@ -200,47 +551,236 @@
     --score-cold-bg: rgba(107, 114, 128, 0.12);
     --score-cold-border: rgba(107, 114, 128, 0.25);
 
-    /* Action buttons - ALL variants with full theming */
+    /* Action buttons - ALL variants with DYNAMIC theming */
     --action-whatsapp-bg: rgba(37, 211, 102, 0.1);
     --action-whatsapp-bg-hover: rgba(37, 211, 102, 0.15);
     --action-whatsapp-text: #25D366;
     --action-whatsapp-border: rgba(37, 211, 102, 0.25);
-    --action-call-bg: rgba(14, 181, 140, 0.1);
-    --action-call-bg-hover: rgba(14, 181, 140, 0.15);
+    /* Call action - DYNAMIC from tenant-primary */
+    --action-call-bg: color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+    --action-call-bg-hover: color-mix(in srgb, var(--tenant-primary) 15%, transparent);
     --action-call-text: var(--tenant-primary);
-    --action-call-border: rgba(14, 181, 140, 0.25);
+    --action-call-border: color-mix(in srgb, var(--tenant-primary) 25%, transparent);
     --action-email-bg: rgba(59, 130, 246, 0.1);
     --action-email-bg-hover: rgba(59, 130, 246, 0.15);
     --action-email-text: #3B82F6;
     --action-email-border: rgba(59, 130, 246, 0.25);
-    --action-primary-bg: rgba(14, 181, 140, 0.1);
-    --action-primary-bg-hover: rgba(14, 181, 140, 0.15);
+    /* Primary action - DYNAMIC from tenant-primary */
+    --action-primary-bg: color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+    --action-primary-bg-hover: color-mix(in srgb, var(--tenant-primary) 15%, transparent);
     --action-primary-text: var(--tenant-primary);
-    --action-primary-border: rgba(14, 181, 140, 0.25);
+    --action-primary-border: color-mix(in srgb, var(--tenant-primary) 25%, transparent);
 
-    /* Channel colors - for lead source badges */
+    /* Channel colors - for lead source badges & campaigns */
     --channel-whatsapp: #25D366;
     --channel-social: var(--tenant-accent);
     --channel-email: #3B82F6;
     --channel-phone: var(--tenant-primary);
+    --channel-sms: #6B7280;
+    --channel-facebook: #1877F2;
+    --channel-instagram: #E4405F;
+    --channel-linkedin: #0A66C2;
+    --channel-twitter: #1DA1F2;
+    --channel-push: #8B5CF6;
+    --channel-in-app: var(--tenant-accent);
+
+    /* ============================================
+       CAMPAIGNS MODULE - Status Colors
+       Used by useCampaignTheme.tsx as defaults
+       ============================================ */
+    --campaign-status-draft: #6B7280;
+    --campaign-status-draft-bg: rgba(107, 114, 128, 0.1);
+    --campaign-status-draft-border: rgba(107, 114, 128, 0.2);
+    --campaign-status-scheduled: #3B82F6;
+    --campaign-status-scheduled-bg: rgba(59, 130, 246, 0.1);
+    --campaign-status-scheduled-border: rgba(59, 130, 246, 0.2);
+    --campaign-status-active: var(--tenant-primary);
+    --campaign-status-active-bg: color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+    --campaign-status-active-border: color-mix(in srgb, var(--tenant-primary) 25%, transparent);
+    --campaign-status-paused: #F59E0B;
+    --campaign-status-paused-bg: rgba(245, 158, 11, 0.1);
+    --campaign-status-paused-border: rgba(245, 158, 11, 0.2);
+    --campaign-status-completed: #8B5CF6;
+    --campaign-status-completed-bg: rgba(139, 92, 246, 0.1);
+    --campaign-status-completed-border: rgba(139, 92, 246, 0.2);
+    --campaign-status-cancelled: #EF4444;
+    --campaign-status-cancelled-bg: rgba(239, 68, 68, 0.1);
+    --campaign-status-cancelled-border: rgba(239, 68, 68, 0.2);
+    --campaign-status-archived: #64748B;
+    --campaign-status-archived-bg: rgba(100, 116, 139, 0.1);
+    --campaign-status-archived-border: rgba(100, 116, 139, 0.2);
+
+    /* Campaign card theming */
+    --campaign-card-accent: var(--tenant-primary);
+    --campaign-card-border-hover: color-mix(in srgb, var(--tenant-primary) 30%, transparent);
+
+    /* ============================================
+       EMAIL MODULE THEMING SYSTEM
+       All values DERIVE from --tenant-* variables
+       useEmailTheme hook updates these CSS variables
+       ============================================ */
+
+    /* Email Sidebar - Uses tenant surface */
+    --email-sidebar-bg: var(--tenant-surface, #052828);
+    --email-sidebar-text: #ffffff;
+    --email-sidebar-text-muted: rgba(255, 255, 255, 0.7);
+    --email-sidebar-hover: rgba(255, 255, 255, 0.1);
+    --email-sidebar-active: color-mix(in srgb, var(--tenant-primary) 30%, transparent);
+    --email-sidebar-active-text: var(--tenant-primary);
+
+    /* Email List */
+    --email-list-bg: #ffffff;
+    --email-list-border: #e5e7eb;
+    --email-list-hover: color-mix(in srgb, var(--tenant-primary) 5%, transparent);
+    --email-list-selected: color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+    --email-list-selected-border: var(--tenant-primary);
+
+    /* Email Unread Indicator */
+    --email-unread-dot: var(--tenant-primary);
+    --email-unread-bg: color-mix(in srgb, var(--tenant-primary) 8%, transparent);
+    --email-unread-text: var(--tenant-primary);
+
+    /* Email Compose Button */
+    --email-compose-bg: var(--tenant-primary);
+    --email-compose-hover: var(--tenant-primary-hover);
+    --email-compose-text: #ffffff;
+    --email-compose-shadow: color-mix(in srgb, var(--tenant-primary) 40%, transparent);
+
+    /* Email Star */
+    --email-star-active: #fbbf24;
+    --email-star-inactive: #9ca3af;
+
+    /* Email Actions */
+    --email-action-reply: var(--tenant-primary);
+    --email-action-forward: var(--tenant-accent);
+    --email-action-delete: #ef4444;
+    --email-action-archive: #6b7280;
+
+    /* Folder Badges */
+    --email-badge-inbox: var(--tenant-primary);
+    --email-badge-sent: var(--tenant-accent);
+    --email-badge-drafts: #f59e0b;
+    --email-badge-trash: #ef4444;
+
+    /* Provider Colors */
+    --email-gmail: #ea4335;
+    --email-outlook: #0078d4;
+
+    /* Email Surface Colors - CRITICAL FALLBACKS for initial render
+       These are dynamically updated by useEmailTheme hook,
+       but fallbacks prevent transparent/undefined backgrounds on first paint */
+    --email-surface: var(--tenant-surface, #052828);
+    --email-surface-light: color-mix(in srgb, var(--tenant-surface, #052828) 90%, white 10%);
+    --email-surface-lighter: color-mix(in srgb, var(--tenant-surface, #052828) 80%, white 20%);
+    --email-surface-border: color-mix(in srgb, var(--tenant-surface, #052828) 75%, white 25%);
+    --email-surface-hover: color-mix(in srgb, var(--tenant-surface, #052828) 92%, white 8%);
+
+    /* Email Detail Panel */
+    --email-detail-bg: var(--tenant-surface, #052828);
+    --email-detail-header-bg: color-mix(in srgb, var(--tenant-surface, #052828) 90%, white 10%);
+    --email-detail-border: color-mix(in srgb, var(--tenant-surface, #052828) 80%, white 20%);
+
+    /* Email List Active State (gold/accent border) */
+    --email-list-active: color-mix(in srgb, var(--tenant-accent, #3ECFB2) 15%, transparent);
+
+    /* Email Input Colors */
+    --email-input-bg: color-mix(in srgb, var(--tenant-surface, #052828) 92%, white 8%);
+    --email-input-border: color-mix(in srgb, var(--tenant-surface, #052828) 80%, white 20%);
+
+    /* Email Icon Sidebar (Modern Layout) */
+    --email-icon-sidebar-bg: var(--tenant-sidebar, #052828);
+    --email-icon-sidebar-bg-end: color-mix(in srgb, var(--tenant-sidebar, #052828) 90%, black 10%);
+
+    /* Email Header & Search */
+    --email-header-bg: color-mix(in srgb, var(--tenant-surface, #052828) 95%, white 5%);
+    --email-search-bg: color-mix(in srgb, var(--tenant-surface, #052828) 90%, white 10%);
+    --email-search-border: color-mix(in srgb, var(--tenant-surface, #052828) 80%, white 20%);
+
+    /* Email Tooltip */
+    --email-tooltip-bg: color-mix(in srgb, var(--tenant-surface, #052828) 100%, black 20%);
+
+    /* Email Folder Navigation (Right Side Nav) */
+    --email-nav-bg: color-mix(in srgb, var(--tenant-surface, #052828) 95%, white 5%);
+    --email-nav-border: color-mix(in srgb, var(--tenant-surface, #052828) 85%, white 15%);
+    --email-nav-text: #f1f5f9;
+    --email-nav-text-muted: color-mix(in srgb, var(--tenant-surface, #052828) 50%, white 50%);
+    --email-nav-hover: color-mix(in srgb, var(--tenant-surface, #052828) 90%, white 10%);
+    --email-nav-badge-bg: color-mix(in srgb, var(--tenant-surface, #052828) 85%, white 15%);
+    --email-nav-badge-text: color-mix(in srgb, var(--tenant-surface, #052828) 40%, white 60%);
+
+    /* Email Text Colors - CRITICAL for visibility on first render */
+    --email-text-primary: #f1f5f9;
+    --email-text-secondary: #cbd5e1;
+    --email-text-muted: color-mix(in srgb, var(--tenant-surface, #052828) 40%, white 60%);
+
+    /* ============================================
+       CAMPAIGNS MODULE THEMING SYSTEM
+       All values DERIVE from --tenant-* variables
+       useCampaignTheme hook updates these CSS variables
+       ============================================ */
+
+    /* Campaign Card */
+    --campaign-card-border: color-mix(in srgb, var(--tenant-primary) 30%, transparent);
+    --campaign-card-border-hover: var(--tenant-primary);
+    --campaign-card-accent: var(--tenant-primary);
+    --campaign-card-bg-hover: color-mix(in srgb, var(--tenant-primary) 5%, transparent);
+
+    /* Campaign Status Colors */
+    --campaign-status-draft: #6B7280;
+    --campaign-status-scheduled: #3B82F6;
+    --campaign-status-sending: var(--tenant-primary);
+    --campaign-status-sent: #10B981;
+    --campaign-status-paused: #F59E0B;
+    --campaign-status-cancelled: #EF4444;
+
+    /* Campaign Stats */
+    --campaign-stat-sent: var(--tenant-primary);
+    --campaign-stat-delivered: #10B981;
+    --campaign-stat-opened: #3B82F6;
+    --campaign-stat-clicked: var(--tenant-accent);
+    --campaign-stat-bounced: #EF4444;
+
+    /* Campaign Editor */
+    --campaign-editor-toolbar: var(--tenant-surface);
+    --campaign-editor-toolbar-text: #ffffff;
+    --campaign-editor-block-border: color-mix(in srgb, var(--tenant-primary) 20%, transparent);
+    --campaign-editor-block-selected: color-mix(in srgb, var(--tenant-primary) 15%, transparent);
+
+    /* Campaign Preview */
+    --campaign-preview-bg: #f9fafb;
+    --campaign-preview-border: #e5e7eb;
+    --campaign-preview-device-active: var(--tenant-primary);
+
+    /* Recipient Selector */
+    --campaign-recipient-selected: color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+    --campaign-recipient-hover: color-mix(in srgb, var(--tenant-primary) 5%, transparent);
+    --campaign-recipient-checkbox: var(--tenant-primary);
+
     --channel-website: #F97316;
     --channel-organic: var(--tenant-accent);
     --channel-referral: #8B5CF6;
     --channel-ad: #EC4899;
 
-    /* Status colors - semantic with tenant-aware success/info */
-    --status-success-bg: rgba(94, 234, 212, 0.15);
+    /* Status colors - semantic with DYNAMIC tenant-aware success/info */
+    --status-success-bg: color-mix(in srgb, var(--tenant-accent) 15%, transparent);
     --status-success-text: var(--tenant-accent);
-    --status-success-border: rgba(94, 234, 212, 0.35);
+    --status-success-border: color-mix(in srgb, var(--tenant-accent) 35%, transparent);
     --status-warning-bg: rgba(245, 158, 11, 0.15);
     --status-warning-text: #D97706;
     --status-warning-border: rgba(245, 158, 11, 0.35);
     --status-error-bg: rgba(239, 68, 68, 0.15);
     --status-error-text: #DC2626;
     --status-error-border: rgba(239, 68, 68, 0.35);
-    --status-info-bg: rgba(14, 181, 140, 0.15);
+    /* Info status - DYNAMIC from tenant-primary */
+    --status-info-bg: color-mix(in srgb, var(--tenant-primary) 15%, transparent);
     --status-info-text: var(--tenant-primary);
-    --status-info-border: rgba(14, 181, 140, 0.35);
+    --status-info-border: color-mix(in srgb, var(--tenant-primary) 35%, transparent);
+
+    /* Role badge colors - for invitation and team UI */
+    --role-owner-bg: #F59E0B;
+    --role-admin-bg: #A855F7;
+    --role-manager-bg: #3B82F6;
+    --role-viewer-bg: #64748B;
 
     /* ============================================
        VENTAZO 2025 BRAND ALIGNMENT
@@ -253,11 +793,51 @@
 
     /* Stage Colors - Kanban column differentiation */
     --stage-new: #3B82F6;           /* Blue-500 */
-    --stage-contacted: #F59E0B;     /* Amber-500 */
-    --stage-qualified: #8B5CF6;     /* Purple-500 */
-    --stage-proposal: #14B8A6;      /* Teal-500 */
-    --stage-won: #22C55E;           /* Green-500 */
+    --stage-contacted: #06b6d4;     /* Cyan-500 */
+    --stage-in-progress: #8b5cf6;   /* Purple-500 */
+    --stage-qualified: #eab308;     /* Yellow-500 */
+    --stage-proposal: #ec4899;      /* Pink-500 */
+    --stage-negotiation: #f97316;   /* Orange-500 */
+    --stage-won: #10b981;           /* Emerald-500 */
     --stage-lost: #EF4444;          /* Red-500 */
+    --stage-unassigned: #64748b;    /* Slate-500 */
+
+    /* Pipeline Status Colors - Complete Semantic System */
+    --pipeline-new-bg: rgba(59, 130, 246, 0.15);
+    --pipeline-new-border: rgba(59, 130, 246, 0.3);
+    --pipeline-new-text: #60a5fa;
+
+    --pipeline-contacted-bg: rgba(6, 182, 212, 0.15);
+    --pipeline-contacted-border: rgba(6, 182, 212, 0.3);
+    --pipeline-contacted-text: #22d3ee;
+
+    --pipeline-in-progress-bg: rgba(139, 92, 246, 0.15);
+    --pipeline-in-progress-border: rgba(139, 92, 246, 0.3);
+    --pipeline-in-progress-text: #a78bfa;
+
+    --pipeline-qualified-bg: rgba(234, 179, 8, 0.15);
+    --pipeline-qualified-border: rgba(234, 179, 8, 0.3);
+    --pipeline-qualified-text: #facc15;
+
+    --pipeline-proposal-bg: rgba(236, 72, 153, 0.15);
+    --pipeline-proposal-border: rgba(236, 72, 153, 0.3);
+    --pipeline-proposal-text: #f472b6;
+
+    --pipeline-negotiation-bg: rgba(249, 115, 22, 0.15);
+    --pipeline-negotiation-border: rgba(249, 115, 22, 0.3);
+    --pipeline-negotiation-text: #fb923c;
+
+    --pipeline-won-bg: rgba(16, 185, 129, 0.15);
+    --pipeline-won-border: rgba(16, 185, 129, 0.3);
+    --pipeline-won-text: #34d399;
+
+    --pipeline-lost-bg: rgba(239, 68, 68, 0.15);
+    --pipeline-lost-border: rgba(239, 68, 68, 0.3);
+    --pipeline-lost-text: #f87171;
+
+    --pipeline-unassigned-bg: rgba(100, 116, 139, 0.15);
+    --pipeline-unassigned-border: rgba(100, 116, 139, 0.3);
+    --pipeline-unassigned-text: #94a3b8;
 
     /* Hot Lead Glow Effects */
     --hot-lead-glow: rgba(255, 107, 53, 0.25);
@@ -267,6 +847,180 @@
     --urgency-overdue: rgba(239, 68, 68, 0.12);
     --urgency-warning: rgba(245, 158, 11, 0.12);
     --urgency-new: rgba(59, 130, 246, 0.12);
+
+    /* ============================================
+       CUSTOMER MODULE THEMING SYSTEM
+       Health Score, Tier Badges, Lifecycle Kanban
+       ============================================ */
+
+    /* Customer Health Colors - Activity-based scoring */
+    --health-excellent: #059669;
+    --health-excellent-bg: rgba(5, 150, 105, 0.12);
+    --health-excellent-border: rgba(5, 150, 105, 0.25);
+    --health-excellent-glow: rgba(5, 150, 105, 0.3);
+    --health-good: #3B82F6;
+    --health-good-bg: rgba(59, 130, 246, 0.12);
+    --health-good-border: rgba(59, 130, 246, 0.25);
+    --health-good-glow: rgba(59, 130, 246, 0.3);
+    --health-at-risk: #F59E0B;
+    --health-at-risk-bg: rgba(245, 158, 11, 0.12);
+    --health-at-risk-border: rgba(245, 158, 11, 0.25);
+    --health-at-risk-glow: rgba(245, 158, 11, 0.3);
+    --health-critical: #EF4444;
+    --health-critical-bg: rgba(239, 68, 68, 0.12);
+    --health-critical-border: rgba(239, 68, 68, 0.25);
+    --health-critical-glow: rgba(239, 68, 68, 0.3);
+
+    /* Customer Tier Gradients */
+    --tier-enterprise-gradient: linear-gradient(135deg, #7C3AED 0%, #A855F7 50%, #C084FC 100%);
+    --tier-enterprise-shadow: 0 4px 16px rgba(124, 58, 237, 0.35);
+    --tier-enterprise-text: #7C3AED;
+    --tier-premium-gradient: linear-gradient(135deg, #2563EB 0%, #3B82F6 50%, #60A5FA 100%);
+    --tier-premium-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
+    --tier-premium-text: #2563EB;
+    --tier-standard-gradient: linear-gradient(135deg, #6B7280 0%, #9CA3AF 50%, #D1D5DB 100%);
+    --tier-standard-shadow: 0 4px 16px rgba(107, 114, 128, 0.25);
+    --tier-standard-text: #6B7280;
+    --tier-basic-gradient: linear-gradient(135deg, #78716C 0%, #A8A29E 50%, #D6D3D1 100%);
+    --tier-basic-shadow: 0 4px 16px rgba(120, 113, 108, 0.25);
+    --tier-basic-text: #78716C;
+
+    /* Revenue Indicators */
+    --revenue-positive: #059669;
+    --revenue-negative: #DC2626;
+    --revenue-neutral: #6B7280;
+
+    /* Renewal Warning Colors */
+    --renewal-urgent: #DC2626;
+    --renewal-urgent-bg: rgba(220, 38, 38, 0.12);
+    --renewal-warning: #F59E0B;
+    --renewal-warning-bg: rgba(245, 158, 11, 0.12);
+    --renewal-upcoming: #3B82F6;
+    --renewal-upcoming-bg: rgba(59, 130, 246, 0.12);
+    --renewal-ok: #059669;
+    --renewal-ok-bg: rgba(5, 150, 105, 0.12);
+
+    /* Customer Lifecycle Stage Colors */
+    --lifecycle-prospect: #3B82F6;
+    --lifecycle-onboarding: #8B5CF6;
+    --lifecycle-active: #059669;
+    --lifecycle-at-risk: #F59E0B;
+    --lifecycle-renewal: #EC4899;
+    --lifecycle-churned: #6B7280;
+
+    /* Customer Card Sizes */
+    --customer-health-size-sm: 2.5rem;
+    --customer-health-size-md: 3rem;
+    --customer-health-size-lg: 3.5rem;
+    --customer-health-radius: 0.75rem;
+    --mrr-badge-height: 1.75rem;
+    --mrr-badge-radius: 0.5rem;
+
+    /* ============================================
+       TASK MODULE THEMING SYSTEM
+       Status colors, Priority indicators, Metric cards
+       All values support light/dark mode via CSS vars
+       ============================================ */
+
+    /* Task Status Colors - Semantic with alpha backgrounds */
+    --status-pending: #EAB308;
+    --status-pending-bg: rgba(234, 179, 8, 0.12);
+    --status-pending-border: rgba(234, 179, 8, 0.25);
+    --status-in-progress: #3B82F6;
+    --status-in-progress-bg: rgba(59, 130, 246, 0.12);
+    --status-in-progress-border: rgba(59, 130, 246, 0.25);
+    --status-completed: #10B981;
+    --status-completed-bg: rgba(16, 185, 129, 0.12);
+    --status-completed-border: rgba(16, 185, 129, 0.25);
+    --status-cancelled: #EF4444;
+    --status-cancelled-bg: rgba(239, 68, 68, 0.12);
+    --status-cancelled-border: rgba(239, 68, 68, 0.25);
+    --status-deferred: #6B7280;
+    --status-deferred-bg: rgba(107, 114, 128, 0.12);
+    --status-deferred-border: rgba(107, 114, 128, 0.25);
+
+    /* Task Priority Colors - Visual urgency scale */
+    --priority-low: #64748B;
+    --priority-low-bg: rgba(100, 116, 139, 0.12);
+    --priority-low-border: rgba(100, 116, 139, 0.25);
+    --priority-medium: #3B82F6;
+    --priority-medium-bg: rgba(59, 130, 246, 0.12);
+    --priority-medium-border: rgba(59, 130, 246, 0.25);
+    --priority-high: #F97316;
+    --priority-high-bg: rgba(249, 115, 22, 0.12);
+    --priority-high-border: rgba(249, 115, 22, 0.25);
+    --priority-urgent: #EF4444;
+    --priority-urgent-bg: rgba(239, 68, 68, 0.12);
+    --priority-urgent-border: rgba(239, 68, 68, 0.25);
+
+    /* Opportunity Status Colors - Semantic mapping */
+    --opportunity-open: var(--status-in-progress);
+    --opportunity-open-bg: var(--status-in-progress-bg);
+    --opportunity-open-border: var(--status-in-progress-border);
+    --opportunity-won: var(--status-completed);
+    --opportunity-won-bg: var(--status-completed-bg);
+    --opportunity-won-border: var(--status-completed-border);
+    --opportunity-lost: var(--status-cancelled);
+    --opportunity-lost-bg: var(--status-cancelled-bg);
+    --opportunity-lost-border: var(--status-cancelled-border);
+    --opportunity-stalled: var(--status-pending);
+    --opportunity-stalled-bg: var(--status-pending-bg);
+    --opportunity-stalled-border: var(--status-pending-border);
+
+    /* Opportunity Priority - Critical maps to urgent */
+    --priority-critical: var(--priority-urgent);
+    --priority-critical-bg: var(--priority-urgent-bg);
+    --priority-critical-border: var(--priority-urgent-border);
+
+    /* Customer Status Colors */
+    --customer-active: #10B981;
+    --customer-active-bg: rgba(16, 185, 129, 0.12);
+    --customer-active-border: rgba(16, 185, 129, 0.25);
+    --customer-inactive: #6B7280;
+    --customer-inactive-bg: rgba(107, 114, 128, 0.12);
+    --customer-inactive-border: rgba(107, 114, 128, 0.25);
+    --customer-at-risk: #F59E0B;
+    --customer-at-risk-bg: rgba(245, 158, 11, 0.12);
+    --customer-at-risk-border: rgba(245, 158, 11, 0.25);
+    --customer-churned: #EF4444;
+    --customer-churned-bg: rgba(239, 68, 68, 0.12);
+    --customer-churned-border: rgba(239, 68, 68, 0.25);
+
+    /* Customer Tier Colors */
+    --tier-enterprise: #8B5CF6;
+    --tier-enterprise-bg: rgba(139, 92, 246, 0.12);
+    --tier-enterprise-border: rgba(139, 92, 246, 0.25);
+    --tier-premium: #3B82F6;
+    --tier-premium-bg: rgba(59, 130, 246, 0.12);
+    --tier-premium-border: rgba(59, 130, 246, 0.25);
+    --tier-standard: #6B7280;
+    --tier-standard-bg: rgba(107, 114, 128, 0.12);
+    --tier-standard-border: rgba(107, 114, 128, 0.25);
+    --tier-basic: #64748B;
+    --tier-basic-bg: rgba(100, 116, 139, 0.12);
+    --tier-basic-border: rgba(100, 116, 139, 0.25);
+
+    /* Metric Card Tokens */
+    --metric-card-bg: var(--card);
+    --metric-card-border: var(--border);
+    --metric-icon-size: 2.5rem;
+    --metric-value-size: 1.875rem;
+    --metric-label-size: 0.875rem;
+
+    /* Kanban Specific Tokens */
+    --kanban-column-width: 320px;
+    --kanban-column-min-height: 200px;
+    --kanban-card-gap: 0.75rem;
+    --kanban-header-height: 3.5rem;
+    --kanban-empty-height: 120px;
+
+    /* Kanban Scroll Indicators - v1.0 */
+    --kanban-scroll-indicator-size: 40px;
+    --kanban-scroll-indicator-bg: var(--background);
+    --kanban-scroll-indicator-border: var(--border);
+    --kanban-scroll-indicator-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --kanban-scroll-fade-width: 32px;
+    --kanban-scroll-fade-color: var(--background);
 
     /* ============================================
        VENTAZO GLASSMORPHISM TOKENS - 2025 Premium
@@ -294,10 +1048,10 @@
     --radius-badge: 0.5rem;      /* 8px - Badges */
     --radius-chip: 9999px;       /* Pills/Chips */
 
-    /* Glow Effects - Dynamic Brand Colors */
-    --glow-primary-soft: rgba(14, 181, 140, 0.15);
-    --glow-primary-medium: rgba(14, 181, 140, 0.25);
-    --glow-primary-intense: rgba(14, 181, 140, 0.4);
+    /* Glow Effects - DYNAMIC from tenant-primary */
+    --glow-primary-soft: color-mix(in srgb, var(--tenant-primary) 15%, transparent);
+    --glow-primary-medium: color-mix(in srgb, var(--tenant-primary) 25%, transparent);
+    --glow-primary-intense: color-mix(in srgb, var(--tenant-primary) 40%, transparent);
     --glow-hot: rgba(255, 107, 53, 0.3);
     --glow-hot-intense: rgba(255, 107, 53, 0.5);
 
@@ -351,13 +1105,13 @@
     --card-bg-elevated: rgba(255, 255, 255, 0.96);
     --card-bg-subtle: rgba(248, 250, 252, 0.8);
 
-    /* Card Borders - Premium Glass Effect */
+    /* Card Borders - DYNAMIC Premium Glass Effect */
     --card-border: rgba(0, 0, 0, 0.06);
-    --card-border-hover: rgba(14, 181, 140, 0.25);
-    --card-border-active: rgba(14, 181, 140, 0.4);
+    --card-border-hover: color-mix(in srgb, var(--tenant-primary) 25%, transparent);
+    --card-border-active: color-mix(in srgb, var(--tenant-primary) 40%, transparent);
     --card-border-subtle: rgba(0, 0, 0, 0.03);
 
-    /* Card Shadows - Soft Neumorphic */
+    /* Card Shadows - Soft Neumorphic with DYNAMIC primary accent */
     --card-shadow-base:
       0 1px 3px rgba(0, 0, 0, 0.04),
       0 4px 12px rgba(0, 0, 0, 0.03),
@@ -365,15 +1119,15 @@
     --card-shadow-hover:
       0 4px 12px rgba(0, 0, 0, 0.06),
       0 12px 28px rgba(0, 0, 0, 0.05),
-      0 0 0 1px rgba(14, 181, 140, 0.08);
+      0 0 0 1px color-mix(in srgb, var(--tenant-primary) 8%, transparent);
     --card-shadow-elevated:
       0 8px 24px rgba(0, 0, 0, 0.08),
       0 16px 40px rgba(0, 0, 0, 0.04),
-      0 0 0 1px rgba(14, 181, 140, 0.12);
+      0 0 0 1px color-mix(in srgb, var(--tenant-primary) 12%, transparent);
     --card-shadow-dragging:
       0 20px 50px rgba(0, 0, 0, 0.15),
       0 8px 20px rgba(0, 0, 0, 0.08),
-      0 0 0 2px rgba(14, 181, 140, 0.2);
+      0 0 0 2px color-mix(in srgb, var(--tenant-primary) 20%, transparent);
 
     /* Score Indicator System */
     --score-size-sm: 2.75rem;         /* 44px - WCAG touch target */
@@ -381,13 +1135,7 @@
     --score-size-lg: 4rem;            /* 64px - Prominent */
     --score-radius: 0.875rem;         /* 14px - Slightly rounded */
 
-    /* Score Gradients - Temperature Based */
-    --score-hot-gradient: linear-gradient(135deg, #059669 0%, #10B981 50%, #34D399 100%);
-    --score-hot-shadow: 0 4px 16px rgba(5, 150, 105, 0.35);
-    --score-warm-gradient: linear-gradient(135deg, #D97706 0%, #F59E0B 50%, #FBBF24 100%);
-    --score-warm-shadow: 0 4px 16px rgba(217, 119, 6, 0.35);
-    --score-cold-gradient: linear-gradient(135deg, #6B7280 0%, #9CA3AF 50%, #D1D5DB 100%);
-    --score-cold-shadow: 0 4px 16px rgba(107, 114, 128, 0.25);
+    /* NOTE: Score Gradients defined in lines 197-208, do not duplicate here */
 
     /* Action Button System */
     --action-size: 2.75rem;           /* 44px - WCAG compliant */
@@ -410,20 +1158,30 @@
        UNIFIED TYPOGRAPHY SYSTEM - Light Mode
        ============================================ */
 
-    /* Premium Text Hierarchy */
-    --text-bright: #1C1C1E;
-    --text-secondary: #4A4A4C;
-    --text-muted: #8E8E93;
+    /* Premium Text Hierarchy - WCAG AA Compliant (4.5:1 minimum) */
+    --text-primary: #1C1C1E;        /* ~21:1 on white */
+    --text-bright: #1C1C1E;         /* ~21:1 on white */
+    --text-secondary: #3C3C43;      /* ~10:1 on white - improved contrast */
+    --text-muted: #636366;          /* ~5.0:1 on white - WCAG AA compliant */
+    --text-disabled: #8E8E93;       /* ~3.5:1 - acceptable for disabled states */
+    --text-placeholder: #AEAEB2;    /* ~2.6:1 - acceptable for placeholders */
     --text-accent: var(--tenant-primary);
     --text-accent-hover: var(--tenant-primary-hover);
 
-    /* Score Colors - Lead Temperature */
-    --score-hot: #059669;           /* emerald-600 */
-    --score-hot-bg: #D1FAE5;        /* emerald-100 */
-    --score-warm: #D97706;          /* amber-600 */
+    /* Light Mode Text for Modals/Drawers - WCAG AA Compliant */
+    --text-light-primary: #0f172a;  /* ~16:1 on white */
+    --text-light-secondary: #374151; /* ~9.8:1 on white */
+    --text-light-muted: #4b5563;    /* ~7.0:1 on white - improved */
+    --text-light-placeholder: #6b7280; /* ~4.6:1 on white - AA compliant */
+
+    /* Score Colors - Lead Temperature
+       SEMANTIC: hot=orange (high priority), warm=amber (medium), cold=gray (low) */
+    --score-hot: #EA580C;           /* orange-600 - HIGH priority */
+    --score-hot-bg: #FFEDD5;        /* orange-100 */
+    --score-warm: #D97706;          /* amber-600 - MEDIUM priority */
     --score-warm-bg: #FEF3C7;       /* amber-100 */
-    --score-cold: #DC2626;          /* red-600 */
-    --score-cold-bg: #FEE2E2;       /* red-100 */
+    --score-cold: #6B7280;          /* gray-500 - LOW priority */
+    --score-cold-bg: #F3F4F6;       /* gray-100 */
 
     /* Status Colors - Semantic */
     --status-success: #059669;      /* emerald-600 */
@@ -448,6 +1206,40 @@
     --trend-neutral: #6B7280;       /* gray-500 */
     --trend-neutral-bg: #F3F4F6;
 
+    /* Urgency Date Colors - For due dates and deadlines */
+    --urgency-today: #D97706;       /* amber-600 */
+    --urgency-today-bg: rgba(217, 119, 6, 0.1);
+    --urgency-tomorrow: #EA580C;    /* orange-600 */
+    --urgency-tomorrow-bg: rgba(234, 88, 12, 0.1);
+    --urgency-overdue-text: #DC2626; /* red-600 */
+    --urgency-overdue-bg: rgba(220, 38, 38, 0.1);
+    --urgency-soon: #CA8A04;        /* yellow-600 */
+    --urgency-soon-bg: rgba(202, 138, 4, 0.1);
+    --urgency-notice: #B45309;      /* amber-700 */
+    --urgency-notice-bg: rgba(180, 83, 9, 0.1);
+
+    /* Action Button Colors - Semantic actions */
+    --action-send: #2563EB;         /* blue-600 */
+    --action-send-bg: rgba(37, 99, 235, 0.1);
+    --action-accept: #059669;       /* emerald-600 */
+    --action-accept-bg: rgba(5, 150, 105, 0.1);
+    --action-reject: #DC2626;       /* red-600 */
+    --action-reject-bg: rgba(220, 38, 38, 0.1);
+    --action-duplicate: #7C3AED;    /* violet-600 */
+    --action-duplicate-bg: rgba(124, 58, 237, 0.1);
+    --action-complete: #059669;     /* emerald-600 */
+    --action-complete-bg: rgba(5, 150, 105, 0.1);
+    /* NOTE: --action-win and --action-lost are defined in OPPORTUNITIES MODULE above */
+    /* Do NOT duplicate here - use the canonical definitions at lines ~249-250 */
+
+    /* Entity Link Colors */
+    --link-entity: #2563EB;         /* blue-600 */
+    --link-prospect: #3B82F6;       /* blue-500 */
+    --link-customer: #10B981;       /* emerald-500 */
+
+    /* Provider Brand Colors */
+    --provider-google: #2563EB;     /* blue-600 */
+
     /* Highlight/Active States */
     --highlight-primary: rgba(14, 181, 140, 0.1);
     --highlight-warning: rgba(234, 88, 12, 0.1);
@@ -467,9 +1259,9 @@
     --form-space-2xl: 1.5rem;    /* 24px */
     --form-space-3xl: 2rem;      /* 32px */
 
-    /* Touch Targets (WCAG 2.5.5 AAA = 44px minimum) */
-    --touch-target-min: 44px;
-    --touch-target-comfortable: 48px;
+    /* Touch Targets - CANONICAL DEFINITIONS at lines ~800-803 (using rem) */
+    /* Do NOT redefine here - the rem values ensure proper scaling */
+    /* --touch-target-min: 2.75rem (44px), --touch-target-comfortable: 3rem (48px), --touch-target-large: 3.5rem (56px) */
 
     /* Form Field Heights */
     --input-height-sm: 36px;
@@ -580,11 +1372,12 @@
     --ring: 160 85% 39%;
 
     /* ============================================
-       SIDEBAR LAYOUT SYSTEM (Dark)
+       SIDEBAR LAYOUT SYSTEM (Dark) - Fluid Responsive
+       Matches light mode fluid values
        ============================================ */
-    --sidebar-width: 256px;
-    --sidebar-collapsed-width: 64px;
-    --sidebar-expanded-width: 256px;
+    --sidebar-width: clamp(240px, 17vw, 264px);
+    --sidebar-collapsed-width: clamp(56px, 4.5vw, 68px);
+    --sidebar-expanded-width: clamp(240px, 17vw, 264px);
 
     /* Sidebar - Deep Green Premium */
     --sidebar-background: 179 100% 7%;
@@ -597,36 +1390,327 @@
     --sidebar-ring: 160 85% 39%;
 
     /* ============================================
+       SETTINGS MODULE - Category Colors (Dark Mode)
+       Adjusted for dark mode visibility
+       ============================================ */
+    --settings-profile-icon: #60a5fa;
+    --settings-profile-bg: rgba(59, 130, 246, 0.15);
+    --settings-notifications-icon: #fbbf24;
+    --settings-notifications-bg: rgba(245, 158, 11, 0.15);
+    --settings-branding-icon: #a78bfa;
+    --settings-branding-bg: rgba(139, 92, 246, 0.15);
+    --settings-team-icon: #34d399;
+    --settings-team-bg: rgba(16, 185, 129, 0.15);
+    --settings-billing-icon: #f87171;
+    --settings-billing-bg: rgba(239, 68, 68, 0.15);
+    --settings-messaging-icon: #22d3ee;
+    --settings-messaging-bg: rgba(6, 182, 212, 0.15);
+    --settings-proposals-icon: #a78bfa;
+    --settings-proposals-bg: rgba(139, 92, 246, 0.15);
+    --settings-integrations-icon: #f472b6;
+    --settings-integrations-bg: rgba(236, 72, 153, 0.15);
+    --settings-pipeline-icon: #fb923c;
+    --settings-pipeline-bg: rgba(249, 115, 22, 0.15);
+    --settings-activity-icon: #94a3b8;
+    --settings-activity-bg: rgba(100, 116, 139, 0.15);
+    --settings-security-icon: #818cf8;
+    --settings-security-bg: rgba(99, 102, 241, 0.15);
+    --settings-data-icon: #2dd4bf;
+    --settings-data-bg: rgba(20, 184, 166, 0.15);
+
+    /* ============================================
+       TASK DUE DATE & URGENCY SYSTEM (Dark Mode)
+       Brighter colors for dark background visibility
+       ============================================ */
+    --due-overdue: #F87171;
+    --due-overdue-bg: rgba(248, 113, 113, 0.08);
+    --due-overdue-border: rgba(248, 113, 113, 0.15);
+    --due-overdue-text: #FCA5A5;
+    --due-today: #FB923C;
+    --due-today-bg: rgba(251, 146, 60, 0.08);
+    --due-today-border: rgba(251, 146, 60, 0.18);
+    --due-today-text: #FDBA74;
+    --due-soon: #FBBF24;
+    --due-soon-bg: rgba(251, 191, 36, 0.06);
+    --due-soon-border: rgba(251, 191, 36, 0.15);
+    --due-soon-text: #FCD34D;
+    /* Urgency Hierarchy (Dark Mode) */
+    --urgency-low: #60A5FA;
+    --urgency-medium: #FBBF24;
+    --urgency-high: #FB923C;
+    --urgency-critical: #F87171;
+
+    /* ============================================
+       OPPORTUNITY MODULE (Dark Mode)
+       ============================================ */
+    --prob-high-base: #059669;
+    --prob-high-text: #34D399;
+    --prob-medium-base: #D97706;
+    --prob-medium-text: #FCD34D;
+    --prob-low-base: #DC2626;
+    --prob-low-text: #FCA5A5;
+    --opp-status-won-text: #34D399;
+    --opp-status-lost-text: #FCA5A5;
+    --opp-priority-critical-text: #FCA5A5;
+    --action-whatsapp: #25D366;
+    --action-call: var(--tenant-primary, #0EB58C);
+    --action-email: #60A5FA;
+    --action-win: #34D399;
+    --action-lost: #F87171;
+    --action-warning: #FBBF24;
+
+    /* ============================================
+       QUOTES MODULE (Dark Mode)
+       ============================================ */
+    --quote-status-draft: #94A3B8;
+    --quote-status-pending: #FBBF24;
+    --quote-status-sent: #60A5FA;
+    --quote-status-viewed: #A78BFA;
+    --quote-status-accepted: #34D399;
+    --quote-status-rejected: #F87171;
+    --quote-status-expired: #9CA3AF;
+    --quote-status-revised: #22D3EE;
+    --quote-urgency-expired-text: #FCA5A5;
+    --quote-urgency-critical-text: #FBBF24;
+    --quote-urgency-warning-text: #FCD34D;
+    --quote-urgency-warning: #FCD34D;
+
+    /* Quote Status BG/Border/Text - Dark Mode (higher opacity for visibility) */
+    --quote-draft-bg: rgba(148, 163, 184, 0.15);
+    --quote-draft-border: rgba(148, 163, 184, 0.3);
+    --quote-draft-text: #CBD5E1;
+    --quote-pending-bg: rgba(251, 191, 36, 0.15);
+    --quote-pending-border: rgba(251, 191, 36, 0.3);
+    --quote-pending-text: #FCD34D;
+    --quote-sent-bg: rgba(96, 165, 250, 0.15);
+    --quote-sent-border: rgba(96, 165, 250, 0.3);
+    --quote-sent-text: #93C5FD;
+    --quote-viewed-bg: rgba(167, 139, 250, 0.15);
+    --quote-viewed-border: rgba(167, 139, 250, 0.3);
+    --quote-viewed-text: #C4B5FD;
+    --quote-accepted-bg: rgba(52, 211, 153, 0.15);
+    --quote-accepted-border: rgba(52, 211, 153, 0.3);
+    --quote-accepted-text: #6EE7B7;
+    --quote-rejected-bg: rgba(248, 113, 113, 0.15);
+    --quote-rejected-border: rgba(248, 113, 113, 0.3);
+    --quote-rejected-text: #FCA5A5;
+    --quote-expired-bg: rgba(156, 163, 175, 0.15);
+    --quote-expired-border: rgba(156, 163, 175, 0.3);
+    --quote-expired-text: #D1D5DB;
+    --quote-revised-bg: rgba(34, 211, 238, 0.15);
+    --quote-revised-border: rgba(34, 211, 238, 0.3);
+    --quote-revised-text: #67E8F9;
+
+    /* ============================================
+       TASKS MODULE - Dark Mode
+       ============================================ */
+    /* Task Status - Pending (Amber) - Dark Mode */
+    --task-status-pending: #FBBF24;
+    --task-status-pending-bg: rgba(251, 191, 36, 0.15);
+    --task-status-pending-text: #FCD34D;
+    --task-status-pending-border: rgba(251, 191, 36, 0.3);
+    /* Task Status - In Progress (Blue) - Dark Mode */
+    --task-status-in-progress: #60A5FA;
+    --task-status-in-progress-bg: rgba(96, 165, 250, 0.15);
+    --task-status-in-progress-text: #93C5FD;
+    --task-status-in-progress-border: rgba(96, 165, 250, 0.3);
+    /* Task Status - Completed (Emerald) - Dark Mode */
+    --task-status-completed: #34D399;
+    --task-status-completed-hover: #10B981;
+    --task-status-completed-bg: rgba(52, 211, 153, 0.15);
+    --task-status-completed-text: #6EE7B7;
+    --task-status-completed-border: rgba(52, 211, 153, 0.3);
+    /* Task Status - Cancelled (Red) - Dark Mode */
+    --task-status-cancelled: #F87171;
+    --task-status-cancelled-bg: rgba(248, 113, 113, 0.15);
+    --task-status-cancelled-text: #FCA5A5;
+    --task-status-cancelled-border: rgba(248, 113, 113, 0.3);
+    /* Task Status - Deferred (Violet) - Dark Mode */
+    --task-status-deferred: #A78BFA;
+    --task-status-deferred-bg: rgba(167, 139, 250, 0.15);
+    --task-status-deferred-text: #C4B5FD;
+    --task-status-deferred-border: rgba(167, 139, 250, 0.3);
+
+    /* Task Priority - Dark Mode */
+    --task-priority-low: #94A3B8;
+    --task-priority-low-bg: rgba(148, 163, 184, 0.15);
+    --task-priority-low-text: #CBD5E1;
+    --task-priority-medium: #60A5FA;
+    --task-priority-medium-bg: rgba(96, 165, 250, 0.15);
+    --task-priority-medium-text: #93C5FD;
+    --task-priority-high: #FBBF24;
+    --task-priority-high-bg: rgba(251, 191, 36, 0.15);
+    --task-priority-high-text: #FCD34D;
+    --task-priority-urgent: #F87171;
+    --task-priority-urgent-bg: rgba(248, 113, 113, 0.15);
+    --task-priority-urgent-text: #FCA5A5;
+
+    /* Task Types - Dark Mode */
+    --task-type-call: #4ADE80;
+    --task-type-call-bg: rgba(74, 222, 128, 0.15);
+    --task-type-email: #60A5FA;
+    --task-type-email-bg: rgba(96, 165, 250, 0.15);
+    --task-type-meeting: #C084FC;
+    --task-type-meeting-bg: rgba(192, 132, 252, 0.15);
+    --task-type-follow-up: #FB923C;
+    --task-type-follow-up-bg: rgba(251, 146, 60, 0.15);
+    --task-type-demo: #22D3EE;
+    --task-type-demo-bg: rgba(34, 211, 238, 0.15);
+    --task-type-proposal: #818CF8;
+    --task-type-proposal-bg: rgba(129, 140, 248, 0.15);
+
+    /* Task Activity Types - Dark Mode */
+    --task-activity-created: #4ADE80;
+    --task-activity-created-bg: rgba(74, 222, 128, 0.15);
+    --task-activity-updated: #60A5FA;
+    --task-activity-updated-bg: rgba(96, 165, 250, 0.15);
+    --task-activity-completed: #34D399;
+    --task-activity-completed-bg: rgba(52, 211, 153, 0.15);
+    --task-activity-cancelled: #F87171;
+    --task-activity-cancelled-bg: rgba(248, 113, 113, 0.15);
+    --task-activity-deferred: #A78BFA;
+    --task-activity-deferred-bg: rgba(167, 139, 250, 0.15);
+    --task-activity-reassigned: #C084FC;
+    --task-activity-reassigned-bg: rgba(192, 132, 252, 0.15);
+    --task-activity-status-changed: #818CF8;
+    --task-activity-status-changed-bg: rgba(129, 140, 248, 0.15);
+    --task-activity-priority-changed: #FB923C;
+    --task-activity-priority-changed-bg: rgba(251, 146, 60, 0.15);
+    --task-activity-due-date-changed: #FBBF24;
+    --task-activity-due-date-changed-bg: rgba(251, 191, 36, 0.15);
+
+    /* ============================================
+       INTEGRATION PROVIDERS - Dark Mode
+       OAuth Connection Colors for Calendar/Email integrations
+       ============================================ */
+    /* Google - Dark Mode */
+    --integration-google: #60A5FA;
+    --integration-google-light: #93C5FD;
+    --integration-google-bg: rgba(96, 165, 250, 0.15);
+    --integration-google-text: #93C5FD;
+    /* Microsoft - Dark Mode */
+    --integration-microsoft: #38BDF8;
+    --integration-microsoft-light: #7DD3FC;
+    --integration-microsoft-bg: rgba(56, 189, 248, 0.15);
+    --integration-microsoft-text: #7DD3FC;
+    /* Generic Status - Connected (green) - Dark Mode */
+    --integration-status-connected: #4ADE80;
+    --integration-status-connected-bg: rgba(74, 222, 128, 0.15);
+    --integration-status-connected-hover: #22C55E;
+    /* Warning/Expired (amber) - Dark Mode */
+    --integration-status-warning: #FBBF24;
+    --integration-status-warning-bg: rgba(251, 191, 36, 0.12);
+    --integration-status-warning-border: rgba(251, 191, 36, 0.3);
+    --integration-status-warning-text: #FCD34D;
+
+    /* ============================================
+       CUSTOMER MODULE - Tier Colors (Dark Mode)
+       ============================================ */
+    --tier-enterprise: #A78BFA;
+    --tier-enterprise-light: #C4B5FD;
+    --tier-enterprise-bg: rgba(167, 139, 250, 0.15);
+    --tier-enterprise-border: rgba(167, 139, 250, 0.3);
+    --tier-premium: #60A5FA;
+    --tier-premium-light: #93C5FD;
+    --tier-premium-bg: rgba(96, 165, 250, 0.15);
+    --tier-premium-border: rgba(96, 165, 250, 0.3);
+    --tier-standard: #9CA3AF;
+    --tier-standard-light: #D1D5DB;
+    --tier-standard-bg: rgba(156, 163, 175, 0.15);
+    --tier-standard-border: rgba(156, 163, 175, 0.3);
+    --tier-basic: #A8A29E;
+    --tier-basic-light: #D6D3D1;
+    --tier-basic-bg: rgba(168, 162, 158, 0.15);
+    --tier-basic-border: rgba(168, 162, 158, 0.3);
+
+    /* ============================================
+       CALENDAR MODULE (Dark Mode)
+       ============================================ */
+    --cal-event-lead: #A78BFA;
+    --cal-event-customer: #34D399;
+    --cal-event-opportunity: #FBBF24;
+    --cal-event-task: #60A5FA;
+    --cal-event-confirmed: #818CF8;
+    --cal-event-tentative: #CBD5E1;
+    --cal-event-cancelled: #F87171;
+
+    /* ============================================
+       CHANNELS (Dark Mode) - Brighter for visibility
+       ============================================ */
+    --channel-whatsapp: #25D366;
+    --channel-email: #60A5FA;
+    --channel-sms: #94A3B8;
+    --channel-facebook: #4299E1;
+    --channel-instagram: #F472B6;
+    --channel-linkedin: #38BDF8;
+    --channel-twitter: #38BDF8;
+    --channel-push: #A78BFA;
+
+    /* ============================================
+       CAMPAIGNS MODULE (Dark Mode)
+       ============================================ */
+    --campaign-status-draft: #94A3B8;
+    --campaign-status-draft-bg: rgba(148, 163, 184, 0.15);
+    --campaign-status-draft-border: rgba(148, 163, 184, 0.25);
+    --campaign-status-scheduled: #60A5FA;
+    --campaign-status-scheduled-bg: rgba(96, 165, 250, 0.15);
+    --campaign-status-scheduled-border: rgba(96, 165, 250, 0.25);
+    --campaign-status-active: var(--tenant-primary);
+    --campaign-status-active-bg: color-mix(in srgb, var(--tenant-primary) 15%, transparent);
+    --campaign-status-active-border: color-mix(in srgb, var(--tenant-primary) 30%, transparent);
+    --campaign-status-paused: #FBBF24;
+    --campaign-status-paused-bg: rgba(251, 191, 36, 0.15);
+    --campaign-status-paused-border: rgba(251, 191, 36, 0.25);
+    --campaign-status-completed: #A78BFA;
+    --campaign-status-completed-bg: rgba(167, 139, 250, 0.15);
+    --campaign-status-completed-border: rgba(167, 139, 250, 0.25);
+    --campaign-status-cancelled: #F87171;
+    --campaign-status-cancelled-bg: rgba(248, 113, 113, 0.15);
+    --campaign-status-cancelled-border: rgba(248, 113, 113, 0.25);
+    --campaign-status-archived: #94A3B8;
+    --campaign-status-archived-bg: rgba(148, 163, 184, 0.12);
+    --campaign-status-archived-border: rgba(148, 163, 184, 0.2);
+
+    /* ============================================
        VENTAZO PREMIUM GLASS SYSTEM
        ============================================ */
 
-    /* Glass Backgrounds - Based on Ventazo Dark */
-    --glass-bg: rgba(0, 60, 59, 0.5);
-    --glass-bg-light: rgba(0, 80, 78, 0.35);
-    --glass-bg-dark: rgba(0, 40, 39, 0.7);
+    /* Glass Backgrounds - DYNAMIC using tenant surface color */
+    --glass-bg: color-mix(in srgb, var(--tenant-surface, #052828) 50%, transparent);
+    --glass-bg-light: color-mix(in srgb, var(--tenant-surface, #052828) 35%, transparent);
+    --glass-bg-dark: color-mix(in srgb, var(--tenant-surface, #052828) 70%, transparent);
 
-    /* Glass Borders */
+    /* Glass Borders - DYNAMIC */
     --glass-border: rgba(255, 255, 255, 0.1);
     --glass-border-light: rgba(255, 255, 255, 0.15);
-    --glass-border-hover: rgba(14, 181, 140, 0.3);
+    --glass-border-hover: color-mix(in srgb, var(--tenant-primary) 30%, transparent);
 
-    /* Glow Effects - Ventazo Green */
-    --glow-primary: rgba(14, 181, 140, 0.2);
-    --glow-primary-intense: rgba(14, 181, 140, 0.35);
-    --glow-accent: rgba(14, 181, 140, 0.15);
-    --glow-accent-intense: rgba(14, 181, 140, 0.25);
+    /* Glow Effects - DYNAMIC from tenant-primary */
+    --glow-primary: color-mix(in srgb, var(--tenant-primary) 20%, transparent);
+    --glow-primary-intense: color-mix(in srgb, var(--tenant-primary) 35%, transparent);
+    --glow-accent: color-mix(in srgb, var(--tenant-accent) 15%, transparent);
+    --glow-accent-intense: color-mix(in srgb, var(--tenant-accent) 25%, transparent);
 
     /* Premium Gradients - Ventazo Brand */
     --gradient-dark-start: #001A1A;
     --gradient-dark-mid: #002828;
     --gradient-dark-end: #003C3B;
 
-    /* Premium Text Colors - Dark Mode */
-    --text-bright: #FFFFFF;
-    --text-secondary: #B8C4C4;
-    --text-muted: #7A8F8F;
+    /* Premium Text Colors - Dark Mode - WCAG AA Compliant */
+    --text-primary: #FFFFFF;        /* ~21:1 on dark bg */
+    --text-bright: #FFFFFF;         /* ~21:1 on dark bg */
+    --text-secondary: #D1D5DB;      /* ~12:1 on dark bg - improved */
+    --text-muted: #9CA3AF;          /* ~7.5:1 on dark bg - WCAG AA */
+    --text-disabled: #6B7280;       /* ~4.5:1 on dark bg - AA compliant */
+    --text-placeholder: #4B5563;    /* ~2.6:1 - acceptable for placeholders */
     --text-accent: var(--tenant-primary);
     --text-accent-hover: var(--tenant-primary-hover);
+
+    /* Dark Mode Text for Modals/Drawers - WCAG AA Compliant */
+    --text-light-primary: #FFFFFF;  /* ~21:1 on dark bg */
+    --text-light-secondary: #E5E7EB; /* ~15:1 on dark bg */
+    --text-light-muted: #9CA3AF;    /* ~7.5:1 on dark bg - AA compliant */
+    --text-light-placeholder: #6B7280; /* ~4.5:1 on dark bg - AA compliant */
 
     /* Ventazo Brand Variables (Dark) */
     --ventazo-green: #0EB58C;
@@ -659,22 +1743,105 @@
     --urgency-new: rgba(96, 165, 250, 0.15);
 
     /* ============================================
+       TASK MODULE THEMING - Dark Mode
+       Enhanced visibility for dark backgrounds
+       ============================================ */
+
+    /* Task Status Colors (Dark) - Brighter text, softer backgrounds */
+    --status-pending: #FACC15;
+    --status-pending-bg: rgba(250, 204, 21, 0.15);
+    --status-pending-border: rgba(250, 204, 21, 0.30);
+    --status-in-progress: #60A5FA;
+    --status-in-progress-bg: rgba(96, 165, 250, 0.15);
+    --status-in-progress-border: rgba(96, 165, 250, 0.30);
+    --status-completed: #34D399;
+    --status-completed-bg: rgba(52, 211, 153, 0.15);
+    --status-completed-border: rgba(52, 211, 153, 0.30);
+    --status-cancelled: #F87171;
+    --status-cancelled-bg: rgba(248, 113, 113, 0.15);
+    --status-cancelled-border: rgba(248, 113, 113, 0.30);
+    --status-deferred: #9CA3AF;
+    --status-deferred-bg: rgba(156, 163, 175, 0.15);
+    --status-deferred-border: rgba(156, 163, 175, 0.30);
+
+    /* Task Priority Colors (Dark) - Enhanced contrast */
+    --priority-low: #94A3B8;
+    --priority-low-bg: rgba(148, 163, 184, 0.15);
+    --priority-low-border: rgba(148, 163, 184, 0.30);
+    --priority-medium: #60A5FA;
+    --priority-medium-bg: rgba(96, 165, 250, 0.15);
+    --priority-medium-border: rgba(96, 165, 250, 0.30);
+    --priority-high: #FB923C;
+    --priority-high-bg: rgba(251, 146, 60, 0.15);
+    --priority-high-border: rgba(251, 146, 60, 0.30);
+    --priority-urgent: #F87171;
+    --priority-urgent-bg: rgba(248, 113, 113, 0.15);
+    --priority-urgent-border: rgba(248, 113, 113, 0.30);
+
+    /* Opportunity Status Colors (Dark) - Semantic mapping */
+    --opportunity-open: var(--status-in-progress);
+    --opportunity-open-bg: var(--status-in-progress-bg);
+    --opportunity-open-border: var(--status-in-progress-border);
+    --opportunity-won: var(--status-completed);
+    --opportunity-won-bg: var(--status-completed-bg);
+    --opportunity-won-border: var(--status-completed-border);
+    --opportunity-lost: var(--status-cancelled);
+    --opportunity-lost-bg: var(--status-cancelled-bg);
+    --opportunity-lost-border: var(--status-cancelled-border);
+    --opportunity-stalled: var(--status-pending);
+    --opportunity-stalled-bg: var(--status-pending-bg);
+    --opportunity-stalled-border: var(--status-pending-border);
+
+    /* Opportunity Priority - Critical maps to urgent (Dark) */
+    --priority-critical: var(--priority-urgent);
+    --priority-critical-bg: var(--priority-urgent-bg);
+    --priority-critical-border: var(--priority-urgent-border);
+
+    /* Customer Status Colors (Dark) - Enhanced contrast */
+    --customer-active: #34D399;
+    --customer-active-bg: rgba(52, 211, 153, 0.15);
+    --customer-active-border: rgba(52, 211, 153, 0.30);
+    --customer-inactive: #9CA3AF;
+    --customer-inactive-bg: rgba(156, 163, 175, 0.15);
+    --customer-inactive-border: rgba(156, 163, 175, 0.30);
+    --customer-at-risk: #FBBF24;
+    --customer-at-risk-bg: rgba(251, 191, 36, 0.15);
+    --customer-at-risk-border: rgba(251, 191, 36, 0.30);
+    --customer-churned: #F87171;
+    --customer-churned-bg: rgba(248, 113, 113, 0.15);
+    --customer-churned-border: rgba(248, 113, 113, 0.30);
+
+    /* Customer Tier Colors (Dark) - Enhanced contrast */
+    --tier-enterprise: #A78BFA;
+    --tier-enterprise-bg: rgba(167, 139, 250, 0.15);
+    --tier-enterprise-border: rgba(167, 139, 250, 0.30);
+    --tier-premium: #60A5FA;
+    --tier-premium-bg: rgba(96, 165, 250, 0.15);
+    --tier-premium-border: rgba(96, 165, 250, 0.30);
+    --tier-standard: #9CA3AF;
+    --tier-standard-bg: rgba(156, 163, 175, 0.15);
+    --tier-standard-border: rgba(156, 163, 175, 0.30);
+    --tier-basic: #94A3B8;
+    --tier-basic-bg: rgba(148, 163, 184, 0.15);
+    --tier-basic-border: rgba(148, 163, 184, 0.30);
+
+    /* ============================================
        VENTAZO CARD SYSTEM - Dark Mode
        ============================================ */
 
-    /* Card Backgrounds - Dark Glass */
-    --card-bg: rgba(0, 48, 47, 0.75);
-    --card-bg-hover: rgba(0, 56, 55, 0.85);
-    --card-bg-elevated: rgba(0, 64, 62, 0.8);
-    --card-bg-subtle: rgba(0, 40, 39, 0.6);
+    /* Card Backgrounds - DYNAMIC Dark Glass using tenant colors */
+    --card-bg: color-mix(in srgb, var(--tenant-surface, #052828) 75%, transparent);
+    --card-bg-hover: color-mix(in srgb, var(--tenant-surface, #052828) 85%, transparent);
+    --card-bg-elevated: color-mix(in srgb, var(--tenant-surface, #052828) 80%, transparent);
+    --card-bg-subtle: color-mix(in srgb, var(--tenant-surface, #052828) 60%, transparent);
 
-    /* Card Borders - Premium Dark Glass */
+    /* Card Borders - DYNAMIC Premium Dark Glass */
     --card-border: rgba(255, 255, 255, 0.08);
-    --card-border-hover: rgba(14, 181, 140, 0.35);
-    --card-border-active: rgba(14, 181, 140, 0.5);
+    --card-border-hover: color-mix(in srgb, var(--tenant-primary) 35%, transparent);
+    --card-border-active: color-mix(in srgb, var(--tenant-primary) 50%, transparent);
     --card-border-subtle: rgba(255, 255, 255, 0.04);
 
-    /* Card Shadows - Dark Mode Enhanced */
+    /* Card Shadows - Dark Mode Enhanced with DYNAMIC primary */
     --card-shadow-base:
       0 2px 8px rgba(0, 0, 0, 0.3),
       0 8px 24px rgba(0, 0, 0, 0.2),
@@ -682,35 +1849,37 @@
     --card-shadow-hover:
       0 8px 24px rgba(0, 0, 0, 0.35),
       0 16px 40px rgba(0, 0, 0, 0.25),
-      0 0 0 1px rgba(14, 181, 140, 0.15);
+      0 0 0 1px color-mix(in srgb, var(--tenant-primary) 15%, transparent);
     --card-shadow-elevated:
       0 12px 32px rgba(0, 0, 0, 0.4),
       0 24px 56px rgba(0, 0, 0, 0.3),
-      0 0 0 1px rgba(14, 181, 140, 0.2);
+      0 0 0 1px color-mix(in srgb, var(--tenant-primary) 20%, transparent);
     --card-shadow-dragging:
       0 24px 64px rgba(0, 0, 0, 0.5),
       0 12px 32px rgba(0, 0, 0, 0.35),
-      0 0 0 2px rgba(14, 181, 140, 0.3);
+      0 0 0 2px color-mix(in srgb, var(--tenant-primary) 30%, transparent);
 
-    /* Score Gradients - Dark Mode Temperature */
-    --score-hot-gradient: linear-gradient(135deg, #10B981 0%, #34D399 50%, #6EE7B7 100%);
-    --score-hot-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
-    --score-warm-gradient: linear-gradient(135deg, #F59E0B 0%, #FBBF24 50%, #FCD34D 100%);
+    /* Score Gradients - Dark Mode Temperature
+       SEMANTIC: hot=orange/red (high), warm=amber (medium), cold=gray (low) */
+    --score-hot-gradient: linear-gradient(135deg, #EA580C 0%, #F97316 50%, #FB923C 100%);
+    --score-hot-shadow: 0 4px 20px rgba(249, 115, 22, 0.4);
+    --score-warm-gradient: linear-gradient(135deg, #D97706 0%, #F59E0B 50%, #FBBF24 100%);
     --score-warm-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
-    --score-cold-gradient: linear-gradient(135deg, #9CA3AF 0%, #D1D5DB 50%, #E5E7EB 100%);
-    --score-cold-shadow: 0 4px 20px rgba(156, 163, 175, 0.3);
+    --score-cold-gradient: linear-gradient(135deg, #6B7280 0%, #9CA3AF 50%, #D1D5DB 100%);
+    --score-cold-shadow: 0 4px 20px rgba(107, 114, 128, 0.3);
 
     /* ============================================
        UNIFIED TYPOGRAPHY SYSTEM - Dark Mode
        ============================================ */
 
-    /* Score Colors - Lead Temperature (Dark) */
-    --score-hot: #34D399;           /* emerald-400 */
-    --score-hot-bg: rgba(16, 185, 129, 0.15);
-    --score-warm: #FBBF24;          /* amber-400 */
+    /* Score Colors - Lead Temperature (Dark)
+       SEMANTIC: hot=orange (high priority), warm=amber (medium), cold=gray (low) */
+    --score-hot: #FB923C;           /* orange-400 - HIGH priority */
+    --score-hot-bg: rgba(249, 115, 22, 0.15);
+    --score-warm: #FBBF24;          /* amber-400 - MEDIUM priority */
     --score-warm-bg: rgba(251, 191, 36, 0.15);
-    --score-cold: #F87171;          /* red-400 */
-    --score-cold-bg: rgba(248, 113, 113, 0.15);
+    --score-cold: #9CA3AF;          /* gray-400 - LOW priority */
+    --score-cold-bg: rgba(156, 163, 175, 0.15);
 
     /* Status Colors - Semantic (Dark) */
     --status-success: #34D399;      /* emerald-400 */
@@ -734,6 +1903,40 @@
     --trend-down-bg: rgba(248, 113, 113, 0.15);
     --trend-neutral: #9CA3AF;       /* gray-400 */
     --trend-neutral-bg: rgba(156, 163, 175, 0.1);
+
+    /* Urgency Date Colors - Dark Mode */
+    --urgency-today: #FBBF24;       /* amber-400 */
+    --urgency-today-bg: rgba(251, 191, 36, 0.15);
+    --urgency-tomorrow: #FB923C;    /* orange-400 */
+    --urgency-tomorrow-bg: rgba(251, 146, 60, 0.15);
+    --urgency-overdue-text: #F87171; /* red-400 */
+    --urgency-overdue-bg: rgba(248, 113, 113, 0.15);
+    --urgency-soon: #FACC15;        /* yellow-400 */
+    --urgency-soon-bg: rgba(250, 204, 21, 0.15);
+    --urgency-notice: #FCD34D;      /* amber-300 */
+    --urgency-notice-bg: rgba(252, 211, 77, 0.15);
+
+    /* Action Button Colors - Dark Mode */
+    --action-send: #60A5FA;         /* blue-400 */
+    --action-send-bg: rgba(96, 165, 250, 0.15);
+    --action-accept: #34D399;       /* emerald-400 */
+    --action-accept-bg: rgba(52, 211, 153, 0.15);
+    --action-reject: #F87171;       /* red-400 */
+    --action-reject-bg: rgba(248, 113, 113, 0.15);
+    --action-duplicate: #A78BFA;    /* violet-400 */
+    --action-duplicate-bg: rgba(167, 139, 250, 0.15);
+    --action-complete: #34D399;     /* emerald-400 */
+    --action-complete-bg: rgba(52, 211, 153, 0.15);
+    /* NOTE: --action-win and --action-lost are defined in OPPORTUNITIES MODULE (dark) above */
+    /* Do NOT duplicate here - use the canonical definitions at lines ~1085-1086 */
+
+    /* Entity Link Colors - Dark Mode */
+    --link-entity: #60A5FA;         /* blue-400 */
+    --link-prospect: #60A5FA;       /* blue-400 */
+    --link-customer: #34D399;       /* emerald-400 */
+
+    /* Provider Brand Colors - Dark Mode */
+    --provider-google: #60A5FA;     /* blue-400 */
 
     /* Highlight/Active States (Dark) */
     --highlight-primary: rgba(14, 181, 140, 0.2);
@@ -768,21 +1971,34 @@
     font-feature-settings: 'rlig' 1, 'calt' 1;
   }
 
-  /* Custom scrollbar */
+  /* Custom scrollbar - Global default
+     Uses tenant-aware colors for consistent dark mode theming */
   ::-webkit-scrollbar {
-    @apply w-2 h-2;
+    width: 8px;
+    height: 8px;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-transparent;
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/20 rounded-full;
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 999px;
+    transition: background-color 0.2s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/40;
+    background-color: rgba(0, 0, 0, 0.25);
+  }
+
+  /* Dark mode: Use tenant primary color - much more subtle */
+  .dark ::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 20%, transparent);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 35%, transparent);
   }
 
   /* Focus visible styles */
@@ -1313,8 +2529,13 @@
   }
 
   .dark .kanban-column-premium {
-    background: linear-gradient(180deg, rgba(0,48,47,0.5) 0%, rgba(0,40,39,0.3) 100%);
-    border-color: rgba(255, 255, 255, 0.05);
+    /* Dynamic tenant surface color with gradient effect */
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--tenant-surface, #052828) 50%, transparent) 0%,
+      color-mix(in srgb, var(--tenant-surface, #052828) 30%, transparent) 100%
+    );
+    border-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 8%, transparent);
   }
 
   /* Drop Zone Active State - Dynamic v3.0 */
@@ -1440,6 +2661,51 @@
     border: 1px solid rgba(107, 114, 128, 0.2);
   }
 
+  /* ============================================
+     PAGE TITLE & HEADER UTILITIES
+     Guaranteed visibility in all themes
+     ============================================ */
+
+  /* Page Title - Adapts to tenant theme
+     Uses --foreground which is auto-calculated for optimal contrast with background
+     by TenantThemeProvider using getOptimalForeground() */
+  .page-title {
+    @apply text-lg sm:text-xl md:text-2xl font-bold tracking-tight;
+    color: hsl(var(--foreground));
+  }
+
+  /* Page Subtitle - Muted secondary text
+     Uses --muted-foreground for consistent theming */
+  .page-subtitle {
+    @apply text-xs sm:text-sm;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Section Header - For module/section titles
+     Adapts to tenant theme via --foreground */
+  .section-header {
+    @apply text-base sm:text-lg font-semibold;
+    color: hsl(var(--foreground));
+  }
+
+  /* Card Title - For titles inside cards
+     Uses --card-foreground which is auto-calculated for contrast */
+  .card-title-text {
+    @apply text-sm font-semibold;
+    color: hsl(var(--card-foreground));
+  }
+
+  /* Header Container - Ensures proper background contrast */
+  .header-container {
+    @apply bg-background;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .dark .header-container {
+    background: hsl(var(--background));
+    border-color: hsl(var(--border));
+  }
+
   /* Priority/Score Indicator */
   .score-indicator {
     @apply inline-flex items-center justify-center;
@@ -1466,16 +2732,312 @@
     box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
   }
 
-  /* Premium Input Focus */
+  /* ============================================
+     PREMIUM FORM STYLING
+     High-contrast, accessible form inputs with micro-interactions
+     ============================================ */
+
+  /* Premium Input Base */
   .input-premium {
-    @apply border rounded-[var(--radius-input)] bg-background px-3 py-2;
-    transition: all var(--transition-fast);
+    @apply w-full px-4 py-3 text-base;
+    @apply border rounded-xl;
+    @apply bg-white dark:bg-slate-800;
+    @apply text-slate-900 dark:text-white;
+    @apply border-slate-200 dark:border-slate-600;
+    @apply placeholder:text-slate-400 dark:placeholder:text-slate-400;
+    @apply shadow-sm;
+    transition: all 0.2s ease-out;
+  }
+
+  .input-premium:hover:not(:disabled) {
+    @apply border-slate-300 dark:border-slate-500;
   }
 
   .input-premium:focus {
     outline: none;
-    border-color: hsl(var(--primary));
-    box-shadow: var(--shadow-input-focus);
+    @apply border-primary;
+    @apply ring-2 ring-primary/20;
+    box-shadow: 0 0 0 4px rgba(var(--tenant-primary-rgb, 14, 181, 140), 0.12);
+  }
+
+  .input-premium:disabled {
+    @apply opacity-50 cursor-not-allowed;
+    @apply bg-slate-50 dark:bg-slate-900;
+  }
+
+  /* Form Field Container */
+  .form-field {
+    @apply space-y-2;
+  }
+
+  .form-field-horizontal {
+    @apply flex items-center gap-3;
+  }
+
+  .form-field-horizontal .form-label {
+    @apply shrink-0 w-32;
+  }
+
+  /* Form Label Premium */
+  .form-label {
+    @apply text-sm font-medium;
+    @apply text-slate-700 dark:text-slate-200;
+    @apply block mb-1.5;
+    transition: color 0.15s ease;
+  }
+
+  .form-label.required::after {
+    content: '*';
+    @apply ml-1 text-red-500;
+  }
+
+  /* Form Input Wrapper - for icons and addons */
+  .form-input-wrapper {
+    @apply relative;
+  }
+
+  .form-input-wrapper .input-icon-left {
+    @apply absolute left-3 top-1/2 -translate-y-1/2;
+    @apply text-slate-400 dark:text-slate-500;
+    @apply pointer-events-none;
+    @apply h-5 w-5;
+  }
+
+  .form-input-wrapper .input-icon-right {
+    @apply absolute right-3 top-1/2 -translate-y-1/2;
+    @apply text-slate-400 dark:text-slate-500;
+    @apply h-5 w-5;
+  }
+
+  .form-input-wrapper.has-left-icon .input-premium {
+    @apply pl-10;
+  }
+
+  .form-input-wrapper.has-right-icon .input-premium {
+    @apply pr-10;
+  }
+
+  /* Form Help Text */
+  .form-help {
+    @apply text-xs text-slate-500 dark:text-slate-400 mt-1.5;
+  }
+
+  /* Form Error Text */
+  .form-error {
+    @apply text-xs text-red-500 dark:text-red-400 mt-1.5;
+    @apply flex items-center gap-1;
+  }
+
+  /* Premium Textarea */
+  .textarea-premium {
+    @apply w-full px-4 py-3 text-base min-h-[100px];
+    @apply border rounded-xl resize-y;
+    @apply bg-white dark:bg-slate-800;
+    @apply text-slate-900 dark:text-white;
+    @apply border-slate-200 dark:border-slate-600;
+    @apply placeholder:text-slate-400 dark:placeholder:text-slate-400;
+    @apply shadow-sm;
+    transition: all 0.2s ease-out;
+  }
+
+  .textarea-premium:hover:not(:disabled) {
+    @apply border-slate-300 dark:border-slate-500;
+  }
+
+  .textarea-premium:focus {
+    outline: none;
+    @apply border-primary;
+    @apply ring-2 ring-primary/20;
+    box-shadow: 0 0 0 4px rgba(var(--tenant-primary-rgb, 14, 181, 140), 0.12);
+  }
+
+  /* Form Section Styling */
+  .form-section {
+    @apply space-y-4 pb-4;
+  }
+
+  .form-section-title {
+    @apply text-sm font-semibold text-slate-800 dark:text-slate-100;
+    @apply flex items-center gap-2 mb-3;
+  }
+
+  .form-section-title svg {
+    @apply h-4 w-4 text-primary;
+  }
+
+  /* Form Actions Bar */
+  .form-actions {
+    @apply flex items-center gap-2 pt-4;
+    @apply border-t border-slate-200 dark:border-slate-700;
+  }
+
+  /* Select Premium */
+  .select-premium-trigger {
+    @apply w-full px-4 py-3 text-base;
+    @apply border rounded-xl;
+    @apply bg-white dark:bg-slate-800;
+    @apply text-slate-900 dark:text-white;
+    @apply border-slate-200 dark:border-slate-600;
+    @apply shadow-sm;
+    @apply flex items-center justify-between;
+    transition: all 0.2s ease-out;
+  }
+
+  .select-premium-trigger:hover:not(:disabled) {
+    @apply border-slate-300 dark:border-slate-500;
+  }
+
+  .select-premium-trigger[data-state="open"] {
+    @apply border-primary ring-2 ring-primary/20;
+  }
+
+  /* Error State for all form elements */
+  .input-premium.error,
+  .textarea-premium.error,
+  .select-premium-trigger.error {
+    @apply border-red-400 dark:border-red-500;
+    @apply bg-red-50/50 dark:bg-red-950/20;
+  }
+
+  .input-premium.error:focus,
+  .textarea-premium.error:focus,
+  .select-premium-trigger.error[data-state="open"] {
+    @apply border-red-500 ring-red-500/20;
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+  }
+
+  /* Slider Premium */
+  .slider-premium [data-radix-slider-track] {
+    @apply bg-slate-200 dark:bg-slate-700;
+    @apply h-2 rounded-full;
+  }
+
+  .slider-premium [data-radix-slider-range] {
+    @apply bg-primary;
+    @apply rounded-full;
+  }
+
+  .slider-premium [data-radix-slider-thumb] {
+    @apply h-5 w-5 rounded-full;
+    @apply bg-white dark:bg-slate-100;
+    @apply border-2 border-primary;
+    @apply shadow-md;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/30;
+    transition: transform 0.15s ease;
+  }
+
+  .slider-premium [data-radix-slider-thumb]:hover {
+    transform: scale(1.1);
+  }
+
+  /* Form Grid */
+  .form-grid-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+  }
+
+  .form-grid-3 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4;
+  }
+
+  /* Input Focus Animation */
+  @keyframes inputFocusGlow {
+    0% {
+      box-shadow: 0 0 0 0 rgba(var(--tenant-primary-rgb, 14, 181, 140), 0.3);
+    }
+    50% {
+      box-shadow: 0 0 0 6px rgba(var(--tenant-primary-rgb, 14, 181, 140), 0.1);
+    }
+    100% {
+      box-shadow: 0 0 0 4px rgba(var(--tenant-primary-rgb, 14, 181, 140), 0.12);
+    }
+  }
+
+  .input-premium:focus,
+  .textarea-premium:focus {
+    animation: inputFocusGlow 0.3s ease-out forwards;
+  }
+
+  /* Date Input Styling */
+  .input-premium[type="date"],
+  .input-premium[type="datetime-local"],
+  .input-premium[type="time"] {
+    @apply cursor-pointer;
+  }
+
+  .input-premium[type="date"]::-webkit-calendar-picker-indicator,
+  .input-premium[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  .input-premium[type="time"]::-webkit-calendar-picker-indicator {
+    @apply opacity-60 hover:opacity-100 cursor-pointer;
+    filter: var(--calendar-icon-filter, none);
+  }
+
+  .dark .input-premium[type="date"]::-webkit-calendar-picker-indicator,
+  .dark .input-premium[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  .dark .input-premium[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+
+  /* Number Input - Hide Spinners */
+  .input-premium[type="number"]::-webkit-inner-spin-button,
+  .input-premium[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .input-premium[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  /* ============================================
+     CARD TEXT UTILITIES
+     Guaranteed visibility for card content in all themes
+     ============================================ */
+
+  /* Card Amount - Large monetary values */
+  .card-amount {
+    color: hsl(var(--foreground));
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.025em;
+  }
+
+  .dark .card-amount {
+    color: #FFFFFF;
+  }
+
+  /* Card Amount with Brand Color - For emphasized amounts */
+  .card-amount-brand {
+    color: var(--tenant-primary, hsl(var(--primary)));
+  }
+
+  .dark .card-amount-brand {
+    color: var(--tenant-primary, #60A5FA);
+  }
+
+  /* Card Primary Text - Main text content (names, numbers) */
+  .card-text-primary {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .card-text-primary {
+    color: #F3F4F6;
+  }
+
+  /* Card Secondary Text - Supporting content (subtitles, descriptions) */
+  .card-text-secondary {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .dark .card-text-secondary {
+    color: #9CA3AF;
+  }
+
+  /* Card Muted Text - Least prominent text (timestamps, metadata) */
+  .card-text-muted {
+    color: hsl(var(--muted-foreground) / 0.8);
+  }
+
+  .dark .card-text-muted {
+    color: rgba(156, 163, 175, 0.8);
   }
 
   /* Text Hierarchy Classes */
@@ -1643,6 +3205,69 @@
     }
   }
 
+  /* ========================================
+   * Splash Screen Animations
+   * Premium, calming loading experience
+   * Duration: 2-3s for relaxed feel
+   * Easing: ease-in-out for smooth motion
+   * ======================================== */
+
+  /* Fade in with slight scale */
+  @keyframes splash-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Subtle floating motion for logo */
+  @keyframes splash-float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  /* Gentle pulse for logo */
+  @keyframes splash-pulse {
+    0%, 100% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+  }
+
+  /* Ambient glow breathing effect */
+  @keyframes splash-glow {
+    0%, 100% {
+      opacity: 0.4;
+      transform: scale(0.95);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(1.05);
+    }
+  }
+
+  /* Shimmer effect for skeletons */
+  @keyframes splash-shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
   .animate-slide-in-left {
     animation: animateInFromLeft 0.2s ease-out;
   }
@@ -1671,16 +3296,6 @@
     );
     animation: shimmer 2s infinite;
     content: '';
-  }
-
-  /* Hide scrollbar but keep functionality */
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
   }
 
   /* Truncate with ellipsis */
@@ -2171,14 +3786,20 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Custom thin scrollbar for kanban */
+  /* ============================================
+     CUSTOM SCROLLBAR SYSTEM v2.0
+     Dynamic theming with tenant colors
+     ============================================ */
+
+  /* Base thin scrollbar for kanban & content areas */
   .scrollbar-thin {
     scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 30%, transparent) transparent;
   }
 
   .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
 
   .scrollbar-thin::-webkit-scrollbar-track {
@@ -2186,12 +3807,227 @@
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.15);
-    border-radius: 3px;
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 25%, transparent);
+    border-radius: 999px;
+    transition: background-color 0.2s ease;
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.25);
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 45%, transparent);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:active {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 60%, transparent);
+  }
+
+  /* Light mode variant - uses muted colors */
+  .scrollbar-thin-light {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+  }
+
+  .scrollbar-thin-light::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  .scrollbar-thin-light::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin-light::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.12);
+    border-radius: 999px;
+    transition: background-color 0.2s ease;
+  }
+
+  .scrollbar-thin-light::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.22);
+  }
+
+  /* Premium scrollbar with glass effect */
+  .scrollbar-glass {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--tenant-accent, #5EEAD4) 20%, transparent) transparent;
+  }
+
+  .scrollbar-glass::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .scrollbar-glass::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-glass::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--tenant-accent, #5EEAD4) 30%, transparent) 0%,
+      color-mix(in srgb, var(--tenant-primary, #0EB58C) 25%, transparent) 100%
+    );
+    border-radius: 999px;
+    transition: opacity 0.2s ease;
+  }
+
+  .scrollbar-glass::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--tenant-accent, #5EEAD4) 50%, transparent) 0%,
+      color-mix(in srgb, var(--tenant-primary, #0EB58C) 45%, transparent) 100%
+    );
+  }
+
+  /* Scrollbar that appears only on hover */
+  .scrollbar-hover {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.3s ease;
+  }
+
+  .scrollbar-hover:hover {
+    scrollbar-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 30%, transparent) transparent;
+  }
+
+  .scrollbar-hover::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  .scrollbar-hover::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-hover::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 999px;
+    transition: background-color 0.3s ease;
+  }
+
+  .scrollbar-hover:hover::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 30%, transparent);
+  }
+
+  .scrollbar-hover:hover::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 50%, transparent);
+  }
+
+  /* Dark mode specific adjustments */
+  .dark .scrollbar-thin {
+    scrollbar-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 35%, transparent) transparent;
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 30%, transparent);
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 50%, transparent);
+  }
+
+  /* ============================================
+     KANBAN SCROLLBAR - Auto-hide with theming
+     Specific for horizontal Kanban boards
+     Uses !important to override global defaults
+     ============================================ */
+  .scrollbar-kanban {
+    scrollbar-width: thin !important;
+    scrollbar-color: transparent transparent !important;
+  }
+
+  .scrollbar-kanban::-webkit-scrollbar {
+    width: 6px !important;
+    height: 6px !important;
+  }
+
+  .scrollbar-kanban::-webkit-scrollbar-track {
+    background: transparent !important;
+    margin: 0 8px;
+  }
+
+  .scrollbar-kanban::-webkit-scrollbar-thumb {
+    background-color: transparent !important;
+    border-radius: 999px;
+    transition: background-color 0.3s ease;
+  }
+
+  /* Show scrollbar on hover or scroll */
+  .scrollbar-kanban:hover,
+  .scrollbar-kanban:focus-within,
+  .scrollbar-kanban.is-scrolling {
+    scrollbar-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 40%, transparent) transparent !important;
+  }
+
+  .scrollbar-kanban:hover::-webkit-scrollbar-thumb,
+  .scrollbar-kanban:focus-within::-webkit-scrollbar-thumb,
+  .scrollbar-kanban.is-scrolling::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 40%, transparent) !important;
+  }
+
+  .scrollbar-kanban:hover::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 60%, transparent) !important;
+  }
+
+  .scrollbar-kanban:hover::-webkit-scrollbar-thumb:active {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 70%, transparent) !important;
+  }
+
+  /* Dark mode - slightly more visible */
+  .dark .scrollbar-kanban:hover,
+  .dark .scrollbar-kanban:focus-within,
+  .dark .scrollbar-kanban.is-scrolling {
+    scrollbar-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 45%, transparent) transparent !important;
+  }
+
+  .dark .scrollbar-kanban:hover::-webkit-scrollbar-thumb,
+  .dark .scrollbar-kanban:focus-within::-webkit-scrollbar-thumb,
+  .dark .scrollbar-kanban.is-scrolling::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 45%, transparent) !important;
+  }
+
+  .dark .scrollbar-kanban:hover::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 65%, transparent) !important;
+  }
+
+  /* ============================================
+     MOBILE KANBAN SCROLL OPTIMIZATIONS
+     Fixes gesture conflicts and improves scroll UX
+     ============================================ */
+
+  /* Kanban column cards container - optimized for mobile scroll */
+  [data-kanban-column] > div:last-child {
+    /* Prevent scroll chaining to parent */
+    overscroll-behavior: contain;
+    /* Enable momentum scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
+    /* Smooth native scroll */
+    scroll-behavior: smooth;
+  }
+
+  /* Mobile-specific optimizations */
+  @media (max-width: 1023px) {
+    /* Cards within kanban columns should allow vertical scroll */
+    [data-kanban-column] {
+      /* Allow touch events to pass through for scroll */
+      touch-action: pan-y pinch-zoom;
+    }
+
+    /* Kanban cards - separate drag from scroll */
+    [data-kanban-column] [role="listbox"] > div {
+      /* Allow vertical scroll on the card */
+      touch-action: pan-y;
+    }
+
+    /* Only drag handle should block touch for drag */
+    [data-kanban-column] [aria-label="Arrastrar para mover"] {
+      touch-action: none;
+    }
+
+    /* Smoother scroll container */
+    .scrollbar-thin {
+      scroll-behavior: smooth;
+      overscroll-behavior-y: contain;
+    }
   }
 
   /* ============================================
@@ -2242,7 +4078,116 @@
   }
 
   .dark .kanban-column-premium {
-    @apply bg-white/[0.02] border-white/[0.04];
+    /* Uses dynamic tenant colors for consistent theming */
+    background: color-mix(in srgb, var(--tenant-surface, #052828) 40%, transparent);
+    border-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 10%, transparent);
+  }
+
+  /* ============================================
+     Kanban Container - Scroll Indicators v1.0
+     ============================================ */
+
+  /* Kanban Container - Main wrapper with scroll handling */
+  .kanban-container {
+    @apply relative h-full w-full overflow-hidden;
+  }
+
+  /* Scroll indicator buttons */
+  .kanban-scroll-indicator {
+    @apply absolute top-0 bottom-0 z-30;
+    @apply flex items-center;
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .kanban-scroll-indicator.left {
+    @apply left-0;
+  }
+
+  .kanban-scroll-indicator.right {
+    @apply right-0;
+  }
+
+  .kanban-scroll-indicator.visible {
+    @apply opacity-100 pointer-events-auto translate-x-0;
+  }
+
+  .kanban-scroll-indicator.hidden {
+    @apply opacity-0 pointer-events-none;
+  }
+
+  .kanban-scroll-indicator.hidden.left {
+    @apply -translate-x-4;
+  }
+
+  .kanban-scroll-indicator.hidden.right {
+    @apply translate-x-4;
+  }
+
+  .kanban-scroll-btn {
+    @apply flex items-center justify-center;
+    @apply h-10 w-10 rounded-full;
+    @apply bg-background/90 backdrop-blur-sm;
+    @apply border border-border/50;
+    @apply shadow-lg shadow-black/10;
+    @apply text-muted-foreground;
+    @apply transition-all duration-200 ease-out;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
+  }
+
+  .kanban-scroll-btn:hover {
+    @apply bg-background border-border shadow-xl;
+    @apply text-foreground scale-105;
+  }
+
+  .kanban-scroll-btn:active {
+    @apply scale-95 shadow-md;
+  }
+
+  /* Fade gradients at edges */
+  .kanban-fade-gradient {
+    @apply absolute inset-y-0 z-20;
+    @apply pointer-events-none;
+    @apply transition-opacity duration-300;
+  }
+
+  .kanban-fade-gradient.left {
+    @apply left-0 w-8;
+    background: linear-gradient(to right, var(--background) 0%, transparent 100%);
+  }
+
+  .kanban-fade-gradient.right {
+    @apply right-0 w-8;
+    background: linear-gradient(to left, var(--background) 0%, transparent 100%);
+  }
+
+  /* Scroll area */
+  .kanban-scroll-area {
+    @apply h-full w-full;
+    @apply overflow-x-auto overflow-y-hidden;
+    @apply scrollbar-kanban;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Scroll snap behavior (optional) */
+  .kanban-scroll-area.snap-enabled {
+    @apply snap-x snap-mandatory;
+  }
+
+  .kanban-scroll-area.snap-enabled > * {
+    @apply snap-start;
+  }
+
+  /* Progress bar at bottom */
+  .kanban-progress-bar {
+    @apply absolute bottom-0 left-0 right-0 h-0.5;
+    @apply bg-border/30;
+    @apply transition-opacity duration-300;
+  }
+
+  .kanban-progress-bar-fill {
+    @apply h-full bg-primary/50;
+    @apply transition-[width] duration-150 ease-out;
   }
 
   /* Kanban Column Header - Premium with gradient accent */
@@ -2255,7 +4200,9 @@
   }
 
   .dark .kanban-header-premium {
-    @apply bg-white/[0.03] border-b border-white/[0.06];
+    /* Dynamic tenant surface with subtle transparency */
+    background: color-mix(in srgb, var(--tenant-surface, #052828) 60%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--tenant-primary, #0EB58C) 12%, transparent);
   }
 
   /* Hot Lead Indicator - Animated glow */
@@ -3837,6 +5784,7 @@
   }
 
   /* Leads FAB - Visible on all screen sizes */
+  /* Uses dynamic tenant colors from TenantThemeProvider */
   .leads-fab {
     @apply fixed z-50;
     @apply flex items-center justify-center;
@@ -3845,14 +5793,31 @@
     @apply active:scale-95;
     bottom: 24px;
     right: 24px;
-    background: linear-gradient(135deg, #0D9488 0%, #14B8A6 50%, #0EB58C 100%);
-    color: white;
-    box-shadow: 0 4px 20px -4px rgba(14, 181, 140, 0.5);
+    /*
+     * Dynamic tenant primary color with subtle gradient
+     * Uses only primary color variations for visual consistency
+     */
+    background: var(--tenant-primary, #0EB58C);
+    color: var(--tenant-primary-foreground, white);
+    /* Premium glow effect using tenant primary */
+    box-shadow:
+      0 4px 14px -3px var(--tenant-primary-glow, rgba(14, 181, 140, 0.4)),
+      0 0 0 3px rgba(255, 255, 255, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
   }
 
   .leads-fab:hover {
     transform: translateY(-2px) scale(1.05);
-    box-shadow: 0 8px 28px -4px rgba(14, 181, 140, 0.6);
+    background: var(--tenant-primary-hover, #0A9D79);
+    box-shadow:
+      0 8px 24px -4px var(--tenant-primary-glow, rgba(14, 181, 140, 0.5)),
+      0 0 0 3px rgba(255, 255, 255, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+
+  .leads-fab:active {
+    transform: scale(0.95);
+    background: var(--tenant-primary-hover, #0A9D79);
   }
 
   /* Adjust position on mobile to account for bottom navigation */
@@ -3861,6 +5826,80 @@
       bottom: calc(var(--bottom-bar-height, 64px) + 16px);
       right: 16px;
     }
+  }
+
+  /* Quotes FAB - Visible on all screen sizes */
+  /* Uses dynamic tenant colors from TenantThemeProvider */
+  .quotes-fab {
+    @apply fixed z-40;
+    @apply flex items-center justify-center;
+    @apply w-14 h-14 rounded-full;
+    @apply transition-all duration-200;
+    @apply active:scale-95;
+    bottom: 24px;
+    right: 24px;
+    background: var(--tenant-primary, #0EB58C);
+    color: var(--tenant-primary-foreground, white);
+    box-shadow:
+      0 4px 14px -3px var(--tenant-primary-glow, rgba(14, 181, 140, 0.4)),
+      0 0 0 3px rgba(255, 255, 255, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .quotes-fab:hover {
+    transform: translateY(-2px) scale(1.05);
+    background: var(--tenant-primary-hover, #0A9D79);
+    box-shadow:
+      0 8px 24px -4px var(--tenant-primary-glow, rgba(14, 181, 140, 0.5)),
+      0 0 0 3px rgba(255, 255, 255, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+
+  .quotes-fab:active {
+    transform: scale(0.95);
+    background: var(--tenant-primary-hover, #0A9D79);
+  }
+
+  /* Adjust position on mobile to account for bottom navigation */
+  @media (max-width: 767px) {
+    .quotes-fab {
+      bottom: calc(var(--bottom-bar-height, 64px) + 16px);
+      right: 16px;
+    }
+  }
+
+  /* ============================================
+     QUOTE DETAIL PAGE - Premium Scroll & Layout
+     ============================================ */
+
+  .quote-detail-scroll {
+    /* Premium scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 30%, transparent) transparent;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .quote-detail-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .quote-detail-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .quote-detail-scroll::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 25%, transparent);
+    border-radius: 999px;
+  }
+
+  .quote-detail-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 45%, transparent);
+  }
+
+  /* Safe area padding for iOS devices */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
   /* ============================================
@@ -4694,5 +6733,1938 @@
       margin-left: auto;
       padding-left: 12px;
     }
+  }
+
+  /* ============================================
+     CUSTOMER MODULE COMPONENTS - 2025 Premium
+     Health badges, Tier indicators, Lifecycle Kanban
+     ============================================ */
+
+  /* Customer Card Premium Styles */
+  .customer-card-ventazo {
+    @apply relative overflow-hidden;
+    padding: var(--card-padding-md);
+    background: var(--card-bg, rgba(255, 255, 255, 0.95));
+    border: 1px solid var(--card-border, rgba(0, 0, 0, 0.08));
+    border-radius: var(--card-radius-md, 1.25rem);
+    box-shadow: var(--card-shadow-base);
+    backdrop-filter: blur(8px);
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .customer-card-ventazo:hover {
+    background: var(--card-bg-hover, rgba(255, 255, 255, 1));
+    border-color: var(--card-border-hover, rgba(0, 0, 0, 0.12));
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-3px);
+  }
+
+  .customer-card-ventazo.is-selected {
+    border-color: var(--tenant-primary);
+    box-shadow: 0 0 0 2px var(--tenant-primary-glow), var(--card-shadow-hover);
+  }
+
+  .customer-card-ventazo.is-dragging {
+    opacity: 0.9;
+    transform: rotate(2deg) scale(1.02);
+    box-shadow: var(--card-shadow-dragging);
+    cursor: grabbing;
+  }
+
+  .dark .customer-card-ventazo {
+    /* Dynamic tenant surface color */
+    background: color-mix(in srgb, var(--tenant-surface, #052828) 85%, transparent);
+    border-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 12%, transparent);
+  }
+
+  .dark .customer-card-ventazo:hover {
+    background: color-mix(in srgb, var(--tenant-surface, #052828) 92%, transparent);
+    border-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 20%, transparent);
+  }
+
+  /* Health Score Badge Premium */
+  .health-badge-premium {
+    @apply flex flex-col items-center justify-center shrink-0;
+    width: var(--customer-health-size-md);
+    height: var(--customer-health-size-md);
+    border-radius: var(--customer-health-radius);
+    font-weight: 700;
+    font-size: 1rem;
+    line-height: 1;
+    transition: all 200ms ease-out;
+  }
+
+  .health-badge-premium.excellent {
+    background: var(--health-excellent-bg);
+    color: var(--health-excellent);
+    border: 1px solid var(--health-excellent-border);
+    box-shadow: 0 0 12px var(--health-excellent-glow);
+  }
+
+  .health-badge-premium.good {
+    background: var(--health-good-bg);
+    color: var(--health-good);
+    border: 1px solid var(--health-good-border);
+  }
+
+  .health-badge-premium.at-risk {
+    background: var(--health-at-risk-bg);
+    color: var(--health-at-risk);
+    border: 1px solid var(--health-at-risk-border);
+    animation: pulse-warning 2s infinite;
+  }
+
+  .health-badge-premium.critical {
+    background: var(--health-critical-bg);
+    color: var(--health-critical);
+    border: 1px solid var(--health-critical-border);
+    animation: pulse-critical 1.5s infinite;
+  }
+
+  @keyframes pulse-warning {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  @keyframes pulse-critical {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 8px var(--health-critical-glow);
+    }
+    50% {
+      opacity: 0.85;
+      box-shadow: 0 0 16px var(--health-critical-glow);
+    }
+  }
+
+  /* Tier Badge Premium with Gradients */
+  .tier-badge-premium {
+    @apply inline-flex items-center justify-center;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--badge-radius, 0.5rem);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .tier-badge-premium.enterprise {
+    background: var(--tier-enterprise-gradient);
+    color: white;
+    box-shadow: var(--tier-enterprise-shadow);
+  }
+
+  .tier-badge-premium.premium {
+    background: var(--tier-premium-gradient);
+    color: white;
+    box-shadow: var(--tier-premium-shadow);
+  }
+
+  .tier-badge-premium.standard {
+    background: var(--tier-standard-gradient);
+    color: white;
+    box-shadow: var(--tier-standard-shadow);
+  }
+
+  .tier-badge-premium.basic {
+    background: var(--tier-basic-gradient);
+    color: #374151;
+    box-shadow: var(--tier-basic-shadow);
+  }
+
+  .dark .tier-badge-premium.basic {
+    color: white;
+  }
+
+  /* MRR Badge */
+  .mrr-badge {
+    @apply inline-flex items-center gap-1;
+    height: var(--mrr-badge-height);
+    padding: 0 0.625rem;
+    border-radius: var(--mrr-badge-radius);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  .mrr-badge.positive {
+    background: rgba(5, 150, 105, 0.1);
+    color: var(--revenue-positive);
+  }
+
+  .mrr-badge.negative {
+    background: rgba(220, 38, 38, 0.1);
+    color: var(--revenue-negative);
+  }
+
+  .mrr-badge.neutral {
+    background: rgba(107, 114, 128, 0.1);
+    color: var(--revenue-neutral);
+  }
+
+  /* Renewal Warning Badge */
+  .renewal-badge {
+    @apply inline-flex items-center gap-1.5;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--badge-radius, 0.5rem);
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+
+  .renewal-badge.urgent {
+    background: var(--renewal-urgent-bg);
+    color: var(--renewal-urgent);
+    border: 1px solid rgba(220, 38, 38, 0.25);
+    animation: pulse-critical 1.5s infinite;
+  }
+
+  .renewal-badge.warning {
+    background: var(--renewal-warning-bg);
+    color: var(--renewal-warning);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+  }
+
+  .renewal-badge.upcoming {
+    background: var(--renewal-upcoming-bg);
+    color: var(--renewal-upcoming);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+  }
+
+  .renewal-badge.ok {
+    background: var(--renewal-ok-bg);
+    color: var(--renewal-ok);
+    border: 1px solid rgba(5, 150, 105, 0.25);
+  }
+
+  /* Glass KPI Cards for Customers */
+  .glass-kpi-customer {
+    @apply relative flex items-center gap-3;
+    padding: 0.875rem 1rem;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 0.875rem;
+    cursor: pointer;
+    transition: all 200ms ease-out;
+    min-width: 140px;
+  }
+
+  .glass-kpi-customer:hover {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: color-mix(in srgb, var(--tenant-primary) 20%, transparent);
+    transform: translateY(-2px);
+  }
+
+  .glass-kpi-customer.active {
+    background: color-mix(in srgb, var(--tenant-primary) 8%, white);
+    border-color: color-mix(in srgb, var(--tenant-primary) 30%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tenant-primary) 15%, transparent);
+  }
+
+  .dark .glass-kpi-customer {
+    /* Dynamic tenant surface color for glass effect */
+    background: color-mix(in srgb, var(--tenant-surface, #052828) 60%, transparent);
+    border-color: color-mix(in srgb, var(--tenant-primary, #0EB58C) 10%, transparent);
+  }
+
+  .dark .glass-kpi-customer:hover {
+    background: color-mix(in srgb, var(--tenant-surface, #052828) 75%, transparent);
+  }
+
+  .dark .glass-kpi-customer.active {
+    background: color-mix(in srgb, var(--tenant-primary, #0EB58C) 15%, color-mix(in srgb, var(--tenant-surface, #052828) 80%, transparent));
+  }
+
+  /* Customer FAB */
+  .customers-fab {
+    @apply fixed z-50;
+    @apply flex items-center justify-center;
+    @apply w-14 h-14 rounded-2xl;
+    @apply transition-all duration-200;
+    @apply active:scale-95;
+    bottom: 24px;
+    right: 24px;
+    background: var(--tenant-primary, #0EB58C);
+    color: var(--tenant-primary-foreground, white);
+    box-shadow:
+      0 4px 14px -3px var(--tenant-primary-glow, rgba(14, 181, 140, 0.4)),
+      0 0 0 3px rgba(255, 255, 255, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .customers-fab:hover {
+    transform: translateY(-2px) scale(1.05);
+    background: var(--tenant-primary-hover, #0A9D79);
+    box-shadow:
+      0 8px 24px -4px var(--tenant-primary-glow, rgba(14, 181, 140, 0.5)),
+      0 0 0 3px rgba(255, 255, 255, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+
+  .customers-fab:active {
+    transform: scale(0.95);
+  }
+
+  @media (max-width: 767px) {
+    .customers-fab {
+      bottom: calc(var(--bottom-bar-height, 64px) + 16px);
+      right: 16px;
+    }
+  }
+
+  /* ============================================
+     OPPORTUNITIES MODULE THEMING SYSTEM
+     Pipeline Kanban, Probability Indicators, Deal Cards
+     ============================================ */
+
+  /* ============================================
+     OPPORTUNITIES MODULE - DYNAMIC THEMING
+     All colors derive from useOpportunityTheme hook
+     which sets CSS variables based on tenant branding
+     ============================================ */
+
+  /* Opportunities FAB - Uses tenant primary */
+  .opportunities-fab {
+    @apply fixed z-50;
+    @apply flex items-center justify-center;
+    @apply w-14 h-14 rounded-full;
+    @apply transition-all duration-200;
+    @apply active:scale-95;
+    bottom: 24px;
+    right: 24px;
+    background: var(--tenant-primary);
+    color: white;
+    box-shadow:
+      0 4px 16px -4px var(--tenant-primary-glow),
+      0 2px 8px -2px rgba(0, 0, 0, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .opportunities-fab:hover {
+    transform: translateY(-2px) scale(1.05);
+    background: var(--tenant-primary-hover);
+    box-shadow:
+      0 8px 24px -4px var(--tenant-primary-glow),
+      0 0 0 3px rgba(255, 255, 255, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+
+  .opportunities-fab:active {
+    transform: scale(0.95);
+  }
+
+  @media (max-width: 767px) {
+    .opportunities-fab {
+      bottom: calc(var(--bottom-bar-height, 64px) + 16px);
+      right: 16px;
+    }
+  }
+
+  /* Opportunity Pipeline Column Header - Dynamic */
+  .opportunity-column-header {
+    @apply flex items-center gap-2 px-3 py-2;
+    border-radius: 0.75rem 0.75rem 0 0;
+    border-bottom: 2px solid var(--column-color, var(--tenant-primary));
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--column-color, var(--tenant-primary)) 8%, transparent),
+      transparent
+    );
+  }
+
+  .opportunity-column-header .column-count {
+    @apply inline-flex items-center justify-center;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--column-color, var(--tenant-primary)) 15%, transparent);
+    color: var(--column-color, var(--tenant-primary));
+  }
+
+  /* Opportunity Probability Indicator - DYNAMIC */
+  .probability-indicator {
+    @apply inline-flex items-center justify-center;
+    @apply rounded-full font-bold;
+    transition: all 0.2s ease;
+  }
+
+  .probability-indicator.size-sm {
+    @apply w-8 h-8 text-xs;
+  }
+
+  .probability-indicator.size-md {
+    @apply w-10 h-10 text-sm;
+  }
+
+  .probability-indicator.size-lg {
+    @apply w-12 h-12 text-base;
+  }
+
+  /* Probability colors - Use CSS variables from useOpportunityTheme */
+  .probability-indicator.probability-high {
+    background: var(--prob-high-gradient);
+    color: var(--prob-high-text, white);
+    box-shadow: var(--prob-high-shadow);
+  }
+
+  .probability-indicator.probability-medium {
+    background: var(--prob-medium-gradient);
+    color: var(--prob-medium-text, #78350F);
+    box-shadow: var(--prob-medium-shadow);
+  }
+
+  .probability-indicator.probability-low {
+    background: var(--prob-low-gradient);
+    color: var(--prob-low-text, white);
+    box-shadow: var(--prob-low-shadow);
+  }
+
+  .probability-indicator.probability-won {
+    background: var(--prob-won-gradient);
+    color: white;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+  }
+
+  .probability-indicator.probability-lost {
+    background: var(--prob-lost-gradient);
+    color: white;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+  }
+
+  /* Amount Display - Uses tenant primary */
+  .deal-amount {
+    @apply font-bold tracking-tight;
+    color: var(--tenant-primary);
+  }
+
+  .deal-amount.size-sm {
+    @apply text-sm;
+  }
+
+  .deal-amount.size-md {
+    @apply text-lg;
+  }
+
+  .deal-amount.size-lg {
+    @apply text-xl;
+  }
+
+  /* Win/Lost Status Badges - DYNAMIC */
+  .status-badge-won {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded-full;
+    @apply text-xs font-semibold;
+    background: var(--opp-status-won-bg, rgba(16, 185, 129, 0.12));
+    color: var(--opp-status-won-text, #059669);
+    border: 1px solid var(--opp-status-won-border, rgba(16, 185, 129, 0.25));
+  }
+
+  .status-badge-lost {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded-full;
+    @apply text-xs font-semibold;
+    background: var(--opp-status-lost-bg, rgba(239, 68, 68, 0.12));
+    color: var(--opp-status-lost-text, #DC2626);
+    border: 1px solid var(--opp-status-lost-border, rgba(239, 68, 68, 0.25));
+  }
+
+  .status-badge-open {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded-full;
+    @apply text-xs font-semibold;
+    background: var(--opp-status-open-bg);
+    color: var(--opp-status-open-text, var(--tenant-primary));
+    border: 1px solid var(--opp-status-open-border);
+  }
+
+  .status-badge-stalled {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded-full;
+    @apply text-xs font-semibold;
+    background: var(--opp-status-stalled-bg, rgba(245, 158, 11, 0.12));
+    color: var(--opp-status-stalled-text, #D97706);
+    border: 1px solid var(--opp-status-stalled-border, rgba(245, 158, 11, 0.25));
+  }
+
+  /* Priority Badges - DYNAMIC */
+  .priority-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full;
+    @apply text-[10px] font-bold uppercase tracking-wider;
+  }
+
+  .priority-badge.critical {
+    background: var(--opp-priority-critical-bg, rgba(239, 68, 68, 0.12));
+    color: var(--opp-priority-critical-text, #DC2626);
+    border: 1px solid var(--opp-priority-critical-border, rgba(239, 68, 68, 0.25));
+  }
+
+  .priority-badge.urgent {
+    background: var(--opp-priority-critical-bg, rgba(239, 68, 68, 0.12));
+    color: var(--opp-priority-critical-text, #DC2626);
+    border: 1px solid var(--opp-priority-critical-border, rgba(239, 68, 68, 0.25));
+  }
+
+  .priority-badge.high {
+    background: var(--opp-priority-high-bg, rgba(249, 115, 22, 0.12));
+    color: var(--opp-priority-high-text, #EA580C);
+    border: 1px solid var(--opp-priority-high-border, rgba(249, 115, 22, 0.25));
+  }
+
+  .priority-badge.medium {
+    background: var(--opp-priority-medium-bg);
+    color: var(--opp-priority-medium-text, var(--tenant-primary));
+    border: 1px solid var(--opp-priority-medium-border);
+  }
+
+  .priority-badge.low {
+    background: var(--opp-priority-low-bg, rgba(107, 114, 128, 0.12));
+    color: var(--opp-priority-low-text, #6B7280);
+    border: 1px solid var(--opp-priority-low-border, rgba(107, 114, 128, 0.25));
+  }
+
+  /* Close Date Indicator */
+  .close-date-indicator {
+    @apply inline-flex items-center gap-1;
+    @apply text-xs;
+  }
+
+  .close-date-indicator.overdue {
+    color: #DC2626;
+  }
+
+  .close-date-indicator.urgent {
+    color: #EA580C;
+  }
+
+  .close-date-indicator.soon {
+    color: #D97706;
+  }
+
+  .close-date-indicator.normal {
+    @apply text-muted-foreground;
+  }
+
+  /* Opportunity Quick Actions - DYNAMIC */
+  .opportunity-quick-actions {
+    @apply flex items-center gap-1;
+  }
+
+  .opportunity-action-btn {
+    @apply flex items-center justify-center;
+    @apply w-9 h-9 rounded-xl;
+    @apply transition-all duration-150;
+    @apply text-muted-foreground;
+    background: transparent;
+  }
+
+  .opportunity-action-btn:hover:not(:disabled) {
+    @apply scale-105;
+    background: var(--action-bg, rgba(var(--tenant-primary-rgb), 0.1));
+    color: var(--action-color, var(--tenant-primary));
+  }
+
+  .opportunity-action-btn:active:not(:disabled) {
+    @apply scale-95;
+  }
+
+  .opportunity-action-btn:disabled {
+    @apply opacity-30 cursor-not-allowed;
+  }
+
+  .opportunity-action-btn.win {
+    --action-color: var(--opp-action-win-text, #10B981);
+    --action-bg: var(--opp-action-win-bg, rgba(16, 185, 129, 0.1));
+  }
+
+  .opportunity-action-btn.win:hover:not(:disabled) {
+    background: var(--opp-action-win-bg-hover, rgba(16, 185, 129, 0.15));
+  }
+
+  .opportunity-action-btn.lose {
+    --action-color: var(--opp-action-lost-text, #EF4444);
+    --action-bg: var(--opp-action-lost-bg, rgba(239, 68, 68, 0.1));
+  }
+
+  .opportunity-action-btn.lose:hover:not(:disabled) {
+    background: var(--opp-action-lost-bg-hover, rgba(239, 68, 68, 0.15));
+  }
+
+  .opportunity-action-btn.whatsapp {
+    --action-color: var(--action-whatsapp-text, #25D366);
+    --action-bg: var(--action-whatsapp-bg);
+  }
+
+  .opportunity-action-btn.whatsapp:hover:not(:disabled) {
+    background: var(--action-whatsapp-bg-hover);
+  }
+
+  .opportunity-action-btn.call {
+    --action-color: var(--action-call-text, var(--tenant-primary));
+    --action-bg: var(--action-call-bg);
+  }
+
+  .opportunity-action-btn.call:hover:not(:disabled) {
+    background: var(--action-call-bg-hover);
+  }
+
+  .opportunity-action-btn.email {
+    --action-color: var(--action-email-text, #3B82F6);
+    --action-bg: var(--action-email-bg);
+  }
+
+  .opportunity-action-btn.email:hover:not(:disabled) {
+    background: var(--action-email-bg-hover);
+  }
+
+  /* Opportunity Card - DYNAMIC from tenant */
+  .opportunity-card {
+    @apply relative rounded-xl border bg-card p-3;
+    @apply transition-all duration-200;
+    border-color: rgba(0, 0, 0, 0.06);
+  }
+
+  .opportunity-card:hover {
+    border-color: var(--opp-card-border-hover);
+    box-shadow: var(--opp-card-shadow-hover);
+  }
+
+  .opportunity-card.selected {
+    border-color: var(--opp-card-border-selected, var(--tenant-primary));
+    box-shadow: 0 0 0 2px var(--tenant-primary-glow);
+  }
+
+  .opportunity-card.dragging {
+    box-shadow: var(--opp-card-shadow-dragging);
+    opacity: 0.9;
+  }
+
+  /* Drop Zone - DYNAMIC */
+  .opportunity-drop-zone {
+    @apply transition-all duration-200;
+  }
+
+  .opportunity-drop-zone.active {
+    border-color: var(--opp-drop-border);
+    box-shadow: var(--opp-drop-shadow);
+    background: var(--opp-drop-bg);
+  }
+
+  /* Customer Kanban Column Header */
+  .customer-column-header {
+    @apply flex items-center gap-2 px-3 py-2;
+    border-radius: 0.75rem 0.75rem 0 0;
+    border-bottom: 2px solid var(--column-color, var(--tenant-primary));
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--column-color, var(--tenant-primary)) 8%, transparent),
+      transparent
+    );
+  }
+
+  .customer-column-header .column-count {
+    @apply inline-flex items-center justify-center;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--column-color, var(--tenant-primary)) 15%, transparent);
+    color: var(--column-color, var(--tenant-primary));
+  }
+
+  /* Customer Lifecycle Stage Indicators */
+  .lifecycle-indicator {
+    @apply inline-flex items-center gap-1;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+
+  .lifecycle-indicator.prospect {
+    background: rgba(59, 130, 246, 0.12);
+    color: var(--lifecycle-prospect);
+  }
+
+  .lifecycle-indicator.onboarding {
+    background: rgba(139, 92, 246, 0.12);
+    color: var(--lifecycle-onboarding);
+  }
+
+  .lifecycle-indicator.active {
+    background: rgba(5, 150, 105, 0.12);
+    color: var(--lifecycle-active);
+  }
+
+  .lifecycle-indicator.at-risk {
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--lifecycle-at-risk);
+  }
+
+  .lifecycle-indicator.renewal {
+    background: rgba(236, 72, 153, 0.12);
+    color: var(--lifecycle-renewal);
+  }
+
+  .lifecycle-indicator.churned {
+    background: rgba(107, 114, 128, 0.12);
+    color: var(--lifecycle-churned);
+  }
+
+  /* Customer Quick Actions */
+  .customer-quick-actions {
+    @apply flex items-center gap-1;
+  }
+
+  .customer-action-btn {
+    @apply flex items-center justify-center;
+    @apply w-10 h-10 rounded-xl;
+    @apply transition-all duration-150;
+    @apply text-muted-foreground;
+    background: transparent;
+  }
+
+  .customer-action-btn:hover:not(:disabled) {
+    @apply scale-105;
+    background: color-mix(in srgb, var(--action-color, var(--tenant-primary)) 10%, transparent);
+    color: var(--action-color, var(--tenant-primary));
+  }
+
+  .customer-action-btn:active:not(:disabled) {
+    @apply scale-95;
+  }
+
+  .customer-action-btn:disabled {
+    @apply opacity-30 cursor-not-allowed;
+  }
+
+  .customer-action-btn.whatsapp:hover:not(:disabled) {
+    --action-color: #25D366;
+    background: rgba(37, 211, 102, 0.1);
+    color: #25D366;
+  }
+
+  .customer-action-btn.call:hover:not(:disabled) {
+    --action-color: var(--tenant-primary);
+    background: color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+    color: var(--tenant-primary);
+  }
+
+  .customer-action-btn.email:hover:not(:disabled) {
+    --action-color: #3B82F6;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3B82F6;
+  }
+}
+
+/* ============================================
+   VIEW TRANSITIONS API - SPA Navigation UX
+   Creates native app-like transitions between routes.
+   The sidebar remains stable while content animates.
+   ============================================ */
+
+/* Enable view transitions on the root */
+@supports (view-transition-name: none) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 200ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Crossfade animation */
+  ::view-transition-old(root) {
+    animation-name: fade-out;
+  }
+
+  ::view-transition-new(root) {
+    animation-name: fade-in;
+  }
+
+  @keyframes fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Keep sidebar stable during transitions */
+  aside[role="navigation"] {
+    view-transition-name: sidebar;
+  }
+
+  ::view-transition-old(sidebar),
+  ::view-transition-new(sidebar) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  /* Keep bottom bar stable on mobile */
+  nav[aria-label="Navegación móvil"] {
+    view-transition-name: bottom-bar;
+  }
+
+  ::view-transition-old(bottom-bar),
+  ::view-transition-new(bottom-bar) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  /* Main content area transition */
+  main {
+    view-transition-name: main-content;
+  }
+
+  ::view-transition-old(main-content) {
+    animation: slide-fade-out 180ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  ::view-transition-new(main-content) {
+    animation: slide-fade-in 180ms cubic-bezier(0.0, 0, 0.2, 1) forwards;
+  }
+
+  @keyframes slide-fade-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes slide-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* Fallback for browsers without View Transitions */
+@supports not (view-transition-name: none) {
+  main {
+    transition: opacity 150ms ease-out;
+  }
+}
+
+/* ============================================
+   COMMENTS & MENTIONS SYSTEM
+   Premium styling for social features
+   ============================================ */
+
+/* Comment Card Container - Modern Bubble Style */
+.comment-card {
+  @apply relative;
+  @apply rounded-xl;
+  @apply p-3 sm:p-4;
+  @apply transition-all duration-200;
+  background: hsl(var(--muted) / 0.5);
+  border: 1px solid hsl(var(--border) / 0.5);
+}
+
+.comment-card:hover {
+  background: hsl(var(--muted) / 0.7);
+  border-color: hsl(var(--border) / 0.8);
+}
+
+/* Dark mode enhancement for comment cards */
+.dark .comment-card {
+  background: hsl(var(--muted) / 0.3);
+  border-color: hsl(var(--border) / 0.4);
+}
+
+.dark .comment-card:hover {
+  background: hsl(var(--muted) / 0.4);
+  border-color: hsl(var(--border) / 0.6);
+}
+
+/* Pinned comment highlight */
+.comment-card.pinned {
+  border-left: 3px solid hsl(var(--primary));
+  background: hsl(var(--primary) / 0.05);
+}
+
+.dark .comment-card.pinned {
+  background: hsl(var(--primary) / 0.1);
+}
+
+/* Reply thread indicator */
+.comment-thread-line {
+  @apply absolute left-5 top-14 bottom-0 w-0.5;
+  background: hsl(var(--border));
+}
+
+/* ============================================
+   MENTIONS - User & Group Styling
+   ============================================ */
+
+/* Base mention style */
+.mention {
+  @apply inline-flex items-center;
+  @apply px-1.5 py-0.5 mx-0.5;
+  @apply rounded-md;
+  @apply font-medium text-sm;
+  @apply cursor-pointer;
+  @apply transition-all duration-150;
+}
+
+/* User mentions - Blue accent */
+.mention-user {
+  background: hsl(217 91% 60% / 0.15);
+  color: hsl(217 91% 50%);
+}
+
+.mention-user:hover {
+  background: hsl(217 91% 60% / 0.25);
+}
+
+.dark .mention-user {
+  background: hsl(217 91% 60% / 0.2);
+  color: hsl(217 91% 70%);
+}
+
+.dark .mention-user:hover {
+  background: hsl(217 91% 60% / 0.3);
+}
+
+/* Group mentions - Violet accent */
+.mention-group {
+  background: hsl(262 83% 58% / 0.15);
+  color: hsl(262 83% 48%);
+}
+
+.mention-group:hover {
+  background: hsl(262 83% 58% / 0.25);
+}
+
+.dark .mention-group {
+  background: hsl(262 83% 58% / 0.2);
+  color: hsl(262 83% 70%);
+}
+
+.dark .mention-group:hover {
+  background: hsl(262 83% 58% / 0.3);
+}
+
+/* ============================================
+   DYNAMIC AVATAR COLORS
+   Hash-based color assignment for users
+   ============================================ */
+
+.avatar-color-0 { background-color: #6366f1 !important; color: #ffffff !important; }
+.avatar-color-1 { background-color: #8b5cf6 !important; color: #ffffff !important; }
+.avatar-color-2 { background-color: #a855f7 !important; color: #ffffff !important; }
+.avatar-color-3 { background-color: #d946ef !important; color: #ffffff !important; }
+.avatar-color-4 { background-color: #ec4899 !important; color: #ffffff !important; }
+.avatar-color-5 { background-color: #f43f5e !important; color: #ffffff !important; }
+.avatar-color-6 { background-color: #ef4444 !important; color: #ffffff !important; }
+.avatar-color-7 { background-color: #f97316 !important; color: #ffffff !important; }
+.avatar-color-8 { background-color: #eab308 !important; color: #1f2937 !important; }
+.avatar-color-9 { background-color: #84cc16 !important; color: #1f2937 !important; }
+.avatar-color-10 { background-color: #22c55e !important; color: #ffffff !important; }
+.avatar-color-11 { background-color: #10b981 !important; color: #ffffff !important; }
+.avatar-color-12 { background-color: #14b8a6 !important; color: #ffffff !important; }
+.avatar-color-13 { background-color: #06b6d4 !important; color: #ffffff !important; }
+.avatar-color-14 { background-color: #0ea5e9 !important; color: #ffffff !important; }
+.avatar-color-15 { background-color: #3b82f6 !important; color: #ffffff !important; }
+
+/* ============================================
+   REACTION BAR ENHANCEMENTS
+   ============================================ */
+
+.reaction-button {
+  @apply flex items-center gap-1;
+  @apply px-2 py-1;
+  @apply rounded-full;
+  @apply text-xs font-medium;
+  @apply transition-all duration-150;
+  background: hsl(var(--muted) / 0.5);
+  border: 1px solid transparent;
+}
+
+.reaction-button:hover {
+  background: hsl(var(--muted));
+  border-color: hsl(var(--border));
+  transform: scale(1.05);
+}
+
+.reaction-button.active {
+  background: hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary) / 0.3);
+  color: hsl(var(--primary));
+}
+
+.reaction-button.active:hover {
+  background: hsl(var(--primary) / 0.15);
+}
+
+/* ============================================
+   COMMENT INPUT ENHANCEMENTS
+   ============================================ */
+
+.comment-input-container {
+  @apply relative;
+  @apply rounded-xl;
+  @apply border;
+  @apply overflow-hidden;
+  @apply transition-all duration-200;
+  background: hsl(var(--background));
+  border-color: hsl(var(--border));
+}
+
+.comment-input-container:focus-within {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+}
+
+.comment-input-toolbar {
+  @apply flex items-center gap-1;
+  @apply px-3 py-2;
+  @apply border-t;
+  background: hsl(var(--muted) / 0.3);
+  border-color: hsl(var(--border) / 0.5);
+}
+
+/* Mention picker popup styling */
+.mention-picker {
+  @apply rounded-xl;
+  @apply border;
+  @apply shadow-lg;
+  @apply overflow-hidden;
+  background: hsl(var(--popover));
+  border-color: hsl(var(--border));
+}
+
+.mention-picker-item {
+  @apply flex items-center gap-3;
+  @apply px-3 py-2;
+  @apply cursor-pointer;
+  @apply transition-colors duration-100;
+}
+
+.mention-picker-item:hover,
+.mention-picker-item[data-highlighted] {
+  background: hsl(var(--accent) / 0.1);
+}
+
+.mention-picker-item.selected {
+  background: hsl(var(--primary) / 0.1);
+}
+
+/* ============================================
+   COMMENT SKELETON LOADING
+   ============================================ */
+
+.comment-skeleton {
+  @apply animate-pulse;
+}
+
+.comment-skeleton .avatar {
+  @apply rounded-full;
+  background: hsl(var(--muted));
+}
+
+.comment-skeleton .text {
+  @apply h-3 rounded;
+  background: hsl(var(--muted));
+}
+
+.comment-skeleton .text-short {
+  @apply w-1/4;
+}
+
+.comment-skeleton .text-medium {
+  @apply w-2/3;
+}
+
+.comment-skeleton .text-long {
+  @apply w-full;
+}
+
+/* ============================================
+   FILE ATTACHMENT SYSTEM - Premium Styles 2025
+   ============================================ */
+
+/* ============================================
+   FILE DROPZONE
+   ============================================ */
+
+.file-dropzone {
+  @apply relative flex flex-col items-center justify-center;
+  @apply w-full min-h-[160px] p-6;
+  @apply border-2 border-dashed;
+  @apply rounded-xl;
+  @apply cursor-pointer;
+  @apply transition-all duration-300 ease-out;
+  border-color: hsl(var(--border));
+  background: hsl(var(--muted) / 0.3);
+}
+
+.file-dropzone:hover {
+  border-color: var(--tenant-primary);
+  background: color-mix(in srgb, var(--tenant-primary) 5%, transparent);
+}
+
+.file-dropzone.dragging {
+  border-color: var(--tenant-primary);
+  background: color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px -4px color-mix(in srgb, var(--tenant-primary) 20%, transparent);
+}
+
+.file-dropzone.error {
+  border-color: hsl(var(--destructive));
+  background: hsl(var(--destructive) / 0.05);
+}
+
+.file-dropzone.disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+/* Glass Variant */
+.file-dropzone-glass {
+  @apply backdrop-blur-sm shadow-sm;
+  background: hsl(var(--background) / 0.8);
+  border-color: hsl(var(--border) / 0.6);
+}
+
+.file-dropzone-glass:hover {
+  border-color: color-mix(in srgb, var(--tenant-primary) 40%, transparent);
+  background: hsl(var(--background) / 0.9);
+}
+
+/* Premium Variant */
+.file-dropzone-premium {
+  @apply shadow-sm;
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--background)),
+    hsl(var(--muted) / 0.5)
+  );
+}
+
+.file-dropzone-premium:hover {
+  @apply shadow-md;
+  border-color: hsl(var(--primary) / 0.5);
+}
+
+/* ============================================
+   UPLOAD PROGRESS
+   ============================================ */
+
+.upload-progress-bar {
+  @apply h-1.5 rounded-full overflow-hidden;
+  background: hsl(var(--muted));
+}
+
+.upload-progress-fill {
+  @apply h-full;
+  @apply transition-all duration-300 ease-out;
+  background: linear-gradient(
+    90deg,
+    var(--tenant-primary),
+    color-mix(in srgb, var(--tenant-primary) 80%, white)
+  );
+}
+
+.upload-progress-fill.indeterminate {
+  @apply animate-pulse;
+  width: 100% !important;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--tenant-primary),
+    transparent
+  );
+  animation: progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ============================================
+   ATTACHMENT ITEM
+   ============================================ */
+
+.attachment-item {
+  @apply flex items-center gap-3 p-3;
+  @apply rounded-lg;
+  @apply transition-all duration-200;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / 0.5);
+}
+
+.attachment-item:hover {
+  border-color: hsl(var(--border));
+  box-shadow: 0 2px 8px -2px hsl(var(--foreground) / 0.1);
+}
+
+.attachment-item.error {
+  border-color: hsl(var(--destructive) / 0.5);
+  background: hsl(var(--destructive) / 0.05);
+}
+
+.attachment-item.success {
+  border-color: hsl(var(--success) / 0.5);
+  background: hsl(var(--success) / 0.05);
+}
+
+/* ============================================
+   FILE ICON COLORS BY EXTENSION
+   ============================================ */
+
+.file-icon-pdf { background: #DC2626; }
+.file-icon-doc,
+.file-icon-docx { background: #2563EB; }
+.file-icon-txt { background: #64748B; }
+
+.file-icon-xls,
+.file-icon-xlsx { background: #16A34A; }
+.file-icon-csv { background: #22C55E; }
+
+.file-icon-ppt,
+.file-icon-pptx { background: #EA580C; }
+
+.file-icon-jpg,
+.file-icon-jpeg,
+.file-icon-png { background: #9333EA; }
+.file-icon-gif { background: #A855F7; }
+.file-icon-webp { background: #7C3AED; }
+.file-icon-svg { background: #6D28D9; }
+
+.file-icon-mp4,
+.file-icon-webm,
+.file-icon-mov { background: #EC4899; }
+
+.file-icon-mp3,
+.file-icon-wav { background: #F59E0B; }
+
+.file-icon-default { background: #94A3B8; }
+
+/* ============================================
+   ATTACHMENT PREVIEW MODAL
+   ============================================ */
+
+.attachment-preview-overlay {
+  @apply fixed inset-0 z-50;
+  @apply flex items-center justify-center;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+}
+
+.attachment-preview-content {
+  @apply relative;
+  @apply max-w-5xl max-h-[90vh];
+  @apply overflow-hidden rounded-xl;
+  background: hsl(var(--popover));
+}
+
+.attachment-preview-image {
+  @apply max-w-full max-h-full;
+  @apply object-contain;
+  @apply transition-transform duration-300 ease-out;
+}
+
+.attachment-preview-navigation {
+  @apply absolute top-1/2 -translate-y-1/2;
+  @apply w-12 h-12 rounded-full;
+  @apply flex items-center justify-center;
+  @apply transition-all duration-200;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+}
+
+.attachment-preview-navigation:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.attachment-preview-navigation.prev {
+  @apply left-4;
+}
+
+.attachment-preview-navigation.next {
+  @apply right-4;
+}
+
+/* ============================================
+   ATTACHMENT GRID VIEW
+   ============================================ */
+
+.attachment-grid {
+  @apply grid gap-3;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.attachment-grid-item {
+  @apply relative;
+  @apply rounded-xl overflow-hidden;
+  @apply transition-all duration-200;
+  border: 1px solid hsl(var(--border) / 0.5);
+  background: hsl(var(--card));
+}
+
+.attachment-grid-item:hover {
+  border-color: hsl(var(--border));
+  box-shadow: 0 4px 12px -2px hsl(var(--foreground) / 0.1);
+  transform: translateY(-2px);
+}
+
+.attachment-grid-item-thumbnail {
+  @apply aspect-square;
+  @apply flex items-center justify-center;
+  background: hsl(var(--muted) / 0.3);
+}
+
+.attachment-grid-item-info {
+  @apply p-3;
+}
+
+.attachment-grid-item-overlay {
+  @apply absolute inset-0;
+  @apply flex items-center justify-center gap-2;
+  @apply opacity-0;
+  @apply transition-opacity duration-200;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.attachment-grid-item:hover .attachment-grid-item-overlay {
+  @apply opacity-100;
+}
+
+/* ============================================
+   ATTACHMENT COMPACT VIEW (CHIPS)
+   ============================================ */
+
+.attachment-chip {
+  @apply inline-flex items-center gap-2;
+  @apply px-3 py-1.5;
+  @apply rounded-full;
+  @apply text-sm;
+  @apply transition-colors duration-200;
+  background: hsl(var(--muted));
+}
+
+.attachment-chip:hover {
+  background: hsl(var(--muted) / 0.8);
+}
+
+/* ============================================
+   ATTACHMENT FORM SECTION
+   ============================================ */
+
+.attachment-form-section {
+  @apply space-y-4 p-4;
+  @apply rounded-xl;
+  background: hsl(var(--muted) / 0.3);
+  border: 1px solid hsl(var(--border) / 0.5);
+}
+
+.attachment-form-section-title {
+  @apply flex items-center gap-2;
+  @apply text-sm font-medium;
+  color: hsl(var(--foreground));
+}
+
+.attachment-form-section-title svg {
+  @apply w-4 h-4;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ============================================
+   DARK MODE ADJUSTMENTS
+   ============================================ */
+
+.dark .file-dropzone {
+  background: hsl(var(--muted) / 0.2);
+}
+
+.dark .file-dropzone:hover {
+  background: color-mix(in srgb, var(--tenant-primary) 8%, transparent);
+}
+
+.dark .file-dropzone.dragging {
+  background: color-mix(in srgb, var(--tenant-primary) 15%, transparent);
+}
+
+.dark .attachment-item {
+  background: hsl(var(--card));
+}
+
+.dark .attachment-grid-item {
+  background: hsl(var(--card));
+}
+
+.dark .attachment-chip {
+  background: hsl(var(--muted) / 0.5);
+}
+
+.dark .attachment-form-section {
+  background: hsl(var(--muted) / 0.2);
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 640px) {
+  .file-dropzone {
+    @apply min-h-[120px] p-4;
+  }
+
+  .attachment-grid {
+    grid-template-columns: repeat(2, 1fr);
+    @apply gap-2;
+  }
+
+  .attachment-preview-navigation {
+    @apply w-10 h-10;
+  }
+}
+
+/* ============================================
+   INTELLIGENT RESPONSIVE LAYOUT SYSTEM
+   Media query overrides for fluid scaling
+   ============================================ */
+
+/* Extra Small - Mobile (< 375px) */
+@media (max-width: 374px) {
+  :root {
+    --sidebar-width: 240px;
+    --sidebar-collapsed-width: 56px;
+    --sidebar-header-height: 56px;
+    --sidebar-footer-height: 48px;
+    --sidebar-icon-size: 18px;
+    --sidebar-padding-x: 10px;
+    --sidebar-padding-y: 8px;
+    --bottom-bar-height: 56px;
+  }
+}
+
+/* Small Mobile (375px - 640px) */
+@media (min-width: 375px) and (max-width: 639px) {
+  :root {
+    --sidebar-width: 260px;
+    --sidebar-collapsed-width: 64px;
+    --sidebar-header-height: 60px;
+    --sidebar-footer-height: 56px;
+    --sidebar-icon-size: 20px;
+    --sidebar-padding-x: 12px;
+    --sidebar-padding-y: 10px;
+    --bottom-bar-height: 64px;
+  }
+}
+
+/* Tablet Portrait (640px - 768px) */
+@media (min-width: 640px) and (max-width: 767px) {
+  :root {
+    --sidebar-width: 240px;
+    --sidebar-tablet-width: 240px;
+    --sidebar-collapsed-width: 68px;
+    --sidebar-header-height: 64px;
+    --sidebar-footer-height: 60px;
+    --sidebar-icon-size: 22px;
+    --sidebar-padding-x: 14px;
+    --sidebar-padding-y: 10px;
+  }
+}
+
+/* Tablet Landscape (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root {
+    --sidebar-width: 260px;
+    --sidebar-tablet-width: 250px;
+    --sidebar-collapsed-width: 70px;
+    --sidebar-header-height: 68px;
+    --sidebar-footer-height: 62px;
+    --sidebar-icon-size: 22px;
+    --sidebar-padding-x: 14px;
+    --sidebar-padding-y: 11px;
+  }
+}
+
+/* Small Desktop (1024px - 1280px) */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  :root {
+    --sidebar-width: 270px;
+    --sidebar-collapsed-width: 72px;
+    --sidebar-header-height: 70px;
+    --sidebar-footer-height: 64px;
+    --sidebar-icon-size: 22px;
+    --sidebar-padding-x: 15px;
+    --sidebar-padding-y: 12px;
+  }
+}
+
+/* Large Desktop (1280px - 1536px) */
+@media (min-width: 1280px) and (max-width: 1535px) {
+  :root {
+    --sidebar-width: 280px;
+    --sidebar-expanded-width: 280px;
+    --sidebar-collapsed-width: 72px;
+    --sidebar-header-height: 72px;
+    --sidebar-footer-height: 64px;
+    --sidebar-icon-size: 24px;
+    --sidebar-padding-x: 16px;
+    --sidebar-padding-y: 12px;
+  }
+}
+
+/* Extra Large Desktop (>= 1536px) */
+@media (min-width: 1536px) {
+  :root {
+    --sidebar-width: 300px;
+    --sidebar-expanded-width: 300px;
+    --sidebar-collapsed-width: 76px;
+    --sidebar-header-height: 76px;
+    --sidebar-footer-height: 68px;
+    --sidebar-icon-size: 26px;
+    --sidebar-padding-x: 18px;
+    --sidebar-padding-y: 14px;
+  }
+}
+
+/* ============================================
+   VIEWPORT HEIGHT ADJUSTMENTS
+   For devices with different aspect ratios
+   ============================================ */
+
+/* Short viewport (landscape phones, small laptops) */
+@media (max-height: 600px) {
+  :root {
+    --sidebar-header-height: 56px;
+    --sidebar-footer-height: 48px;
+    --sidebar-section-gap: 8px;
+    --sidebar-item-gap: 2px;
+    --bottom-bar-height: 52px;
+  }
+}
+
+/* Very short viewport */
+@media (max-height: 500px) {
+  :root {
+    --sidebar-header-height: 48px;
+    --sidebar-footer-height: 40px;
+    --sidebar-section-gap: 6px;
+    --sidebar-item-gap: 1px;
+    --bottom-bar-height: 48px;
+  }
+}
+
+/* Tall viewport (tablets in portrait, large monitors) */
+@media (min-height: 900px) {
+  :root {
+    --sidebar-header-height: 80px;
+    --sidebar-footer-height: 72px;
+    --sidebar-section-gap: 20px;
+    --sidebar-item-gap: 6px;
+  }
+}
+
+/* ============================================
+   TOUCH DEVICE OPTIMIZATIONS
+   Larger touch targets for touch screens
+   ============================================ */
+
+@media (hover: none) and (pointer: coarse) {
+  :root {
+    --sidebar-item-height: 48px;
+    --touch-target-min: 48px;
+    --touch-target-comfortable: 52px;
+    --bottom-bar-height: 68px;
+  }
+}
+
+/* Fine pointer (mouse) - can use smaller targets */
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --sidebar-item-height: 40px;
+    --touch-target-min: 36px;
+    --touch-target-comfortable: 40px;
+  }
+}
+
+/* ============================================
+   SMART GLASS ADAPTIVE SYSTEM - 2026
+
+   Apple Liquid Glass inspired components with:
+   - APCA contrast algorithm (WCAG 3.0)
+   - OKLCH perceptual color space
+   - Adaptive icon inversion for light tenant colors
+   - content-visibility optimization
+   - @starting-style entry animations
+   ============================================ */
+
+@layer components {
+  /* ----------------------------------------
+     Adaptive Glass CSS Custom Properties
+     Set by useAdaptiveColors hook
+     ---------------------------------------- */
+  :root {
+    /* Smart Glass adaptive variables - defaults for dark primary */
+    --adaptive-icon-color: oklch(95% 0 0);
+    --adaptive-icon-muted: oklch(75% 0 0);
+    --adaptive-icon-active: var(--tenant-primary, #0EB58C);
+    --adaptive-glass-bg: rgba(255, 255, 255, 0.08);
+    --adaptive-glass-opacity: 0.12;
+    --adaptive-border: rgba(255, 255, 255, 0.15);
+    --adaptive-shadow: rgba(0, 0, 0, 0.25);
+    --adaptive-badge-gradient: linear-gradient(135deg, var(--tenant-primary, #0EB58C), var(--tenant-accent, #5EEAD4));
+    --adaptive-badge-text: #FFFFFF;
+  }
+
+  /* ----------------------------------------
+     Floating Dock Component
+     Apple macOS Tahoe / iOS 26 Liquid Glass
+     ---------------------------------------- */
+  .floating-dock {
+    /* Render optimization */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 400px auto 60px;
+    contain: layout style;
+
+    /* Base Liquid Glass material */
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+
+    /* Entry animation using @starting-style */
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity 350ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* @starting-style for entry animations without layout thrashing */
+  @starting-style {
+    .floating-dock {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+  }
+
+  /* Dock icon magnification hover effect */
+  .dock-icon {
+    /* Optimized hover - will-change applied via JS during interaction */
+    transition:
+      background-color 200ms ease,
+      border-color 200ms ease,
+      box-shadow 200ms ease;
+  }
+
+  .dock-icon:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--adaptive-border),
+      0 0 0 4px var(--tenant-primary, #0EB58C);
+  }
+
+  /* ----------------------------------------
+     Adaptive Glass Variants
+     Auto-switch based on tenant primary luminance
+     ---------------------------------------- */
+  .adaptive-glass {
+    /* Base styles applied to both variants */
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  /* Dark primary (luminance <= 0.65) - Light icons on glass */
+  .adaptive-glass--dark {
+    --local-glass-bg: rgba(255, 255, 255, 0.08);
+    --local-border: rgba(255, 255, 255, 0.15);
+    --local-icon: oklch(95% 0 0);
+    --local-icon-muted: oklch(75% 0 0);
+
+    background: var(--local-glass-bg);
+    border-color: var(--local-border);
+    color: var(--local-icon);
+  }
+
+  /* Light primary (luminance > 0.65) - Dark icons on glass */
+  .adaptive-glass--light {
+    --local-glass-bg: rgba(0, 0, 0, 0.08);
+    --local-border: rgba(0, 0, 0, 0.12);
+    --local-icon: oklch(25% 0 0);
+    --local-icon-muted: oklch(45% 0 0);
+
+    background: var(--local-glass-bg);
+    border-color: var(--local-border);
+    color: var(--local-icon);
+  }
+
+  /* Glass surface with specular highlight */
+  .glass-surface {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .glass-surface::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.1) 0%,
+      transparent 100%
+    );
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  /* Adaptive reflection for light mode */
+  .adaptive-glass--light .glass-surface::before {
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.15) 0%,
+      transparent 100%
+    );
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY MEDIA QUERIES - WCAG 2.2
+   ============================================ */
+
+/* ----------------------------------------
+   Reduced Motion Preference
+   Disable animations, backdrop-filter, and decorative effects
+   ---------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Disable backdrop-filter blur for performance */
+  .floating-dock,
+  .adaptive-glass,
+  .adaptive-glass--dark,
+  .adaptive-glass--light {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(0, 0, 0, 0.85);
+  }
+
+  .adaptive-glass--light {
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  /* Hide purely decorative elements */
+  .motion-reduce\:hidden {
+    display: none !important;
+  }
+
+  /* Disable dock magnification effect */
+  .dock-icon {
+    transform: none !important;
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  /* Disable @starting-style entry animations */
+  .floating-dock {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ----------------------------------------
+   High Contrast Preference
+   Increase opacity, borders, and icon thickness
+   ---------------------------------------- */
+@media (prefers-contrast: more) {
+  :root {
+    /* Stronger glass background */
+    --adaptive-glass-opacity: 0.25;
+    --adaptive-border: rgba(255, 255, 255, 0.35);
+  }
+
+  .floating-dock {
+    /* Solid background for better contrast */
+    background: rgba(0, 0, 0, 0.9) !important;
+    border: 2px solid rgba(255, 255, 255, 0.4) !important;
+  }
+
+  .adaptive-glass--light .floating-dock {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 2px solid rgba(0, 0, 0, 0.3) !important;
+  }
+
+  .dock-icon {
+    /* Thicker icon strokes for visibility */
+    --icon-stroke-width: 2.5;
+    border: 2px solid transparent !important;
+  }
+
+  .dock-icon:hover,
+  .dock-icon:focus-visible {
+    border-color: var(--tenant-primary, #0EB58C) !important;
+  }
+
+  .dock-icon[aria-current="page"] {
+    background: rgba(255, 255, 255, 0.25) !important;
+    border-color: var(--tenant-primary, #0EB58C) !important;
+  }
+
+  /* Larger, more visible badges */
+  .dock-icon [class*="badge"] {
+    font-weight: 800;
+    border: 2px solid white;
+    min-width: 22px;
+    height: 22px;
+  }
+}
+
+/* ----------------------------------------
+   Forced Colors Mode (Windows High Contrast)
+   ---------------------------------------- */
+@media (forced-colors: active) {
+  .floating-dock {
+    background: Canvas;
+    border: 2px solid CanvasText;
+    forced-color-adjust: none;
+  }
+
+  .dock-icon {
+    background: transparent;
+    border: 1px solid CanvasText;
+    color: CanvasText;
+  }
+
+  .dock-icon:hover,
+  .dock-icon:focus-visible {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+
+  .dock-icon[aria-current="page"] {
+    background: Highlight;
+    color: HighlightText;
+    border-color: HighlightText;
+  }
+}
+
+/* ============================================
+   OKLCH COLOR UTILITIES
+   Modern perceptual color manipulation
+   ============================================ */
+
+@layer utilities {
+  /* OKLCH-based text colors for adaptive contrast */
+  .text-oklch-white {
+    color: oklch(95% 0 0);
+  }
+
+  .text-oklch-near-white {
+    color: oklch(90% 0 0);
+  }
+
+  .text-oklch-light {
+    color: oklch(75% 0 0);
+  }
+
+  .text-oklch-muted {
+    color: oklch(60% 0 0);
+  }
+
+  .text-oklch-dark {
+    color: oklch(35% 0 0);
+  }
+
+  .text-oklch-near-black {
+    color: oklch(20% 0 0);
+  }
+
+  .text-oklch-black {
+    color: oklch(10% 0 0);
+  }
+
+  /* Adaptive icon color utilities */
+  .icon-adaptive {
+    color: var(--adaptive-icon-color, oklch(95% 0 0));
+  }
+
+  .icon-adaptive-muted {
+    color: var(--adaptive-icon-muted, oklch(75% 0 0));
+  }
+
+  .icon-adaptive-active {
+    color: var(--adaptive-icon-active, var(--tenant-primary, #0EB58C));
+  }
+
+  /* Glass background utilities */
+  .bg-glass {
+    background: var(--adaptive-glass-bg, rgba(255, 255, 255, 0.08));
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  .bg-glass-dark {
+    background: rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  .bg-glass-light {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  /* Performance-optimized will-change */
+  .will-change-interaction {
+    will-change: transform, opacity;
+  }
+
+  .will-change-none {
+    will-change: auto;
+  }
+
+  /* Content visibility optimization */
+  .content-visibility-auto {
+    content-visibility: auto;
+  }
+
+  .contain-layout {
+    contain: layout;
+  }
+
+  .contain-style {
+    contain: style;
+  }
+
+  .contain-paint {
+    contain: paint;
+  }
+
+  .contain-strict {
+    contain: strict;
   }
 }

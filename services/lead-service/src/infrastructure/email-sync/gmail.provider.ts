@@ -36,11 +36,13 @@ export class GmailProvider {
 
   /**
    * Get config from environment
+   * Uses GOOGLE_EMAIL_REDIRECT_URI for email sync, falls back to GOOGLE_REDIRECT_URI
    */
   private getConfigFromEnv(): GmailConfig | undefined {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    // Prefer email-specific redirect URI, fall back to generic
+    const redirectUri = process.env.GOOGLE_EMAIL_REDIRECT_URI || process.env.GOOGLE_REDIRECT_URI;
 
     if (!clientId || !clientSecret || !redirectUri) {
       return undefined;
@@ -167,8 +169,37 @@ export class GmailProvider {
 
   /**
    * Get user profile
+   * Uses Google's userinfo endpoint which is more reliable than Gmail's profile endpoint
    */
   async getUserProfile(accessToken: string): Promise<{ email: string; name?: string }> {
+    // Try userinfo endpoint first (requires userinfo.email and userinfo.profile scopes)
+    try {
+      const userinfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (userinfoResponse.ok) {
+        const data = await userinfoResponse.json() as {
+          email: string;
+          name?: string;
+          given_name?: string;
+          family_name?: string;
+          picture?: string;
+        };
+        return {
+          email: data.email,
+          name: data.name || (data.given_name && data.family_name
+            ? `${data.given_name} ${data.family_name}`
+            : data.given_name)
+        };
+      }
+    } catch (error) {
+      console.warn('[Gmail] Userinfo endpoint failed, falling back to Gmail profile:', error);
+    }
+
+    // Fallback to Gmail profile endpoint
     const response = await fetch(`${this.baseUrl}/users/me/profile`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -176,6 +207,8 @@ export class GmailProvider {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Gmail] Failed to get profile:', response.status, errorText);
       throw new Error('Failed to get user profile');
     }
 
@@ -215,7 +248,9 @@ export class GmailProvider {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to list messages');
+      const errorText = await response.text();
+      console.error('[Gmail] listMessages failed:', response.status, errorText);
+      throw new Error(`Failed to list messages: ${response.status} - ${errorText}`);
     }
 
     return response.json() as Promise<{

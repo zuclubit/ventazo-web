@@ -3,14 +3,14 @@ const nextConfig = {
   // Enable React Strict Mode for better development experience
   reactStrictMode: true,
 
-  // Ignore ESLint errors during builds (handle separately in CI)
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-
   // Ignore TypeScript errors during builds (handle separately in CI)
   typescript: {
     ignoreBuildErrors: true,
+  },
+
+  // Turbopack configuration for monorepo
+  turbopack: {
+    root: process.cwd(),
   },
 
   // Transpile packages from the monorepo

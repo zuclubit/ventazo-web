@@ -1,11 +1,22 @@
 'use client';
 
+/**
+ * Select Component - Ventazo Design System 2025
+ *
+ * Z-Index Architecture:
+ * - SelectContent uses z-[70] (alertOverlay level) to ensure
+ *   selects appear above Sheets (z-60) when used inside modals.
+ *
+ * @version 2.0.0
+ */
+
 import * as React from 'react';
 
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { zIndexClasses } from '@/lib/theme/z-index';
 
 const Select = SelectPrimitive.Root;
 
@@ -20,8 +31,8 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      // Base styles
-      'flex w-full items-center justify-between rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground',
+      // Base styles with explicit dark mode text color
+      'flex w-full items-center justify-between rounded-md border border-input bg-background text-sm text-slate-900 dark:text-slate-100 ring-offset-background placeholder:text-slate-400 dark:placeholder:text-slate-500',
       // Responsive height - 48px on mobile (touch friendly), 44px on desktop
       'h-12 sm:h-11',
       // Responsive padding
@@ -89,12 +100,18 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
+        // z-[70] (alertOverlay) - above sheets (z-60), ensures visibility inside modals
+        zIndexClasses.alertOverlay,
         // Base styles with mobile-safe max-width
-        'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
+        'relative max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
         // Mobile: constrain to viewport width with safe margins
         'max-w-[calc(100vw-32px)]',
         // Animations
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+        'data-[state=open]:animate-in data-[state=closed]:animate-out',
+        'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+        'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+        'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2',
+        'data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
         position === 'popper' &&
           'data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
         className
@@ -137,8 +154,8 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      // Base styles
-      'relative flex w-full cursor-default select-none items-center rounded-sm text-sm outline-none',
+      // Base styles with explicit dark mode text color
+      'relative flex w-full cursor-default select-none items-center rounded-sm text-sm text-slate-900 dark:text-slate-100 outline-none',
       // Responsive padding - larger on mobile for touch targets (min 44px height)
       'py-2.5 sm:py-1.5 pl-8 pr-2',
       // Focus states

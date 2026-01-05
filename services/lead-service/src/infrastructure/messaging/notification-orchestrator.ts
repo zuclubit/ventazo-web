@@ -314,6 +314,18 @@ const EVENT_TO_TEMPLATE_MAP: Record<NotificationEventType, {
     whatsapp: MessageTemplate.DRIP_COMPLETED,
     email: EmailTemplate.DRIP_COMPLETED,
   },
+
+  // Comment/Mention Events
+  'comment.mention': {
+    sms: MessageTemplate.COMMENT_MENTION,
+    whatsapp: MessageTemplate.COMMENT_MENTION,
+    email: EmailTemplate.COMMENT_MENTION,
+  },
+  'comment.group_mention': {
+    sms: MessageTemplate.COMMENT_GROUP_MENTION,
+    whatsapp: MessageTemplate.COMMENT_GROUP_MENTION,
+    email: EmailTemplate.COMMENT_GROUP_MENTION,
+  },
 };
 
 // ============================================================================

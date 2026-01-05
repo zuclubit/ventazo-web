@@ -33,12 +33,41 @@
   X-XSS-Protection: 1; mode=block
   Referrer-Policy: strict-origin-when-cross-origin
 
-# HTML pages - always revalidate
-/
-  Cache-Control: no-cache, no-store, must-revalidate
+# ===========================================
+# PERFORMANCE OPTIMIZATION - TTFB Reduction
+# See: docs/PERFORMANCE_OPTIMIZATION_PLAN_V2.md
+# ===========================================
 
-/app/*
-  Cache-Control: no-cache, no-store, must-revalidate
+# Public pages - Edge cache with stale-while-revalidate
+# These pages are static for guests, cache aggressively
+/
+  Cache-Control: public, max-age=60, stale-while-revalidate=300
+  CDN-Cache-Control: public, max-age=300
 
 /login
-  Cache-Control: no-cache, no-store, must-revalidate
+  Cache-Control: public, max-age=60, stale-while-revalidate=300
+  CDN-Cache-Control: public, max-age=300
+
+/register
+  Cache-Control: public, max-age=60, stale-while-revalidate=300
+  CDN-Cache-Control: public, max-age=300
+
+/signup
+  Cache-Control: public, max-age=60, stale-while-revalidate=300
+  CDN-Cache-Control: public, max-age=300
+
+/forgot-password
+  Cache-Control: public, max-age=60, stale-while-revalidate=300
+  CDN-Cache-Control: public, max-age=300
+
+# Protected app pages - no cache (dynamic content per user)
+/app/*
+  Cache-Control: private, no-cache, no-store, must-revalidate
+
+# Onboarding pages - no cache (user-specific state)
+/onboarding/*
+  Cache-Control: private, no-cache, no-store, must-revalidate
+
+# Invite acceptance - no cache
+/invite/*
+  Cache-Control: private, no-cache, no-store, must-revalidate

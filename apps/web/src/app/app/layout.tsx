@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { AuthGuard } from '@/components/auth';
 import { RouteErrorBoundary } from '@/components/common/error-boundary';
 import { DashboardShell } from '@/components/layout';
+import { MobileDetectionProvider } from '@/hooks/use-mobile-detection';
 
 export const metadata: Metadata = {
   title: {
@@ -23,9 +24,11 @@ export default function AppLayout({
 }) {
   return (
     <AuthGuard>
-      <DashboardShell>
-        <RouteErrorBoundary>{children}</RouteErrorBoundary>
-      </DashboardShell>
+      <MobileDetectionProvider>
+        <DashboardShell>
+          <RouteErrorBoundary>{children}</RouteErrorBoundary>
+        </DashboardShell>
+      </MobileDetectionProvider>
     </AuthGuard>
   );
 }

@@ -7,10 +7,13 @@
  * - Image processing
  * - Storage management
  *
+ * Authentication uses native JWT (no Supabase Auth dependency)
+ *
  * @module lib/upload/upload-service
  */
 
-import { createRouteHandlerClient, type SupabaseClient } from '@/lib/supabase/server';
+import { createServiceClient, type SupabaseClient } from '@/lib/supabase/server';
+import { getSession } from '@/lib/session';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
@@ -295,19 +298,23 @@ export class UploadService {
 
 /**
  * Create an upload service instance from request context
- * This function handles authentication and creates the service
+ * This function handles authentication via native JWT session
  */
 export async function createUploadService(): Promise<{ service: UploadService | null; error?: string }> {
   try {
-    const supabase = await createRouteHandlerClient();
+    // Get session from native JWT (no Supabase Auth dependency)
+    const session = await getSession();
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    if (!session?.userId) {
       return { service: null, error: 'No autenticado' };
     }
 
-    return { service: new UploadService(supabase, user.id) };
+    // Use Supabase service client for storage operations only
+    const supabase = await createServiceClient();
+
+    return {
+      service: new UploadService(supabase, session.userId, session.tenantId),
+    };
   } catch (error) {
     console.error('[createUploadService] Error:', error);
     return { service: null, error: 'Error de inicialización' };

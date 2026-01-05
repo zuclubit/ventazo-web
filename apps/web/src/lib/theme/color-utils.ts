@@ -1,9 +1,400 @@
 // ============================================
 // Color Utilities for Theme System
 // Professional color manipulation, conversion, and WCAG validation
+// Enhanced with PerceptualColor from @zuclubit/ui-kit for OKLCH-based operations
 // ============================================
 
 import type { RGB, HSL, ColorValidation } from './types';
+import { ColorBridge } from '@/lib/bridges';
+
+// ============================================
+// OKLCH Types (from PerceptualColor)
+// ============================================
+
+export interface OKLCH {
+  /** Lightness 0-1 */
+  l: number;
+  /** Chroma 0-0.4+ */
+  c: number;
+  /** Hue 0-360 */
+  h: number;
+}
+
+export interface PerceptualColorInfo {
+  hex: string;
+  rgb: RGB;
+  hsl: HSL;
+  oklch: OKLCH;
+  luminance: number;
+  isLight: boolean;
+  isDark: boolean;
+}
+
+export interface ApcaContrastResult {
+  /** Lc value (-108 to +108, positive = dark text on light bg) */
+  lc: number;
+  /** Absolute Lc value */
+  absoluteLc: number;
+  /** Passes APCA threshold for body text (Lc >= 60) */
+  passesBodyText: boolean;
+  /** Passes APCA threshold for headlines (Lc >= 45) */
+  passesHeadlines: boolean;
+  /** Passes APCA threshold for spot text (Lc >= 30) */
+  passesSpotText: boolean;
+}
+
+export interface PerceptualAccessibility {
+  /** WCAG 2.1 contrast ratio */
+  wcag21: {
+    ratio: number;
+    levelAA: boolean;
+    levelAAA: boolean;
+    largeTextAA: boolean;
+    largeTextAAA: boolean;
+  };
+  /** WCAG 3.0 APCA contrast */
+  apca: ApcaContrastResult;
+  /** Recommended usage */
+  recommended: 'body' | 'headlines' | 'spot' | 'avoid';
+}
+
+// ============================================
+// Perceptual Color Functions (OKLCH-based)
+// Uses ColorBridge for accurate color science
+// ============================================
+
+/**
+ * Convert hex to OKLCH color space
+ * OKLCH provides perceptually uniform color manipulation
+ */
+export function hexToOklch(hex: string): OKLCH | null {
+  try {
+    const perceptual = ColorBridge.fromHex(hex);
+    if (!perceptual) return null;
+
+    const oklch = perceptual.toOklch();
+    return {
+      l: oklch.l,
+      c: oklch.c,
+      h: oklch.h,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convert OKLCH to hex color
+ */
+export function oklchToHex(oklch: OKLCH): string {
+  try {
+    const perceptual = ColorBridge.fromOklch(oklch.l, oklch.c, oklch.h);
+    if (!perceptual) return '#000000';
+    return perceptual.toHex();
+  } catch {
+    return '#000000';
+  }
+}
+
+/**
+ * Get comprehensive perceptual color information
+ * Combines RGB, HSL, OKLCH, and luminance data
+ */
+export function getPerceptualInfo(hex: string): PerceptualColorInfo | null {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return null;
+
+  const hsl = rgbToHsl(rgb);
+  const oklch = hexToOklch(hex);
+  const luminance = getRelativeLuminance(rgb);
+
+  return {
+    hex: normalizeHex(hex),
+    rgb,
+    hsl,
+    oklch: oklch || { l: 0, c: 0, h: 0 },
+    luminance,
+    isLight: luminance > 0.179,
+    isDark: luminance <= 0.179,
+  };
+}
+
+/**
+ * Perceptually uniform lightening using OKLCH
+ * More accurate than HSL-based lighten()
+ * @param hex - Input color
+ * @param amount - Amount to lighten (0-1, e.g., 0.1 = 10%)
+ */
+export function perceptualLighten(hex: string, amount: number): string {
+  const oklch = hexToOklch(hex);
+  if (!oklch) return hex;
+
+  const newL = Math.min(1, oklch.l + amount);
+  return oklchToHex({ ...oklch, l: newL });
+}
+
+/**
+ * Perceptually uniform darkening using OKLCH
+ * More accurate than HSL-based darken()
+ * @param hex - Input color
+ * @param amount - Amount to darken (0-1, e.g., 0.1 = 10%)
+ */
+export function perceptualDarken(hex: string, amount: number): string {
+  const oklch = hexToOklch(hex);
+  if (!oklch) return hex;
+
+  const newL = Math.max(0, oklch.l - amount);
+  return oklchToHex({ ...oklch, l: newL });
+}
+
+/**
+ * Perceptually adjust chroma (saturation) using OKLCH
+ * @param hex - Input color
+ * @param amount - Amount to adjust chroma (-0.4 to +0.4)
+ */
+export function perceptualSaturate(hex: string, amount: number): string {
+  const oklch = hexToOklch(hex);
+  if (!oklch) return hex;
+
+  const newC = Math.max(0, Math.min(0.4, oklch.c + amount));
+  return oklchToHex({ ...oklch, c: newC });
+}
+
+/**
+ * Perceptually desaturate using OKLCH
+ * @param hex - Input color
+ * @param amount - Amount to reduce chroma (0-0.4)
+ */
+export function perceptualDesaturate(hex: string, amount: number): string {
+  return perceptualSaturate(hex, -amount);
+}
+
+/**
+ * Rotate hue in OKLCH space (perceptually uniform)
+ * @param hex - Input color
+ * @param degrees - Degrees to rotate (0-360)
+ */
+export function perceptualRotateHue(hex: string, degrees: number): string {
+  const oklch = hexToOklch(hex);
+  if (!oklch) return hex;
+
+  const newH = (oklch.h + degrees + 360) % 360;
+  return oklchToHex({ ...oklch, h: newH });
+}
+
+/**
+ * Calculate APCA (Accessible Perceptual Contrast Algorithm) contrast
+ * WCAG 3.0 contrast calculation - more accurate for modern displays
+ * @param foreground - Text color
+ * @param background - Background color
+ */
+export function getApcaContrast(foreground: string, background: string): ApcaContrastResult {
+  try {
+    const fgPerceptual = ColorBridge.fromHex(foreground);
+    const bgPerceptual = ColorBridge.fromHex(background);
+
+    if (!fgPerceptual || !bgPerceptual) {
+      return { lc: 0, absoluteLc: 0, passesBodyText: false, passesHeadlines: false, passesSpotText: false };
+    }
+
+    // Use ColorBridge's APCA calculation
+    const contrast = ColorBridge.getApcaContrast(fgPerceptual, bgPerceptual);
+    const absoluteLc = Math.abs(contrast);
+
+    return {
+      lc: contrast,
+      absoluteLc,
+      passesBodyText: absoluteLc >= 60,
+      passesHeadlines: absoluteLc >= 45,
+      passesSpotText: absoluteLc >= 30,
+    };
+  } catch {
+    return { lc: 0, absoluteLc: 0, passesBodyText: false, passesHeadlines: false, passesSpotText: false };
+  }
+}
+
+/**
+ * Comprehensive accessibility validation (WCAG 2.1 + 3.0)
+ * @param foreground - Text color
+ * @param background - Background color
+ */
+export function validateAccessibility(foreground: string, background: string): PerceptualAccessibility {
+  const wcagRatio = getContrastRatio(foreground, background);
+  const apca = getApcaContrast(foreground, background);
+
+  // Determine recommended usage based on both standards
+  let recommended: 'body' | 'headlines' | 'spot' | 'avoid' = 'avoid';
+  if (wcagRatio >= 4.5 && apca.passesBodyText) {
+    recommended = 'body';
+  } else if (wcagRatio >= 3 && apca.passesHeadlines) {
+    recommended = 'headlines';
+  } else if (apca.passesSpotText) {
+    recommended = 'spot';
+  }
+
+  return {
+    wcag21: {
+      ratio: wcagRatio,
+      levelAA: wcagRatio >= 4.5,
+      levelAAA: wcagRatio >= 7,
+      largeTextAA: wcagRatio >= 3,
+      largeTextAAA: wcagRatio >= 4.5,
+    },
+    apca,
+    recommended,
+  };
+}
+
+/**
+ * Generate perceptually uniform color palette using OKLCH
+ * Creates shades with consistent visual steps
+ */
+export function generatePerceptualPalette(baseHex: string): Record<string, string> {
+  const oklch = hexToOklch(baseHex);
+  if (!oklch) return {};
+
+  const palette: Record<string, string> = {};
+
+  // Perceptually uniform lightness values (0-1 scale)
+  const shades = [
+    { name: '50', l: 0.97 },
+    { name: '100', l: 0.93 },
+    { name: '200', l: 0.85 },
+    { name: '300', l: 0.75 },
+    { name: '400', l: 0.62 },
+    { name: '500', l: 0.50 },
+    { name: '600', l: 0.42 },
+    { name: '700', l: 0.35 },
+    { name: '800', l: 0.27 },
+    { name: '900', l: 0.20 },
+    { name: '950', l: 0.12 },
+  ];
+
+  shades.forEach(shade => {
+    // Adjust chroma based on lightness for natural appearance
+    // Reduce chroma at extremes for better readability
+    const chromaMultiplier = shade.l > 0.9 ? 0.3 : shade.l < 0.2 ? 0.6 : 1;
+    const adjustedChroma = oklch.c * chromaMultiplier;
+
+    palette[shade.name] = oklchToHex({
+      l: shade.l,
+      c: adjustedChroma,
+      h: oklch.h,
+    });
+  });
+
+  return palette;
+}
+
+/**
+ * Generate perceptually uniform color scale
+ * @param baseHex - Base color
+ * @param steps - Number of steps in the scale
+ * @param direction - 'light' | 'dark' | 'both'
+ */
+export function generatePerceptualScale(
+  baseHex: string,
+  steps: number = 5,
+  direction: 'light' | 'dark' | 'both' = 'both'
+): string[] {
+  const oklch = hexToOklch(baseHex);
+  if (!oklch) return [baseHex];
+
+  const scale: string[] = [];
+
+  if (direction === 'light' || direction === 'both') {
+    const lightSteps = direction === 'both' ? Math.floor(steps / 2) : steps;
+    for (let i = lightSteps; i > 0; i--) {
+      const l = Math.min(1, oklch.l + (i / lightSteps) * (1 - oklch.l) * 0.8);
+      const c = oklch.c * (1 - (i / lightSteps) * 0.5); // Reduce chroma as we go lighter
+      scale.push(oklchToHex({ l, c, h: oklch.h }));
+    }
+  }
+
+  scale.push(baseHex);
+
+  if (direction === 'dark' || direction === 'both') {
+    const darkSteps = direction === 'both' ? Math.floor(steps / 2) : steps;
+    for (let i = 1; i <= darkSteps; i++) {
+      const l = Math.max(0, oklch.l - (i / darkSteps) * oklch.l * 0.8);
+      const c = oklch.c * (1 - (i / darkSteps) * 0.3); // Slightly reduce chroma as we go darker
+      scale.push(oklchToHex({ l, c, h: oklch.h }));
+    }
+  }
+
+  return scale;
+}
+
+/**
+ * Find the best contrasting color (APCA-optimized)
+ * Returns black or white based on WCAG 3.0 APCA
+ */
+export function getOptimalForegroundApca(background: string): string {
+  const blackContrast = getApcaContrast('#000000', background);
+  const whiteContrast = getApcaContrast('#FFFFFF', background);
+
+  return blackContrast.absoluteLc > whiteContrast.absoluteLc ? '#000000' : '#FFFFFF';
+}
+
+/**
+ * Generate semantic variants using perceptual color operations
+ * More accurate hover/active states than HSL-based approach
+ */
+export function generatePerceptualSemanticVariants(baseHex: string): {
+  base: string;
+  hover: string;
+  active: string;
+  disabled: string;
+  light: string;
+  dark: string;
+  foreground: string;
+} {
+  const oklch = hexToOklch(baseHex);
+  if (!oklch) {
+    return {
+      base: baseHex,
+      hover: darken(baseHex, 8),
+      active: darken(baseHex, 12),
+      disabled: desaturate(lighten(baseHex, 20), 30),
+      light: lighten(baseHex, 35),
+      dark: darken(baseHex, 20),
+      foreground: getOptimalForeground(baseHex),
+    };
+  }
+
+  return {
+    base: baseHex,
+    hover: perceptualDarken(baseHex, 0.08),
+    active: perceptualDarken(baseHex, 0.12),
+    disabled: oklchToHex({ l: Math.min(0.85, oklch.l + 0.2), c: oklch.c * 0.3, h: oklch.h }),
+    light: oklchToHex({ l: Math.min(0.95, oklch.l + 0.35), c: oklch.c * 0.5, h: oklch.h }),
+    dark: perceptualDarken(baseHex, 0.2),
+    foreground: getOptimalForegroundApca(baseHex),
+  };
+}
+
+/**
+ * Derive full palette from primary using ColorBridge
+ * Uses perceptual color intelligence for optimal results
+ */
+export function derivePerceptualPaletteFromPrimary(primaryHex: string): SemanticBrandPalette {
+  try {
+    const palette = ColorBridge.generatePalette(primaryHex, {
+      includeStates: true,
+      ensureContrast: true,
+    });
+
+    return {
+      sidebarColor: palette.dark || perceptualDarken(primaryHex, 0.35),
+      primaryColor: primaryHex,
+      accentColor: palette.light || perceptualLighten(primaryHex, 0.25),
+      surfaceColor: palette.darkest || perceptualDarken(primaryHex, 0.45),
+    };
+  } catch {
+    // Fallback to HSL-based derivation
+    return deriveFullPaletteFromPrimary(primaryHex);
+  }
+}
 
 // ============================================
 // Color Conversion Functions
@@ -132,6 +523,17 @@ export function hexToHsl(hex: string): HSL | null {
   const rgb = hexToRgb(hex);
   if (!rgb) return null;
   return rgbToHsl(rgb);
+}
+
+/**
+ * Convert Hex to RGBA string
+ * @param hex - Hex color string
+ * @param alpha - Opacity value 0-1
+ */
+export function hexToRgba(hex: string, alpha: number): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return `rgba(0, 0, 0, ${alpha})`;
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
 }
 
 // ============================================

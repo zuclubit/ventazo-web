@@ -42,6 +42,16 @@ export enum Permission {
   // Tenant permissions
   TENANT_SETTINGS = 'tenant:settings',
   TENANT_BILLING = 'tenant:billing',
+
+  // Kanban permissions
+  KANBAN_VIEW = 'kanban:view',                   // View Kanban boards
+  KANBAN_MOVE = 'kanban:move',                   // Move items on Kanban
+  KANBAN_CONFIG = 'kanban:config',               // Configure WIP limits & stages
+  KANBAN_FORCE_WIP = 'kanban:force_wip',         // Force move when WIP exceeded
+  KANBAN_UNDO = 'kanban:undo',                   // Undo/Redo moves
+  KANBAN_HISTORY = 'kanban:history',             // View move history
+  KANBAN_METRICS = 'kanban:metrics',             // View & calculate metrics
+  KANBAN_CONSISTENCY = 'kanban:consistency',     // Verify & repair consistency
 }
 
 /**
@@ -67,6 +77,15 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.USER_VIEW,
     Permission.TENANT_SETTINGS,
     Permission.TENANT_BILLING,
+    // Kanban - Full access
+    Permission.KANBAN_VIEW,
+    Permission.KANBAN_MOVE,
+    Permission.KANBAN_CONFIG,
+    Permission.KANBAN_FORCE_WIP,
+    Permission.KANBAN_UNDO,
+    Permission.KANBAN_HISTORY,
+    Permission.KANBAN_METRICS,
+    Permission.KANBAN_CONSISTENCY,
   ],
   [UserRole.ADMIN]: [
     Permission.LEAD_CREATE,
@@ -83,6 +102,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.USER_INVITE,
     Permission.USER_MANAGE,
     Permission.USER_VIEW,
+    // Kanban - Full access except consistency repair
+    Permission.KANBAN_VIEW,
+    Permission.KANBAN_MOVE,
+    Permission.KANBAN_CONFIG,
+    Permission.KANBAN_FORCE_WIP,
+    Permission.KANBAN_UNDO,
+    Permission.KANBAN_HISTORY,
+    Permission.KANBAN_METRICS,
   ],
   [UserRole.MANAGER]: [
     Permission.LEAD_CREATE,
@@ -95,6 +122,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.LEAD_EXPORT,
     Permission.STATS_VIEW,
     Permission.USER_VIEW,
+    // Kanban - Move, undo, history, metrics
+    Permission.KANBAN_VIEW,
+    Permission.KANBAN_MOVE,
+    Permission.KANBAN_UNDO,
+    Permission.KANBAN_HISTORY,
+    Permission.KANBAN_METRICS,
   ],
   [UserRole.SALES_REP]: [
     Permission.LEAD_CREATE,
@@ -102,10 +135,18 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.LEAD_UPDATE,         // Only assigned leads
     Permission.LEAD_QUALIFY,
     Permission.STATS_VIEW,
+    // Kanban - Basic move and undo
+    Permission.KANBAN_VIEW,
+    Permission.KANBAN_MOVE,
+    Permission.KANBAN_UNDO,
+    Permission.KANBAN_HISTORY,
   ],
   [UserRole.VIEWER]: [
     Permission.LEAD_READ,
     Permission.STATS_VIEW,
+    // Kanban - View only
+    Permission.KANBAN_VIEW,
+    Permission.KANBAN_HISTORY,
   ],
 };
 

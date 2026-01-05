@@ -29,6 +29,10 @@ const DYNAMIC_ROUTES = [
   '/reset-password',
   '/verify-email',
 
+  // OAuth callbacks
+  '/auth',
+  '/auth/*',
+
   // Protected app routes
   '/app',
   '/app/*',

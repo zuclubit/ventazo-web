@@ -55,43 +55,43 @@ import { cn } from '@/lib/utils';
 
 const premiumInputClasses = cn(
   'h-12 rounded-xl border-white/10 bg-white/[0.03]',
-  'text-white placeholder:text-[#7A8F8F]',
-  'focus:border-[#0EB58C]/50 focus:ring-2 focus:ring-[#0EB58C]/20',
+  'text-white placeholder:text-[var(--onboarding-text-muted)]',
+  'focus:border-[var(--tenant-primary)]/50 focus:ring-2 focus:ring-[var(--tenant-primary)]/20',
   'hover:border-white/20 transition-all duration-200'
 );
 
 const premiumSelectTriggerClasses = cn(
   'h-12 rounded-xl border-white/10 bg-white/[0.03]',
-  'text-white data-[placeholder]:text-[#7A8F8F]',
-  'focus:border-[#0EB58C]/50 focus:ring-2 focus:ring-[#0EB58C]/20',
+  'text-white data-[placeholder]:text-[var(--onboarding-text-muted)]',
+  'focus:border-[var(--tenant-primary)]/50 focus:ring-2 focus:ring-[var(--tenant-primary)]/20',
   'hover:border-white/20 transition-all duration-200'
 );
 
 const premiumSelectContentClasses = cn(
-  'rounded-xl border-white/10 bg-[#001A1A]/95 backdrop-blur-xl',
+  'rounded-xl border-white/10 bg-[var(--onboarding-bg-dark)]/95 backdrop-blur-xl',
   'shadow-[0_8px_32px_rgba(0,0,0,0.5)]'
 );
 
 const premiumSelectItemClasses = cn(
   'text-white rounded-lg cursor-pointer',
-  'focus:bg-[#0EB58C]/20 focus:text-white',
-  'data-[state=checked]:bg-[#0EB58C]/20'
+  'focus:bg-[var(--tenant-primary)]/20 focus:text-white',
+  'data-[state=checked]:bg-[var(--tenant-primary)]/20'
 );
 
-const premiumLabelClasses = 'text-[#E8ECEC] font-medium';
+const premiumLabelClasses = 'text-[var(--onboarding-text-label)] font-medium';
 
 const premiumButtonPrimary = cn(
   'h-12 rounded-xl font-semibold',
-  'bg-gradient-to-r from-[#003C3B] to-[#0EB58C]',
-  'text-white shadow-lg shadow-[#0EB58C]/25',
-  'hover:shadow-xl hover:shadow-[#0EB58C]/30 hover:scale-[1.02]',
+  'bg-gradient-to-r from-[var(--ventazo-dark)] to-[var(--tenant-primary)]',
+  'text-white shadow-lg shadow-[var(--tenant-primary)]/25',
+  'hover:shadow-xl hover:shadow-[var(--tenant-primary)]/30 hover:scale-[1.02]',
   'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100',
   'transition-all duration-200'
 );
 
 const premiumButtonGhost = cn(
   'h-12 rounded-xl font-medium',
-  'text-[#B8C4C4] hover:text-white',
+  'text-[var(--onboarding-text-secondary)] hover:text-white',
   'hover:bg-white/[0.05]',
   'transition-all duration-200'
 );
@@ -205,19 +205,19 @@ function BusinessBenefits({ type }: { type: BusinessType }) {
   return (
     <div className={cn(
       'rounded-xl p-4 animate-in fade-in-50 duration-300',
-      'bg-[#0EB58C]/10 border border-[#0EB58C]/20',
+      'bg-[var(--tenant-primary)]/10 border border-[var(--tenant-primary)]/20',
       'backdrop-blur-sm'
     )}>
       <div className="flex items-start gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0EB58C]/20">
-          <Sparkles className="h-4 w-4 text-[#0EB58C]" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--tenant-primary)]/20">
+          <Sparkles className="h-4 w-4 text-[var(--tenant-primary)]" />
         </div>
         <div className="flex-1">
           <p className="font-medium text-white">Perfecto para {typeInfo.label}:</p>
-          <ul className="mt-2 space-y-1.5 text-sm text-[#B8C4C4]">
+          <ul className="mt-2 space-y-1.5 text-sm text-[var(--onboarding-text-secondary)]">
             {benefits.map((benefit, i) => (
               <li key={i} className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#0EB58C]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--tenant-primary)]" />
                 {benefit}
               </li>
             ))}
@@ -495,7 +495,7 @@ export default function CreateBusinessPage() {
                 label={t.createBusiness.fields.phone}
                 required
                 defaultCountryCode={watchedCountry || 'MX'}
-                className="[&_label]:text-[#E8ECEC] [&_input]:h-12 [&_input]:rounded-xl [&_input]:border-white/10 [&_input]:bg-white/[0.03] [&_input]:text-white [&_input]:placeholder:text-[#7A8F8F] [&_button]:h-12 [&_button]:rounded-xl [&_button]:border-white/10 [&_button]:bg-white/[0.03] [&_button]:text-white"
+                className="[&_label]:text-[var(--onboarding-text-label)] [&_input]:h-12 [&_input]:rounded-xl [&_input]:border-white/10 [&_input]:bg-white/[0.03] [&_input]:text-white [&_input]:placeholder:text-[var(--onboarding-text-muted)] [&_button]:h-12 [&_button]:rounded-xl [&_button]:border-white/10 [&_button]:bg-white/[0.03] [&_button]:text-white"
               />
 
               {/* Country */}
@@ -504,7 +504,7 @@ export default function CreateBusinessPage() {
                 name="country"
                 label={t.createBusiness.fields.country}
                 required
-                className="[&_label]:text-[#E8ECEC] [&_button]:h-12 [&_button]:rounded-xl [&_button]:border-white/10 [&_button]:bg-white/[0.03] [&_button]:text-white [&_[role=listbox]]:bg-[#001A1A]/95 [&_[role=listbox]]:border-white/10 [&_[role=option]]:text-white"
+                className="[&_label]:text-[var(--onboarding-text-label)] [&_button]:h-12 [&_button]:rounded-xl [&_button]:border-white/10 [&_button]:bg-white/[0.03] [&_button]:text-white [&_[role=listbox]]:bg-[var(--onboarding-bg-dark)]/95 [&_[role=listbox]]:border-white/10 [&_[role=option]]:text-white"
               />
             </div>
           </form>

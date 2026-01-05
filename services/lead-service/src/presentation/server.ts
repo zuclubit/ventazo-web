@@ -1192,6 +1192,62 @@ x-tenant-id: <your-tenant-uuid>
     return { ready: true };
   });
 
+  // Warmup endpoint for edge functions and scheduled warmup jobs
+  // PERFORMANCE: Keeps database connections and caches warm
+  // See: docs/PERFORMANCE_OPTIMIZATION_PLAN_V2.md - Section 3.2
+  server.get('/warmup', {
+    schema: {
+      tags: ['health'],
+      description: 'Warmup endpoint to pre-heat database connections and caches',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            duration: { type: 'number', description: 'Warmup duration in milliseconds' },
+            timestamp: { type: 'string' },
+            pool: {
+              type: 'object',
+              properties: {
+                totalCount: { type: 'number' },
+                idleCount: { type: 'number' },
+                waitingCount: { type: 'number' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const startTime = Date.now();
+
+    try {
+      // Import pool utilities
+      const { warmupPool, getPoolStats } = await import('../infrastructure/database');
+
+      // Warm up database connections
+      await warmupPool();
+
+      // Get pool statistics
+      const poolStats = getPoolStats();
+
+      return {
+        success: true,
+        duration: Date.now() - startTime,
+        timestamp: new Date().toISOString(),
+        pool: poolStats,
+      };
+    } catch (error) {
+      request.log.error('Warmup failed:', error);
+      return {
+        success: false,
+        duration: Date.now() - startTime,
+        timestamp: new Date().toISOString(),
+        pool: { totalCount: 0, idleCount: 0, waitingCount: 0 },
+      };
+    }
+  });
+
   return server;
 }
 

@@ -20,6 +20,7 @@ import {
   Calendar,
   DollarSign,
   GripVertical,
+  Loader2,
   MoreHorizontal,
   Trophy,
   XCircle,
@@ -45,6 +46,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { touchTargets } from '@/lib/theme/tokens';
 import type { Opportunity } from '@/lib/opportunities';
 import { OpportunityProbabilityIndicator } from '../OpportunityProbabilityIndicator';
 
@@ -57,6 +59,8 @@ export interface OpportunityKanbanCardProps {
   opportunity: Opportunity;
   /** Whether the card is in a dragging overlay */
   isOverlay?: boolean;
+  /** Whether the card is being moved (API call in progress) */
+  isMoving?: boolean;
   /** Handler when card is clicked */
   onClick?: (opportunity: Opportunity) => void;
   /** Handler for edit action */
@@ -78,19 +82,19 @@ export interface OpportunityKanbanCardProps {
 const priorityConfig: Record<string, { label: string; className: string }> = {
   low: {
     label: 'Baja',
-    className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    className: 'bg-[var(--priority-low-bg)] text-[var(--priority-low)] border-[var(--priority-low-border)]',
   },
   medium: {
     label: 'Media',
-    className: 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300',
+    className: 'bg-[var(--priority-medium-bg)] text-[var(--priority-medium)] border-[var(--priority-medium-border)]',
   },
   high: {
     label: 'Alta',
-    className: 'bg-orange-100 text-orange-600 dark:bg-orange-900/50 dark:text-orange-300',
+    className: 'bg-[var(--priority-high-bg)] text-[var(--priority-high)] border-[var(--priority-high-border)]',
   },
   critical: {
     label: 'Critica',
-    className: 'bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-300',
+    className: 'bg-[var(--priority-critical-bg)] text-[var(--priority-critical)] border-[var(--priority-critical-border)]',
   },
 };
 
@@ -113,17 +117,17 @@ function getCloseDateInfo(date: Date | string | null | undefined) {
   const closeDate = typeof date === 'string' ? new Date(date) : date;
 
   if (isToday(closeDate)) {
-    return { label: 'Hoy', className: 'text-amber-600 dark:text-amber-400', isUrgent: true };
+    return { label: 'Hoy', className: 'text-[var(--urgency-today)]', isUrgent: true };
   }
 
   if (isTomorrow(closeDate)) {
-    return { label: 'Manana', className: 'text-orange-600 dark:text-orange-400', isUrgent: true };
+    return { label: 'Mañana', className: 'text-[var(--urgency-tomorrow)]', isUrgent: true };
   }
 
   if (isPast(closeDate)) {
     return {
       label: `Vencido ${formatDistanceToNow(closeDate, { addSuffix: false, locale: es })}`,
-      className: 'text-red-600 dark:text-red-400',
+      className: 'text-[var(--urgency-overdue-text)]',
       isUrgent: true,
     };
   }
@@ -142,6 +146,7 @@ function getCloseDateInfo(date: Date | string | null | undefined) {
 export function OpportunityKanbanCard({
   opportunity,
   isOverlay = false,
+  isMoving = false,
   onClick,
   onEdit,
   onWin,
@@ -170,7 +175,7 @@ export function OpportunityKanbanCard({
     transition,
   };
 
-  const defaultPriority = { label: 'Media', className: 'bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300' };
+  const defaultPriority = { label: 'Media', className: 'bg-[var(--priority-medium-bg)] text-[var(--priority-medium)] border-[var(--priority-medium-border)]' };
   const priority = priorityConfig[opportunity.priority] ?? defaultPriority;
   const closeDateInfo = getCloseDateInfo(opportunity.expectedCloseDate);
   const isOpen = opportunity.status === 'open';
@@ -217,10 +222,20 @@ export function OpportunityKanbanCard({
         'active:cursor-grabbing',
         isDragging && 'opacity-50 shadow-lg ring-2 ring-primary/30',
         isOverlay && 'shadow-xl rotate-3',
+        isMoving && 'opacity-70 pointer-events-none ring-2 ring-[var(--action-send)]/50',
         className
       )}
       onClick={handleClick}
     >
+      {/* Moving indicator overlay */}
+      {isMoving && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/50 backdrop-blur-[1px] z-10">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--action-send-bg)] text-[var(--action-send)]">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-xs font-medium">Moviendo...</span>
+          </div>
+        </div>
+      )}
       {/* Drag Handle + Header */}
       <div className="flex items-start gap-2 mb-3">
         {/* Drag Handle */}
@@ -247,27 +262,30 @@ export function OpportunityKanbanCard({
           </p>
         </div>
 
-        {/* Actions Menu */}
+        {/* Actions Menu - Touch-friendly */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <Button
               variant="ghost"
               size="icon"
               className={cn(
-                'h-7 w-7 rounded-full',
-                'opacity-0 group-hover:opacity-100',
+                touchTargets.iconButton, // WCAG compliant sizing
+                'rounded-full',
+                // Always visible on mobile (no hover), fade in on desktop
+                'opacity-100 sm:opacity-0 sm:group-hover:opacity-100',
                 'transition-opacity'
               )}
             >
               <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">Opciones</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onClick={(e) => handleAction('view', e)}>
+          <DropdownMenuContent align="end" className="w-48 sm:w-44">
+            <DropdownMenuItem onClick={(e) => handleAction('view', e)} className={touchTargets.comfortable}>
               <Eye className="mr-2 h-4 w-4" />
               Ver detalles
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => handleAction('edit', e)}>
+            <DropdownMenuItem onClick={(e) => handleAction('edit', e)} className={touchTargets.comfortable}>
               <Edit2 className="mr-2 h-4 w-4" />
               Editar
             </DropdownMenuItem>
@@ -275,14 +293,20 @@ export function OpportunityKanbanCard({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className="text-emerald-600 focus:text-emerald-600"
+                  className={cn(
+                    'text-[var(--action-win)] focus:text-[var(--action-win)]',
+                    touchTargets.comfortable
+                  )}
                   onClick={(e) => handleAction('win', e)}
                 >
                   <Trophy className="mr-2 h-4 w-4" />
                   Marcar Ganada
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="text-red-600 focus:text-red-600"
+                  className={cn(
+                    'text-[var(--action-lost)] focus:text-[var(--action-lost)]',
+                    touchTargets.comfortable
+                  )}
                   onClick={(e) => handleAction('lost', e)}
                 >
                   <XCircle className="mr-2 h-4 w-4" />
@@ -297,7 +321,7 @@ export function OpportunityKanbanCard({
       {/* Amount & Probability Row */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
-          <DollarSign className="h-4 w-4 text-emerald-500" />
+          <DollarSign className="h-4 w-4 text-[var(--action-accept)]" />
           <span className="font-bold text-sm">
             {formatCurrency(opportunity.amount, opportunity.currency)}
           </span>

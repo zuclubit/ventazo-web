@@ -91,6 +91,10 @@ export enum MessageTemplate {
   DRIP_ENROLLED = 'drip-enrolled',
   DRIP_COMPLETED = 'drip-completed',
 
+  // Comment/Mention Templates
+  COMMENT_MENTION = 'comment-mention',
+  COMMENT_GROUP_MENTION = 'comment-group-mention',
+
   // General Templates
   OTP_VERIFICATION = 'otp-verification',
   CUSTOM = 'custom',
@@ -647,6 +651,22 @@ export const MESSAGE_TEMPLATES: Record<MessageTemplate, MessageTemplateDefinitio
     channel: 'sms',
     smsBody: '{{contactName}} completo secuencia "{{sequenceName}}". Listo para venta!',
     whatsAppBody: '🎯 *Lead Maduro!*\n\n*{{contactName}}* completo la secuencia *{{sequenceName}}*.\n\n*Engagement:*\nEmails abiertos: {{opensCount}}\nClicks: {{clicksCount}}\n\n¡Es momento de contactar!\n\n👉 {{actionUrl}}',
+    maxLength: 160,
+  },
+
+  // Comment/Mention Templates
+  [MessageTemplate.COMMENT_MENTION]: {
+    template: MessageTemplate.COMMENT_MENTION,
+    channel: 'sms',
+    smsBody: '{{mentionedBy}} te menciono en un comentario. Ver: {{actionUrl}}',
+    whatsAppBody: '💬 *Te Mencionaron*\n\n*{{mentionedBy}}* te menciono en un comentario:\n\n"{{commentPreview}}"\n\nEn: {{entityType}} - {{entityName}}\n\n👉 {{actionUrl}}',
+    maxLength: 160,
+  },
+  [MessageTemplate.COMMENT_GROUP_MENTION]: {
+    template: MessageTemplate.COMMENT_GROUP_MENTION,
+    channel: 'sms',
+    smsBody: '{{mentionedBy}} menciono a @{{groupName}}. Ver: {{actionUrl}}',
+    whatsAppBody: '💬 *Mencion de Grupo*\n\n*{{mentionedBy}}* menciono al grupo *@{{groupName}}*:\n\n"{{commentPreview}}"\n\nEn: {{entityType}} - {{entityName}}\n\n👉 {{actionUrl}}',
     maxLength: 160,
   },
 };

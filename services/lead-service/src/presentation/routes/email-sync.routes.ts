@@ -82,6 +82,64 @@ export async function emailSyncRoutes(fastify: FastifyInstance): Promise<void> {
   const emailSyncService = container.resolve<EmailSyncService>('EmailSyncService');
 
   /**
+   * Get email stats (unread count, folder stats, etc.)
+   * GET /api/v1/email-sync/stats
+   */
+  fastify.get(
+    '/stats',
+    async (
+      request: FastifyRequest,
+      reply: FastifyReply
+    ) => {
+      const tenantId = request.headers['x-tenant-id'] as string;
+
+      if (!tenantId) {
+        return reply.status(401).send({
+          error: 'Unauthorized',
+          message: 'Missing tenant identification',
+        });
+      }
+
+      try {
+        // Get accounts to check if any are connected
+        const accountsResult = await emailSyncService.listAccounts(tenantId);
+        const accounts = accountsResult.isSuccess ? (accountsResult.value || []) : [];
+
+        // Get email counts per folder
+        const inboxResult = await emailSyncService.listEmails(tenantId, { folder: 'INBOX', limit: 0 });
+        const sentResult = await emailSyncService.listEmails(tenantId, { folder: 'SENT', limit: 0 });
+        const draftResult = await emailSyncService.listEmails(tenantId, { folder: 'DRAFT', limit: 0 });
+        const unreadResult = await emailSyncService.listEmails(tenantId, { isRead: false, limit: 0 });
+
+        const stats = {
+          totalAccounts: accounts.length,
+          hasConnectedAccounts: accounts.length > 0,
+          unreadCount: unreadResult.isSuccess ? (unreadResult.value?.total || 0) : 0,
+          totalEmails: inboxResult.isSuccess ? (inboxResult.value?.total || 0) : 0,
+          folderStats: [
+            { folder: 'inbox', total: inboxResult.isSuccess ? (inboxResult.value?.total || 0) : 0, unread: unreadResult.isSuccess ? (unreadResult.value?.total || 0) : 0 },
+            { folder: 'sent', total: sentResult.isSuccess ? (sentResult.value?.total || 0) : 0, unread: 0 },
+            { folder: 'drafts', total: draftResult.isSuccess ? (draftResult.value?.total || 0) : 0, unread: 0 },
+            { folder: 'trash', total: 0, unread: 0 },
+            { folder: 'spam', total: 0, unread: 0 },
+          ],
+          lastSyncAt: accounts.length > 0 ? accounts[0].lastSyncAt : null,
+        };
+
+        return reply.status(200).send({
+          success: true,
+          data: stats,
+        });
+      } catch (error) {
+        return reply.status(500).send({
+          error: 'Internal Error',
+          message: error instanceof Error ? error.message : 'Failed to get email stats',
+        });
+      }
+    }
+  );
+
+  /**
    * Get OAuth authorization URL
    * GET /api/v1/email-sync/auth/url
    */
@@ -162,6 +220,11 @@ export async function emailSyncRoutes(fastify: FastifyInstance): Promise<void> {
           message: result.error || 'Failed to connect email account',
         });
       }
+
+      // Auto-start initial sync in the background
+      emailSyncService.syncAccount(result.value.id, tenantId).catch((syncError) => {
+        console.error('[EmailSync] Auto-sync failed after connect:', syncError);
+      });
 
       return reply.status(201).send({
         success: true,

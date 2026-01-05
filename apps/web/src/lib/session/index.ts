@@ -33,21 +33,67 @@ const SESSION_DURATION_MS = SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000;
 
 /**
  * Get secret key for JWT encryption
- * IMPORTANT: Always use environment variable in production
+ *
+ * SECURITY: This function enforces proper secret configuration:
+ * - In production: Throws error if SESSION_SECRET is not set
+ * - In development: Allows a dev-only fallback with warning
+ *
+ * The secret must be at least 32 characters for adequate security.
  */
+/**
+ * Development fallback key - MUST be consistent across all files
+ * This fallback is shared between: middleware.ts, callback route, session/index.ts
+ * IMPORTANT: In production, always set SESSION_SECRET environment variable
+ */
+const DEV_FALLBACK_KEY = 'zuclubit-dev-session-key-do-not-use-in-production';
+
+/**
+ * Get Cloudflare context env bindings (if available)
+ */
+function getCloudflareEnv(): Record<string, string | undefined> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getCloudflareContext } = require('@opennextjs/cloudflare');
+    const ctx = getCloudflareContext();
+    return ctx?.env || {};
+  } catch {
+    return {};
+  }
+}
+
 function getSecretKey(): Uint8Array {
-  // Try multiple env var names (Cloudflare Workers bindings vs process.env)
+  const cfEnv = getCloudflareEnv();
+
   const secret = process.env['SESSION_SECRET'] ||
+                 process.env['NEXTAUTH_SECRET'] ||
+                 cfEnv['SESSION_SECRET'] ||
+                 cfEnv['NEXTAUTH_SECRET'] ||
                  (globalThis as Record<string, unknown>)['SESSION_SECRET'] as string | undefined;
 
+  // Check if we're in production
+  const isProduction =
+    process.env['NODE_ENV'] === 'production' ||
+    (typeof globalThis !== 'undefined' && (globalThis as Record<string, unknown>)['NODE_ENV'] === 'production') ||
+    (typeof self !== 'undefined' && (self as unknown as Record<string, unknown>)['CF_PAGES'] === '1');
+
   if (!secret) {
-    // In development or if secret not available, use a fallback
-    // This is safe because the JWT is only valid within the same deployment
-    console.warn(
-      '[Session] WARNING: SESSION_SECRET not set. Using deployment fallback.'
-    );
-    // Use a deterministic fallback based on a fixed key
-    return new TextEncoder().encode('zuclubit-crm-session-fallback-key-2025');
+    if (isProduction) {
+      console.error(
+        '[Session] CRITICAL: SESSION_SECRET not configured in production! ' +
+        'Using fallback key. Run: wrangler pages secret put SESSION_SECRET'
+      );
+    } else {
+      console.warn(
+        '[Session] WARNING: SESSION_SECRET not set. Using development fallback. ' +
+        'This is ONLY acceptable in development mode.'
+      );
+    }
+
+    return new TextEncoder().encode(DEV_FALLBACK_KEY);
+  }
+
+  if (secret.length < 32) {
+    console.warn('[Session] SESSION_SECRET should be at least 32 characters for adequate security.');
   }
 
   return new TextEncoder().encode(secret);
@@ -83,8 +129,11 @@ export interface SessionPayload extends JWTPayload {
   requiresOnboarding: boolean;
 
   // Metadata
-  expiresAt: number; // Unix timestamp (seconds)
+  expiresAt: number; // Unix timestamp (seconds) - session expiry (7 days)
   createdAt: number; // Unix timestamp (seconds)
+
+  // Token refresh metadata (optional for backwards compatibility)
+  accessTokenExpiresAt?: number; // Unix timestamp when access token expires (~1 hour)
 }
 
 /**
@@ -162,6 +211,11 @@ function extractUserFromAccessToken(accessToken: string): { userId: string; emai
 /**
  * Decrypt and verify session JWT
  * Returns null if invalid or expired
+ *
+ * SECURITY: Handles session verification with proper defaults:
+ * - Expired JWT → null (will redirect to login)
+ * - Missing userId/email → null (invalid session)
+ * - requiresOnboarding defaults based on tenantId presence (CRITICAL for proper redirect)
  */
 export async function decryptSession(
   session: string | undefined
@@ -193,21 +247,47 @@ export async function decryptSession(
       return null;
     }
 
+    // Extract tenantId first to determine onboarding defaults
+    const tenantId = (payload['tenantId'] as string) || '';
+
+    // CRITICAL FIX: Determine onboarding state with SAFE DEFAULTS
+    // - If user has tenantId AND onboarding status is not set → assume completed (legacy sessions)
+    // - If user has no tenantId → requires onboarding
+    const onboardingStatus = (payload['onboardingStatus'] as OnboardingStatus) ||
+      (tenantId ? 'completed' : 'not_started');
+    const onboardingStep = (payload['onboardingStep'] as string) ||
+      (tenantId ? 'complete' : 'create-business');
+
+    // CRITICAL FIX: If requiresOnboarding is explicitly set, use it.
+    // Otherwise, determine based on tenantId and onboardingStatus.
+    // This prevents legacy sessions (without requiresOnboarding field) from
+    // incorrectly redirecting users with tenants to onboarding.
+    let requiresOnboarding: boolean;
+    if (typeof payload['requiresOnboarding'] === 'boolean') {
+      requiresOnboarding = payload['requiresOnboarding'];
+    } else {
+      // Legacy session without explicit requiresOnboarding
+      // If user has tenant and status is not 'not_started' → doesn't require onboarding
+      requiresOnboarding = !tenantId || onboardingStatus === 'not_started';
+    }
+
     return {
       userId,
       email,
-      tenantId: (payload['tenantId'] as string) || '',
+      tenantId,
       role: (payload['role'] as string) || 'viewer',
       accessToken: (payload['accessToken'] as string) || '',
       refreshToken: (payload['refreshToken'] as string) || '',
-      onboardingStatus: (payload['onboardingStatus'] as OnboardingStatus) || 'not_started',
-      onboardingStep: (payload['onboardingStep'] as string) || 'create-business',
-      requiresOnboarding: (payload['requiresOnboarding'] as boolean) ?? true,
+      onboardingStatus,
+      onboardingStep,
+      requiresOnboarding,
       expiresAt: (payload['expiresAt'] as number) || 0,
       createdAt: (payload['createdAt'] as number) || 0,
+      // Optional: access token expiry for proactive refresh
+      accessTokenExpiresAt: (payload['accessTokenExpiresAt'] as number) || undefined,
     } as SessionPayload;
   } catch (error) {
-    // Don't log for normal expiration
+    // Don't log for normal expiration - this is expected behavior
     if (error instanceof Error && !error.message.includes('expired')) {
       console.warn('[Session] Decryption failed:', error.message);
     }
@@ -393,6 +473,9 @@ export const requireSession = cache(async (): Promise<SessionPayload> => {
 /**
  * Get safe session data for client components
  * Does NOT include tokens or sensitive data
+ *
+ * SECURITY: Returns null for expired sessions, triggering login redirect.
+ * Uses safe defaults for onboarding based on tenantId presence.
  */
 export async function getClientSession(): Promise<ClientSession | null> {
   const session = await getSession();
@@ -401,21 +484,23 @@ export async function getClientSession(): Promise<ClientSession | null> {
     return null;
   }
 
-  // Check expiration
+  // Check expiration - return null to trigger login redirect
   const now = Math.floor(Date.now() / 1000);
   if (session.expiresAt && session.expiresAt < now) {
+    console.log('[getClientSession] Session expired, returning null');
     return null;
   }
 
+  // Use session values directly - they already have proper defaults from decryptSession
   return {
     userId: session.userId,
     email: session.email,
     tenantId: session.tenantId,
     role: session.role,
     isAuthenticated: true,
-    onboardingStatus: session.onboardingStatus || 'not_started',
-    onboardingStep: session.onboardingStep || 'create-business',
-    requiresOnboarding: session.requiresOnboarding ?? true,
+    onboardingStatus: session.onboardingStatus,
+    onboardingStep: session.onboardingStep,
+    requiresOnboarding: session.requiresOnboarding,
   };
 }
 

@@ -1,5 +1,5 @@
 /**
- * useTenantBranding Hook - v2.0
+ * useTenantBranding Hook - v2.1
  *
  * Enterprise-grade dynamic tenant branding system.
  * Provides secure, validated, and optimized branding configuration.
@@ -11,6 +11,11 @@
  * - Multi-device responsive (CSS variables)
  * - WCAG 2.1 AA color contrast aware
  * - Unified CSS variable system (--tenant-* and --sidebar-*)
+ *
+ * v2.1 Changes (Design System Audit 2026):
+ * - Consolidated color utilities to use @/lib/theme/color-utils
+ * - Removed duplicate hexToHsl, hexToRgb, hexToRgba implementations
+ * - Kept branding-specific functions: generateAccentColor, generateSurfaceColor, generateDarkModeColor
  *
  * @module hooks/use-tenant-branding
  */
@@ -28,6 +33,16 @@ import {
   sanitizeHexColor,
   sanitizeAssetUrl,
 } from '@/lib/auth';
+
+// Import consolidated color utilities (Design System Audit 2026)
+import {
+  hexToHsl as hexToHslCore,
+  hexToRgb as hexToRgbCore,
+  hexToRgba as hexToRgbaCore,
+  getOptimalForeground as getOptimalForegroundCore,
+  lighten,
+  darken,
+} from '@/lib/theme/color-utils';
 
 // ============================================
 // Constants
@@ -176,152 +191,64 @@ export type TenantBranding = ComputedBranding;
 export type BrandingPlanTier = PlanTier;
 
 // ============================================
-// Color Utilities (Pure Functions)
+// Color Utilities (Consolidated - Design System Audit 2026)
 // ============================================
 
+// Core utilities imported from @/lib/theme/color-utils:
+// - hexToHslCore: Convert hex to HSL
+// - hexToRgbCore: Convert hex to RGB
+// - hexToRgbaCore: Convert hex to RGBA string
+// - getOptimalForegroundCore: WCAG-compliant foreground color
+// - lighten: Lighten hex color by percentage
+// - darken: Darken hex color by percentage
+
 /**
- * Convert hex color to HSL values
- * Uses optimized algorithm without regex in hot path
+ * Wrapper for hexToHsl with Ventazo fallback
+ * @param hex - Hex color string
+ * @returns HSL object with h, s, l values
  */
 function hexToHsl(hex: string): { h: number; s: number; l: number } {
-  // Remove # and parse
-  const cleanHex = hex.startsWith('#') ? hex.slice(1) : hex;
-
-  // Handle shorthand (#RGB)
-  const fullHex = cleanHex.length === 3
-    ? cleanHex.split('').map(c => c + c).join('')
-    : cleanHex;
-
-  if (fullHex.length !== 6) {
-    return { h: 160, s: 85, l: 39 }; // Fallback to Ventazo primary
+  const result = hexToHslCore(hex);
+  // Fallback to Ventazo primary if invalid
+  if (!result || (result.h === 0 && result.s === 0 && result.l === 0 && hex !== '#000000')) {
+    return { h: 160, s: 85, l: 39 };
   }
+  return result;
+}
 
-  const r = parseInt(fullHex.slice(0, 2), 16) / 255;
-  const g = parseInt(fullHex.slice(2, 4), 16) / 255;
-  const b = parseInt(fullHex.slice(4, 6), 16) / 255;
-
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-
-  if (max === min) {
-    return { h: 0, s: 0, l: Math.round(l * 100) };
-  }
-
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-
-  let h = 0;
-  switch (max) {
-    case r:
-      h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-      break;
-    case g:
-      h = ((b - r) / d + 2) / 6;
-      break;
-    case b:
-      h = ((r - g) / d + 4) / 6;
-      break;
-  }
-
-  return {
-    h: Math.round(h * 360),
-    s: Math.round(s * 100),
-    l: Math.round(l * 100),
-  };
+/**
+ * Wrapper for getOptimalForeground
+ * Uses WCAG luminance formula for contrast
+ */
+function getOptimalForeground(hex: string): string {
+  return getOptimalForegroundCore(hex);
 }
 
 /**
  * Generate accent color from primary (lighter, more saturated)
+ * Branding-specific: creates a highlight color from primary
  */
 function generateAccentColor(primaryHex: string): string {
   const hsl = hexToHsl(primaryHex);
-  // Create a lighter, more vibrant version
   return `hsl(${hsl.h}, ${Math.min(hsl.s + 15, 100)}%, ${Math.min(hsl.l + 25, 85)}%)`;
 }
 
 /**
  * Generate surface color from sidebar (slightly darker)
+ * Branding-specific: creates card/dropdown background from sidebar
  */
 function generateSurfaceColor(sidebarHex: string): string {
   const hsl = hexToHsl(sidebarHex);
-  // Create a slightly darker version for surfaces
   return `hsl(${hsl.h}, ${hsl.s}%, ${Math.max(hsl.l - 5, 5)}%)`;
 }
 
 /**
  * Generate dark mode variant (lighter for visibility)
+ * Branding-specific: creates accessible dark mode color
  */
 function generateDarkModeColor(hex: string): string {
   const hsl = hexToHsl(hex);
   return `hsl(${hsl.h}, ${hsl.s}%, ${Math.min(hsl.l + 10, 70)}%)`;
-}
-
-/**
- * Convert hex color to RGB values
- */
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const cleanHex = hex.startsWith('#') ? hex.slice(1) : hex;
-  const fullHex = cleanHex.length === 3
-    ? cleanHex.split('').map(c => c + c).join('')
-    : cleanHex;
-
-  return {
-    r: parseInt(fullHex.slice(0, 2), 16),
-    g: parseInt(fullHex.slice(2, 4), 16),
-    b: parseInt(fullHex.slice(4, 6), 16),
-  };
-}
-
-/**
- * Generate RGBA string from hex and alpha
- */
-function hexToRgba(hex: string, alpha: number): string {
-  const { r, g, b } = hexToRgb(hex);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-/**
- * Calculate optimal foreground color for WCAG contrast
- * Uses relative luminance to determine black or white text
- */
-function getOptimalForeground(hex: string): string {
-  const { r, g, b } = hexToRgb(hex);
-
-  // Calculate relative luminance (WCAG formula)
-  const toLinear = (c: number) => {
-    const sRGB = c / 255;
-    return sRGB <= 0.03928 ? sRGB / 12.92 : Math.pow((sRGB + 0.055) / 1.055, 2.4);
-  };
-
-  const luminance = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-
-  // Return white for dark backgrounds, dark for light backgrounds
-  return luminance > 0.179 ? '#1C1C1E' : '#FFFFFF';
-}
-
-/**
- * Darken a hex color by percentage
- */
-function darkenColor(hex: string, percent: number): string {
-  const { r, g, b } = hexToRgb(hex);
-  const factor = 1 - percent / 100;
-  const newR = Math.round(r * factor);
-  const newG = Math.round(g * factor);
-  const newB = Math.round(b * factor);
-  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
-}
-
-/**
- * Lighten a hex color by percentage
- */
-function lightenColor(hex: string, percent: number): string {
-  const { r, g, b } = hexToRgb(hex);
-  const factor = percent / 100;
-  const newR = Math.round(r + (255 - r) * factor);
-  const newG = Math.round(g + (255 - g) * factor);
-  const newB = Math.round(b + (255 - b) * factor);
-  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
 }
 
 // ============================================
@@ -553,15 +480,32 @@ export function useTenantBranding(): ComputedBranding {
     }
 
     // Handle sidebar color (new) or secondary color (legacy)
-    const sidebarValue = storeSettings.primaryColor ? undefined : storeSettings.secondaryColor;
-    if (sidebarValue && isValidHexColor(sidebarValue)) {
-      const sanitized = sanitizeHexColor(sidebarValue, branding.sidebarColor);
+    const sidebarFromStore = storeSettings.sidebarColor || storeSettings.secondaryColor;
+    if (sidebarFromStore && isValidHexColor(sidebarFromStore)) {
+      const sanitized = sanitizeHexColor(sidebarFromStore, branding.sidebarColor);
       branding = {
         ...branding,
         sidebarColor: sanitized,
         secondaryColor: sanitized,
         sidebarColorDark: generateDarkModeColor(sanitized),
-        surfaceColor: generateSurfaceColor(sanitized),
+      };
+      hasCustomBranding = true;
+    }
+
+    // Handle accent color from store
+    if (storeSettings.accentColor && isValidHexColor(storeSettings.accentColor)) {
+      branding = {
+        ...branding,
+        accentColor: sanitizeHexColor(storeSettings.accentColor, branding.accentColor),
+      };
+      hasCustomBranding = true;
+    }
+
+    // Handle surface color from store
+    if (storeSettings.surfaceColor && isValidHexColor(storeSettings.surfaceColor)) {
+      branding = {
+        ...branding,
+        surfaceColor: sanitizeHexColor(storeSettings.surfaceColor, branding.surfaceColor),
       };
       hasCustomBranding = true;
     }
@@ -619,116 +563,23 @@ export function useBrandingColors(): BrandingColors {
 // ============================================
 
 /**
- * Apply branding as CSS custom properties to document root
+ * @deprecated CSS variables are now managed by TenantThemeProvider
  *
- * Features:
- * - Optimized to avoid unnecessary DOM updates
- * - Automatic cleanup on unmount
- * - SSR-safe (checks for document)
- * - Batch updates for performance
+ * This hook is kept for backward compatibility but no longer applies
+ * CSS variables. TenantThemeProvider is the single source of truth for:
+ * - Tenant semantic colors (--tenant-*)
+ * - Legacy brand colors (--brand-*)
+ * - Sidebar UI colors (--sidebar-*)
+ * - HSL components (--brand-*-h/s/l)
+ *
+ * The inline script in layout.tsx handles FOUC prevention by reading
+ * from localStorage before React hydrates.
+ *
+ * @see TenantThemeProvider in @/lib/theme/tenant-theme-provider.tsx
  */
 export function useBrandingCSSVars(): void {
-  const branding = useTenantBranding();
-
-  // Use ref to track previous values and avoid unnecessary updates
-  const prevBrandingRef = React.useRef<ComputedBranding | null>(null);
-
-  React.useEffect(() => {
-    if (typeof document === 'undefined') return;
-
-    const root = document.documentElement;
-    const prev = prevBrandingRef.current;
-
-    // Check if update is necessary (using 4-color semantic system)
-    const needsUpdate = !prev ||
-      prev.sidebarColor !== branding.sidebarColor ||
-      prev.primaryColor !== branding.primaryColor ||
-      prev.accentColor !== branding.accentColor ||
-      prev.surfaceColor !== branding.surfaceColor;
-
-    if (!needsUpdate) return;
-
-    // Batch DOM updates with all CSS variables
-    requestAnimationFrame(() => {
-      // ============================================
-      // Tenant semantic colors (primary system)
-      // ============================================
-      root.style.setProperty(CSS_VARS.TENANT_PRIMARY, branding.primaryColor);
-      root.style.setProperty(CSS_VARS.TENANT_ACCENT, branding.accentColor);
-      root.style.setProperty(CSS_VARS.TENANT_SIDEBAR, branding.sidebarColor);
-      root.style.setProperty(CSS_VARS.TENANT_SURFACE, branding.surfaceColor);
-      root.style.setProperty(CSS_VARS.TENANT_PRIMARY_FOREGROUND, branding.primaryForeground);
-      root.style.setProperty(CSS_VARS.TENANT_ACCENT_FOREGROUND, branding.accentForeground);
-
-      // Tenant color variations
-      root.style.setProperty(CSS_VARS.TENANT_PRIMARY_HOVER, darkenColor(branding.primaryColor, 10));
-      root.style.setProperty(CSS_VARS.TENANT_PRIMARY_LIGHT, lightenColor(branding.primaryColor, 35));
-      root.style.setProperty(CSS_VARS.TENANT_PRIMARY_LIGHTER, lightenColor(branding.primaryColor, 45));
-      root.style.setProperty(CSS_VARS.TENANT_PRIMARY_GLOW, `${branding.primaryColor}40`);
-      root.style.setProperty(CSS_VARS.TENANT_ACCENT_HOVER, darkenColor(branding.accentColor, 10));
-      root.style.setProperty(CSS_VARS.TENANT_ACCENT_LIGHT, lightenColor(branding.accentColor, 35));
-      root.style.setProperty(CSS_VARS.TENANT_ACCENT_GLOW, `${branding.accentColor}40`);
-      root.style.setProperty(CSS_VARS.TENANT_SURFACE_LIGHT, lightenColor(branding.surfaceColor, 5));
-      root.style.setProperty(CSS_VARS.TENANT_SURFACE_BORDER, lightenColor(branding.surfaceColor, 15));
-
-      // ============================================
-      // Legacy brand colors (backward compatibility)
-      // ============================================
-      root.style.setProperty(CSS_VARS.BRAND_SIDEBAR, branding.sidebarColor);
-      root.style.setProperty(CSS_VARS.BRAND_PRIMARY, branding.primaryColor);
-      root.style.setProperty(CSS_VARS.BRAND_ACCENT, branding.accentColor);
-      root.style.setProperty(CSS_VARS.BRAND_SURFACE, branding.surfaceColor);
-      root.style.setProperty(CSS_VARS.BRAND_SECONDARY, branding.sidebarColor);
-
-      // HSL components for primary color
-      root.style.setProperty(CSS_VARS.PRIMARY_H, String(branding.hsl.h));
-      root.style.setProperty(CSS_VARS.PRIMARY_S, `${branding.hsl.s}%`);
-      root.style.setProperty(CSS_VARS.PRIMARY_L, `${branding.hsl.l}%`);
-      // HSL components for sidebar color
-      root.style.setProperty(CSS_VARS.SIDEBAR_H, String(branding.sidebarHsl.h));
-      root.style.setProperty(CSS_VARS.SIDEBAR_S, `${branding.sidebarHsl.s}%`);
-      root.style.setProperty(CSS_VARS.SIDEBAR_L, `${branding.sidebarHsl.l}%`);
-
-      // ============================================
-      // Sidebar UI colors (derived from branding)
-      // ============================================
-      // Glass background using sidebarColor with high opacity
-      root.style.setProperty(
-        CSS_VARS.SIDEBAR_GLASS_BG,
-        hexToRgba(branding.sidebarColor, 0.95)
-      );
-      // Text colors
-      root.style.setProperty(CSS_VARS.SIDEBAR_TEXT_PRIMARY, '#FFFFFF');
-      root.style.setProperty(CSS_VARS.SIDEBAR_TEXT_SECONDARY, '#E5E5E5');
-      root.style.setProperty(CSS_VARS.SIDEBAR_TEXT_MUTED, '#94A3AB');
-      root.style.setProperty(CSS_VARS.SIDEBAR_TEXT_ACCENT, branding.accentColor);
-      // Active background using primary color with transparency
-      root.style.setProperty(
-        CSS_VARS.SIDEBAR_ACTIVE_BG,
-        hexToRgba(branding.primaryColor, 0.18)
-      );
-      // Active border using primary color
-      root.style.setProperty(CSS_VARS.SIDEBAR_ACTIVE_BORDER, branding.primaryColor);
-      // Hover background
-      root.style.setProperty(CSS_VARS.SIDEBAR_HOVER_BG, 'rgba(255, 255, 255, 0.08)');
-      // Divider color
-      root.style.setProperty(CSS_VARS.SIDEBAR_DIVIDER, 'rgba(255, 255, 255, 0.06)');
-      // Active item shadow using primary color
-      root.style.setProperty(
-        CSS_VARS.SIDEBAR_ITEM_SHADOW_ACTIVE,
-        `0 4px 12px -2px ${hexToRgba(branding.primaryColor, 0.3)}`
-      );
-    });
-
-    prevBrandingRef.current = branding;
-
-    // Cleanup on unmount
-    return () => {
-      Object.values(CSS_VARS).forEach((varName) => {
-        root.style.removeProperty(varName);
-      });
-    };
-  }, [branding]);
+  // No-op: CSS variables are now managed by TenantThemeProvider
+  // Keeping this function for backward compatibility with existing imports
 }
 
 // ============================================

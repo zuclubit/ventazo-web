@@ -142,14 +142,22 @@ export async function refreshAccessToken(): Promise<AuthTokens | null> {
 
 /**
  * Get a valid access token, refreshing if necessary
+ *
+ * NOTE: With the new BFF architecture, client-side code should NOT call
+ * this function directly. All API calls should go through the api-client
+ * which uses the /api/proxy endpoint. The proxy handles authentication
+ * server-side using the httpOnly session cookie.
+ *
+ * This function is kept for backwards compatibility with legacy code
+ * and for server-side operations that need direct token access.
  */
 export async function getValidAccessToken(): Promise<string | null> {
-  // If token is valid, return it
+  // If token is valid in memory, return it
   if (hasValidTokens()) {
     return accessToken;
   }
 
-  // Try to refresh
+  // Try to refresh if we have a refresh token
   const tokens = await refreshAccessToken();
   return tokens?.accessToken ?? null;
 }

@@ -10,7 +10,7 @@
  * - Dynamic tenant branding colors
  * - Glassmorphism styling
  * - Mobile sidebar trigger (via context)
- * - Search with glass styling
+ * - Global search with Cmd+K shortcut
  * - Notifications dropdown
  * - User profile menu
  * - Responsive design
@@ -22,7 +22,7 @@ import * as React from 'react';
 
 import Link from 'next/link';
 
-import { Bell, LogOut, Search, Settings, User, Users } from 'lucide-react';
+import { Bell, Command, LogOut, Search, Settings, User, Users } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -35,11 +35,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useTenantBranding } from '@/hooks/use-tenant-branding';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useUserManagement } from '@/lib/users';
+import { GlobalSearchDialog } from '@/components/search';
 
 // ============================================
 // Types
@@ -57,6 +57,20 @@ export function Navbar({ className }: NavbarProps) {
   const branding = useTenantBranding();
   const { user, logout } = useAuth();
   const { profile } = useUserManagement();
+  const [searchOpen, setSearchOpen] = React.useState(false);
+
+  // Global keyboard shortcut for search (Cmd+K / Ctrl+K)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Get user initials for avatar fallback
   const getInitials = () => {
@@ -87,21 +101,35 @@ export function Navbar({ className }: NavbarProps) {
       style={accentStyle}
       role="banner"
     >
-      {/* Search - Glass styling with dynamic accent */}
+      {/* Search Button - Opens GlobalSearchDialog */}
       <div className="flex flex-1 items-center gap-2">
-        <div className="relative w-full max-w-sm">
-          <Search
-            aria-hidden="true"
-            className="absolute left-3 top-2.5 h-4 w-4 text-[var(--sidebar-text-muted)]"
-          />
-          <Input
-            aria-label="Buscar leads, clientes..."
-            className="w-full pl-9 glass-input text-white placeholder:text-[var(--sidebar-text-muted)] focus-visible:ring-2 focus-visible:ring-[var(--sidebar-text-accent)]"
-            placeholder="Buscar leads, clientes..."
-            type="search"
-          />
-        </div>
+        <button
+          onClick={() => setSearchOpen(true)}
+          className={cn(
+            'flex items-center gap-2 w-full max-w-[clamp(200px,40vw,384px)] px-3 py-2 rounded-xl',
+            'glass-input text-[var(--sidebar-text-muted)]',
+            'hover:text-[var(--sidebar-text-secondary)] hover:border-[var(--sidebar-text-accent)]/30',
+            'transition-all duration-200 cursor-pointer'
+          )}
+          aria-label="Abrir busqueda global"
+        >
+          <Search className="h-4 w-4 flex-shrink-0" />
+          <span className="flex-1 text-left text-sm hidden sm:block">
+            Buscar leads, clientes...
+          </span>
+          <span className="text-sm sm:hidden">Buscar...</span>
+          <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-white/10 rounded border border-white/20">
+            <Command className="h-3 w-3" />K
+          </kbd>
+        </button>
       </div>
+
+      {/* Global Search Dialog */}
+      <GlobalSearchDialog
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        locale="es"
+      />
 
       {/* Right side actions */}
       <div className="flex items-center gap-2">
@@ -125,7 +153,7 @@ export function Navbar({ className }: NavbarProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-80 bg-[var(--sidebar-glass-bg)] backdrop-blur-xl border-white/10"
+            className="w-[calc(100vw-2rem)] sm:w-80 max-w-[320px] bg-[var(--sidebar-glass-bg)] backdrop-blur-xl border-white/10"
           >
             <DropdownMenuLabel className="text-white">
               Notificaciones
@@ -188,7 +216,7 @@ export function Navbar({ className }: NavbarProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-56 bg-[var(--sidebar-glass-bg)] backdrop-blur-xl border-white/10"
+            className="w-[calc(100vw-2rem)] sm:w-56 max-w-[224px] bg-[var(--sidebar-glass-bg)] backdrop-blur-xl border-white/10"
           >
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">

@@ -2,7 +2,7 @@
  * Logo Upload API Route
  *
  * Secure logo upload endpoint with:
- * - Authentication via Bearer token (Supabase JWT) - PRIORITY
+ * - Authentication via Bearer token (Native JWT) - PRIORITY
  * - Fallback to app session cookie (zcrm_session)
  * - File type validation (magic bytes)
  * - Virus/malware scanning
@@ -10,8 +10,7 @@
  * - Rate limiting
  * - Supabase storage
  *
- * Authentication is aligned with the backend service which uses
- * Supabase Auth tokens validated via Authorization: Bearer <token>
+ * Authentication uses native JWT tokens (same as backend service)
  *
  * @module api/upload/logo
  */
@@ -89,6 +88,35 @@ function getSupabaseAdmin(): SupabaseClient | null {
 // ============================================
 
 /**
+ * Get JWT secret key for native token verification
+ *
+ * SECURITY: Uses JWT_SECRET only (no SUPABASE_JWT_SECRET fallback)
+ * The JWT_SECRET is shared between frontend and backend for native token verification
+ */
+function getJwtSecretKey(): Uint8Array {
+  const secret = process.env['JWT_SECRET'];
+
+  if (!secret) {
+    const isProduction = process.env['NODE_ENV'] === 'production';
+
+    if (isProduction) {
+      throw new Error(
+        '[Logo Upload] CRITICAL: JWT_SECRET is required in production.'
+      );
+    }
+
+    console.warn('[Logo Upload] JWT_SECRET not set, using development fallback');
+    return new TextEncoder().encode('zuclubit-crm-dev-jwt-secret-change-in-production-min-32-chars');
+  }
+
+  if (secret.length < 32) {
+    throw new Error('[Logo Upload] JWT_SECRET must be at least 32 characters.');
+  }
+
+  return new TextEncoder().encode(secret);
+}
+
+/**
  * Extract Bearer token from Authorization header
  */
 function extractBearerToken(authHeader: string | null): string | null {
@@ -99,29 +127,44 @@ function extractBearerToken(authHeader: string | null): string | null {
 }
 
 /**
- * Validate Supabase JWT token and get user info
- * This is the same method used by the backend service
+ * Validate native JWT token and get user info
+ * This is aligned with the backend service's JWT verification
  */
-async function validateSupabaseToken(token: string): Promise<AuthenticatedUser | null> {
-  const supabase = getSupabaseAdmin();
-  if (!supabase) return null;
-
+async function validateNativeJwtToken(token: string): Promise<AuthenticatedUser | null> {
   try {
-    // Verify JWT and get user using Supabase Auth
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Verify JWT using the same secret as the backend
+    const { payload } = await jwtVerify(token, getJwtSecretKey(), {
+      algorithms: ['HS256'],
+    });
 
-    if (error || !user) {
-      console.warn('[Logo Upload] Token validation failed:', error?.message || 'No user');
+    // Extract user info from JWT payload
+    const userId = payload['sub'] as string;
+    const email = payload['email'] as string;
+    const tenantId = payload['tenantId'] as string | undefined;
+    const tokenType = payload['type'] as string;
+
+    // Validate it's an access token
+    if (tokenType && tokenType !== 'access') {
+      console.warn('[Logo Upload] Invalid token type:', tokenType);
+      return null;
+    }
+
+    if (!userId || !email) {
+      console.warn('[Logo Upload] JWT missing required claims');
       return null;
     }
 
     return {
-      userId: user.id,
-      email: user.email || '',
-      tenantId: undefined, // Can be extracted from headers if needed
+      userId,
+      email,
+      tenantId,
     };
   } catch (error) {
-    console.error('[Logo Upload] Token validation error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    // Don't log expiry errors as warnings
+    if (!errorMessage.includes('expired')) {
+      console.warn('[Logo Upload] JWT validation failed:', errorMessage);
+    }
     return null;
   }
 }
@@ -238,13 +281,13 @@ async function getSessionFromCookie(): Promise<AuthenticatedUser | null> {
  * Priority: Bearer token > Session cookie
  */
 async function authenticateRequest(request: NextRequest): Promise<AuthenticatedUser | null> {
-  // 1. Try Bearer token first (aligned with backend)
+  // 1. Try Bearer token first (native JWT aligned with backend)
   const authHeader = request.headers.get('authorization');
   const bearerToken = extractBearerToken(authHeader);
 
   if (bearerToken) {
-    console.log('[Logo Upload] Authenticating with Bearer token');
-    const user = await validateSupabaseToken(bearerToken);
+    console.log('[Logo Upload] Authenticating with Bearer token (Native JWT)');
+    const user = await validateNativeJwtToken(bearerToken);
     if (user) {
       console.log('[Logo Upload] Bearer token valid for user:', user.email);
       return user;

@@ -31,6 +31,21 @@ SUPABASE_URL = "https://fngdlxipgrkpbutiqjhw.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZuZ2RseGlwZ3JrcGJ1dGlxamh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MjExMzUsImV4cCI6MjA4MTI5NzEzNX0.V26aOFufrza_G2nv1N6_PanCNoovLiaw5uObKcXtnQc"
 # Note: SUPABASE_SERVICE_ROLE_KEY should be set as a secret via: wrangler pages secret put SUPABASE_SERVICE_ROLE_KEY
 
+# ===========================================
+# SSO Configuration (Zuclubit SSO)
+# ===========================================
+# Public SSO variables
+NEXT_PUBLIC_SSO_ISSUER_URL = "https://sso.zuclubit.com"
+NEXT_PUBLIC_SSO_CLIENT_ID = "ventazo"
+NEXT_PUBLIC_AUTH_MODE = "sso"
+# Server-side SSO config
+SSO_ISSUER_URL = "https://sso.zuclubit.com"
+SSO_JWKS_URI = "https://sso.zuclubit.com/.well-known/jwks.json"
+SSO_CLIENT_ID = "ventazo"
+# Note: SSO_CLIENT_SECRET and SESSION_SECRET should be set as secrets via:
+# wrangler pages secret put SSO_CLIENT_SECRET
+# wrangler pages secret put SESSION_SECRET
+
 # Preview environment
 [env.preview.vars]
 NEXT_PUBLIC_ENABLE_DEV_TOOLS = "true"

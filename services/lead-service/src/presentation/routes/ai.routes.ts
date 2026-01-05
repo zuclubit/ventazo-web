@@ -18,8 +18,40 @@ const chatSchema = z.object({
     model: z.string().optional(),
     temperature: z.number().min(0).max(2).optional(),
     maxTokens: z.number().int().min(1).max(128000).optional(),
-    provider: z.enum(['openai', 'gemini']).optional(),
+    provider: z.enum(['openai', 'gemini', 'bot-helper']).optional(),
   }).optional(),
+});
+
+// Bot-helper agent request schema
+const agentRequestSchema = z.object({
+  message: z.string().min(1),
+  conversationId: z.string().uuid().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+// Bot-helper confirmation schema
+const confirmationSchema = z.object({
+  requestId: z.string().uuid(),
+  decision: z.enum(['confirm', 'cancel', 'modify']),
+  modifications: z.record(z.unknown()).optional(),
+});
+
+// Bot-helper lead score schema
+const botHelperLeadScoreSchema = z.object({
+  leadData: z.record(z.unknown()),
+});
+
+// Bot-helper email generation schema
+const botHelperEmailSchema = z.object({
+  type: z.enum(['followup', 'intro', 'proposal', 'thankyou', 'reminder']),
+  context: z.object({
+    recipientName: z.string().min(1),
+    recipientCompany: z.string().optional(),
+    senderName: z.string().min(1),
+    subject: z.string().optional(),
+    previousInteractions: z.array(z.string()).optional(),
+    customInstructions: z.string().optional(),
+  }),
 });
 
 const scoreLeadSchema = z.object({
@@ -561,5 +593,342 @@ export const aiRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return reply.send(result.value);
+  });
+
+  // ============================================
+  // Bot-Helper Native Integration
+  // ============================================
+
+  // Bot-Helper Health Check
+  fastify.get('/bot-helper/health', async (request, reply) => {
+    const isAvailable = aiService.isBotHelperAvailable();
+
+    if (!isAvailable) {
+      return reply.status(503).send({
+        status: 'unavailable',
+        message: 'Bot-Helper integration not configured',
+      });
+    }
+
+    const isHealthy = await aiService.checkBotHelperHealth();
+
+    if (!isHealthy) {
+      return reply.status(503).send({
+        status: 'unhealthy',
+        message: 'Bot-Helper service not responding',
+      });
+    }
+
+    return reply.send({
+      status: 'healthy',
+      message: 'Bot-Helper integration active',
+    });
+  });
+
+  // Bot-Helper Agent Request (with tool execution)
+  fastify.post('/bot-helper/agent', async (request, reply) => {
+    const context = getContext(request);
+    const validation = agentRequestSchema.safeParse(request.body);
+
+    if (!validation.success) {
+      return reply.status(400).send({
+        error: 'Validation error',
+        details: validation.error.errors,
+      });
+    }
+
+    // Get user info from request (set by auth middleware)
+    const user = (request as any).user || {};
+
+    const result = await aiService.processAgentRequest({
+      message: validation.data.message,
+      conversationId: validation.data.conversationId,
+      user: {
+        userId: user.sub || context.userId,
+        email: user.email || 'unknown@example.com',
+        displayName: user.name || user.fullName || 'Unknown User',
+        role: user.role || 'member',
+        permissions: user.permissions || [],
+        timezone: user.timezone,
+        locale: user.locale,
+      },
+      tenantId: context.tenantId,
+      metadata: validation.data.metadata,
+    });
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.send(result.value);
+  });
+
+  // Bot-Helper Confirmation Handler
+  fastify.post('/bot-helper/agent/confirm', async (request, reply) => {
+    const validation = confirmationSchema.safeParse(request.body);
+
+    if (!validation.success) {
+      return reply.status(400).send({
+        error: 'Validation error',
+        details: validation.error.errors,
+      });
+    }
+
+    const result = await aiService.handleConfirmation(
+      validation.data.requestId,
+      validation.data.decision,
+      validation.data.modifications
+    );
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.send(result.value);
+  });
+
+  // Bot-Helper Lead Scoring (CRM-optimized)
+  fastify.post('/bot-helper/leads/score', async (request, reply) => {
+    const context = getContext(request);
+    const validation = botHelperLeadScoreSchema.safeParse(request.body);
+
+    if (!validation.success) {
+      return reply.status(400).send({
+        error: 'Validation error',
+        details: validation.error.errors,
+      });
+    }
+
+    const result = await aiService.scoreLeadViaBotHelper(
+      validation.data.leadData,
+      context.tenantId
+    );
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.send(result.value);
+  });
+
+  // Bot-Helper Email Generation (CRM-optimized)
+  fastify.post('/bot-helper/emails/generate', async (request, reply) => {
+    const context = getContext(request);
+    const validation = botHelperEmailSchema.safeParse(request.body);
+
+    if (!validation.success) {
+      return reply.status(400).send({
+        error: 'Validation error',
+        details: validation.error.errors,
+      });
+    }
+
+    const result = await aiService.generateEmailViaBotHelper(
+      validation.data.type,
+      validation.data.context,
+      context.tenantId
+    );
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.send(result.value);
+  });
+
+  // Bot-Helper Sentiment Analysis (CRM-optimized)
+  fastify.post('/bot-helper/sentiment', async (request, reply) => {
+    const context = getContext(request);
+    const validation = sentimentSchema.safeParse(request.body);
+
+    if (!validation.success) {
+      return reply.status(400).send({
+        error: 'Validation error',
+        details: validation.error.errors,
+      });
+    }
+
+    const result = await aiService.analyzeSentimentViaBotHelper(
+      validation.data.text,
+      context.tenantId
+    );
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.send(result.value);
+  });
+
+  // ============================================
+  // Integration Test Endpoint
+  // ============================================
+
+  // Bot-Helper Integration Test (validates full pipeline)
+  fastify.get('/bot-helper/integration-test', async (request, reply) => {
+    const context = getContext(request);
+    const results: {
+      step: string;
+      status: 'pass' | 'fail' | 'skip';
+      latencyMs?: number;
+      details?: unknown;
+      error?: string;
+    }[] = [];
+
+    const startTotal = Date.now();
+
+    // 1. Check if bot-helper is configured
+    const isConfigured = aiService.isBotHelperAvailable();
+    results.push({
+      step: '1. Configuration Check',
+      status: isConfigured ? 'pass' : 'fail',
+      details: { configured: isConfigured },
+    });
+
+    if (!isConfigured) {
+      return reply.send({
+        success: false,
+        message: 'Bot-Helper integration not configured',
+        results,
+        totalTimeMs: Date.now() - startTotal,
+      });
+    }
+
+    // 2. Health Check
+    const startHealth = Date.now();
+    try {
+      const isHealthy = await aiService.checkBotHelperHealth();
+      results.push({
+        step: '2. Health Check',
+        status: isHealthy ? 'pass' : 'fail',
+        latencyMs: Date.now() - startHealth,
+        details: { healthy: isHealthy },
+      });
+
+      if (!isHealthy) {
+        return reply.send({
+          success: false,
+          message: 'Bot-Helper service not responding',
+          results,
+          totalTimeMs: Date.now() - startTotal,
+        });
+      }
+    } catch (error) {
+      results.push({
+        step: '2. Health Check',
+        status: 'fail',
+        latencyMs: Date.now() - startHealth,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return reply.send({
+        success: false,
+        message: 'Health check failed',
+        results,
+        totalTimeMs: Date.now() - startTotal,
+      });
+    }
+
+    // 3. Lead Scoring Test
+    const startScoring = Date.now();
+    try {
+      const scoreResult = await aiService.scoreLeadViaBotHelper(
+        {
+          companyName: 'Test Corp',
+          email: 'test@example.com',
+          industry: 'Technology',
+          budget: '$100k-$500k',
+        },
+        context.tenantId
+      );
+
+      results.push({
+        step: '3. Lead Scoring',
+        status: scoreResult.isSuccess ? 'pass' : 'fail',
+        latencyMs: Date.now() - startScoring,
+        details: scoreResult.isSuccess ? scoreResult.value : undefined,
+        error: scoreResult.isFailure ? scoreResult.error : undefined,
+      });
+    } catch (error) {
+      results.push({
+        step: '3. Lead Scoring',
+        status: 'fail',
+        latencyMs: Date.now() - startScoring,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+
+    // 4. Sentiment Analysis Test
+    const startSentiment = Date.now();
+    try {
+      const sentimentResult = await aiService.analyzeSentimentViaBotHelper(
+        'Estamos muy interesados en su propuesta y queremos agendar una llamada pronto.',
+        context.tenantId
+      );
+
+      results.push({
+        step: '4. Sentiment Analysis',
+        status: sentimentResult.isSuccess ? 'pass' : 'fail',
+        latencyMs: Date.now() - startSentiment,
+        details: sentimentResult.isSuccess ? sentimentResult.value : undefined,
+        error: sentimentResult.isFailure ? sentimentResult.error : undefined,
+      });
+    } catch (error) {
+      results.push({
+        step: '4. Sentiment Analysis',
+        status: 'fail',
+        latencyMs: Date.now() - startSentiment,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+
+    // 5. Email Generation Test
+    const startEmail = Date.now();
+    try {
+      const emailResult = await aiService.generateEmailViaBotHelper(
+        'followup',
+        {
+          recipientName: 'Juan García',
+          recipientCompany: 'Empresa Test',
+          senderName: 'Vendedor CRM',
+        },
+        context.tenantId
+      );
+
+      results.push({
+        step: '5. Email Generation',
+        status: emailResult.isSuccess ? 'pass' : 'fail',
+        latencyMs: Date.now() - startEmail,
+        details: emailResult.isSuccess
+          ? { subject: emailResult.value?.subject, bodyLength: emailResult.value?.body?.length }
+          : undefined,
+        error: emailResult.isFailure ? emailResult.error : undefined,
+      });
+    } catch (error) {
+      results.push({
+        step: '5. Email Generation',
+        status: 'fail',
+        latencyMs: Date.now() - startEmail,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+
+    // Calculate summary
+    const passed = results.filter((r) => r.status === 'pass').length;
+    const failed = results.filter((r) => r.status === 'fail').length;
+    const totalTimeMs = Date.now() - startTotal;
+
+    return reply.send({
+      success: failed === 0,
+      message: failed === 0
+        ? `All ${passed} tests passed`
+        : `${failed} of ${results.length} tests failed`,
+      summary: {
+        passed,
+        failed,
+        total: results.length,
+        totalTimeMs,
+      },
+      results,
+    });
   });
 };

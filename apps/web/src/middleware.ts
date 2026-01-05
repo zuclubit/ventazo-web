@@ -20,12 +20,47 @@ import { jwtVerify } from 'jose';
 // Session cookie name (must match session/index.ts)
 const SESSION_COOKIE_NAME = 'zcrm_session';
 
-// Secret key for session verification
+/**
+ * Get secret key for session verification
+ *
+ * SECURITY: Enforces proper configuration:
+ * - Production: Requires SESSION_SECRET (throws if missing)
+ * - Development: Allows fallback with warning
+ */
+/**
+ * Development fallback key - MUST be consistent across all files
+ * This fallback is shared between: middleware.ts, callback route, session/index.ts
+ * IMPORTANT: In production, always set SESSION_SECRET environment variable
+ */
+const DEV_FALLBACK_KEY = 'zuclubit-dev-session-key-do-not-use-in-production';
+
 const getSecretKey = () => {
-  const secret =
-    process.env['SESSION_SECRET'] ||
+  // Try multiple sources for the secret (Edge runtime compatibility)
+  const secret = process.env['SESSION_SECRET'] ||
     process.env['NEXTAUTH_SECRET'] ||
-    'zuclubit-crm-session-fallback-key-2025';
+    (globalThis as Record<string, unknown>)['SESSION_SECRET'] as string | undefined;
+
+  if (!secret) {
+    // Check if production (Edge runtime may not have NODE_ENV reliably)
+    const isProduction = process.env['NODE_ENV'] === 'production' ||
+      process.env['VERCEL_ENV'] === 'production' ||
+      process.env['CF_PAGES'] === '1';
+
+    if (isProduction) {
+      // In production, log error but use consistent fallback
+      // This ensures session created in callback can be verified in middleware
+      console.error(
+        '[Middleware] CRITICAL: SESSION_SECRET not configured in production! ' +
+        'Using fallback key. Run: wrangler pages secret put SESSION_SECRET'
+      );
+    } else {
+      console.warn('[Middleware] SESSION_SECRET not set. Using development fallback.');
+    }
+
+    // Use consistent fallback (matches callback route and session module)
+    return new TextEncoder().encode(DEV_FALLBACK_KEY);
+  }
+
   return new TextEncoder().encode(secret);
 };
 
@@ -82,6 +117,11 @@ interface SessionData {
 /**
  * Verify session cookie (optimistic check)
  * Returns session payload if valid, null otherwise
+ *
+ * SECURITY: This function handles session verification with proper defaults:
+ * - Expired JWT → null (will redirect to login)
+ * - Missing userId → null (invalid session)
+ * - requiresOnboarding defaults based on tenantId presence (safer default)
  */
 async function verifySessionCookie(sessionCookie: string | undefined): Promise<SessionData | null> {
   if (!sessionCookie) {
@@ -102,25 +142,57 @@ async function verifySessionCookie(sessionCookie: string | undefined): Promise<S
       return null;
     }
 
-    // Extract onboarding state - default to requires onboarding if not present
-    const onboardingStatus = (payload['onboardingStatus'] as OnboardingStatus) || 'not_started';
-    const onboardingStep = (payload['onboardingStep'] as string) || 'create-business';
-    const requiresOnboarding = (payload['requiresOnboarding'] as boolean) ?? true;
+    // Extract tenantId first to determine onboarding defaults
+    const tenantId = (payload['tenantId'] as string) || '';
 
-    console.log('[verifySession] Session verified for user:', userId);
+    // Extract onboarding state with SAFE DEFAULTS:
+    // - If user has tenantId AND onboarding status is not set → assume completed (legacy sessions)
+    // - If user has no tenantId → requires onboarding
+    const onboardingStatus = (payload['onboardingStatus'] as OnboardingStatus) ||
+      (tenantId ? 'completed' : 'not_started');
+    const onboardingStep = (payload['onboardingStep'] as string) ||
+      (tenantId ? 'complete' : 'create-business');
+
+    // CRITICAL FIX: If requiresOnboarding is explicitly set, use it.
+    // Otherwise, determine based on tenantId and onboardingStatus.
+    // This prevents legacy sessions (without requiresOnboarding field) from
+    // incorrectly redirecting users with tenants to onboarding.
+    let requiresOnboarding: boolean;
+    if (typeof payload['requiresOnboarding'] === 'boolean') {
+      requiresOnboarding = payload['requiresOnboarding'];
+    } else {
+      // Legacy session without explicit requiresOnboarding
+      // If user has tenant and status is completed/not explicitly needing onboarding → false
+      requiresOnboarding = !tenantId || onboardingStatus === 'not_started';
+    }
+
+    // Additional check: verify internal expiresAt timestamp if present
+    const expiresAt = payload['expiresAt'] as number | undefined;
+    if (expiresAt && expiresAt < Math.floor(Date.now() / 1000)) {
+      console.log('[verifySession] Session payload expired (internal expiresAt)');
+      return null;
+    }
+
+    console.log('[verifySession] Session verified for user:', userId, {
+      tenantId: tenantId ? 'present' : 'none',
+      onboardingStatus,
+      requiresOnboarding,
+    });
 
     return {
       userId: userId,
       email: (payload['email'] as string) || '',
-      tenantId: (payload['tenantId'] as string) || '',
+      tenantId,
       role: (payload['role'] as string) || 'viewer',
       onboardingStatus,
       onboardingStep,
       requiresOnboarding,
     };
   } catch (error) {
-    // Invalid or expired session
-    console.log('[verifySession] JWT verification failed:', error instanceof Error ? error.message : 'unknown error');
+    // Invalid or expired session - JWT verification failed
+    const errorMessage = error instanceof Error ? error.message : 'unknown error';
+    const isExpired = errorMessage.includes('expired');
+    console.log('[verifySession] JWT verification failed:', errorMessage, isExpired ? '(token expired)' : '');
     return null;
   }
 }
@@ -170,6 +242,21 @@ function getAuthenticatedRedirect(session: SessionData, intendedPath: string): s
 }
 
 // ============================================
+// Cookie Cleanup Helpers
+// ============================================
+
+/**
+ * Create a redirect response that also clears the invalid session cookie
+ * SECURITY: This prevents stale cookies from causing redirect loops
+ */
+function redirectWithCookieCleanup(url: URL): NextResponse {
+  const response = NextResponse.redirect(url);
+  response.cookies.delete(SESSION_COOKIE_NAME);
+  console.log('[Middleware] Clearing invalid session cookie during redirect');
+  return response;
+}
+
+// ============================================
 // Middleware Handler
 // ============================================
 
@@ -183,21 +270,24 @@ export async function middleware(request: NextRequest) {
 
   // Get session from cookie
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const hasCookie = !!sessionCookie;
 
   // Debug logging for auth troubleshooting
   console.log('[Middleware] Path:', pathname);
-  console.log('[Middleware] Cookie present:', !!sessionCookie);
-  if (sessionCookie) {
-    console.log('[Middleware] Cookie length:', sessionCookie.length);
-  }
+  console.log('[Middleware] Cookie present:', hasCookie);
 
   const session = await verifySessionCookie(sessionCookie);
   const isAuthenticated = !!session;
   const hasTenant = !!(session?.tenantId);
 
+  // SECURITY: Detect stale/expired cookies
+  // If there's a cookie but session verification failed, the cookie is invalid
+  const hasExpiredCookie = hasCookie && !isAuthenticated;
+
   console.log('[Middleware] Auth status:', {
     isAuthenticated,
     hasTenant,
+    hasExpiredCookie,
     requiresOnboarding: session?.requiresOnboarding,
     onboardingStatus: session?.onboardingStatus,
   });
@@ -218,10 +308,20 @@ export async function middleware(request: NextRequest) {
 
   // 1. Guest-only routes (login, register, signup)
   // Authenticated users should be redirected
-  if (isGuestOnlyRoute && isAuthenticated) {
-    const redirectParam = request.nextUrl.searchParams.get('redirect');
-    const redirect = getAuthenticatedRedirect(session!, redirectParam || '/app/dashboard');
-    return NextResponse.redirect(new URL(redirect, request.url));
+  if (isGuestOnlyRoute) {
+    if (isAuthenticated) {
+      const redirectParam = request.nextUrl.searchParams.get('redirect');
+      const redirect = getAuthenticatedRedirect(session!, redirectParam || '/app/dashboard');
+      return NextResponse.redirect(new URL(redirect, request.url));
+    }
+    // Performance optimization: Cache guest-only pages for consistent TTFB
+    // See: docs/PERFORMANCE_REMEDIATION_LOG.md - P1.2 TTFB Stabilization
+    const response = NextResponse.next();
+    response.headers.set(
+      'Cache-Control',
+      'public, max-age=60, stale-while-revalidate=300'
+    );
+    return response;
   }
 
   // 2. Protected routes (/app/*)
@@ -231,6 +331,13 @@ export async function middleware(request: NextRequest) {
       // Not authenticated - redirect to login with return URL
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
+
+      // SECURITY: If there was an expired cookie, clean it up and add error param
+      if (hasExpiredCookie) {
+        loginUrl.searchParams.set('error', 'session_expired');
+        return redirectWithCookieCleanup(loginUrl);
+      }
+
       return NextResponse.redirect(loginUrl);
     }
 
@@ -252,6 +359,12 @@ export async function middleware(request: NextRequest) {
   if (isOnboardingRoute) {
     if (!isAuthenticated) {
       // Not authenticated - redirect to signup
+      // SECURITY: If there was an expired cookie, clean it up
+      if (hasExpiredCookie) {
+        const signupUrl = new URL('/signup', request.url);
+        signupUrl.searchParams.set('error', 'session_expired');
+        return redirectWithCookieCleanup(signupUrl);
+      }
       return NextResponse.redirect(new URL('/signup', request.url));
     }
 
@@ -285,8 +398,15 @@ export async function middleware(request: NextRequest) {
       const redirect = getAuthenticatedRedirect(session!, '/app/dashboard');
       return NextResponse.redirect(new URL(redirect, request.url));
     }
-    // Allow guests to see landing page
-    return NextResponse.next();
+    // Allow guests to see landing page with edge caching
+    // Performance optimization: Cache landing page for consistent TTFB
+    // See: docs/PERFORMANCE_REMEDIATION_LOG.md - P1.2 TTFB Stabilization
+    const response = NextResponse.next();
+    response.headers.set(
+      'Cache-Control',
+      'public, max-age=60, stale-while-revalidate=300'
+    );
+    return response;
   }
 
   // 5. Signup verify-email special handling

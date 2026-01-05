@@ -42,13 +42,17 @@ export function NavLinks({ items, className, variant = 'pill' }: NavLinksProps) 
           key={item.href}
           className={cn(
             linkStyles[variant],
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ventazo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ventazo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+            item.highlight && 'bg-gradient-to-r from-[#FDE68A]/15 to-[#FDBA74]/15 text-[#FDE68A] hover:from-[#FDE68A]/25 hover:to-[#FDBA74]/25 hover:text-[#FDE68A] border border-[#FDE68A]/25'
           )}
           href={item.href}
           {...(item.isExternal && { target: '_blank', rel: 'noopener noreferrer' })}
         >
           {item.icon && <item.icon className="mr-2 h-4 w-4" />}
           {item.label}
+          {item.highlight && (
+            <span className="ml-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#FDE68A]" />
+          )}
           {item.badge && (
             <span className="ml-2 rounded-full bg-coral-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
               {item.badge}

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "description": "Cloudflare Pages routing optimization for Ventazo CRM",
+  "include": ["/*"],
+  "exclude": [
+    "/_next/static/*",
+    "/images/*",
+    "/fonts/*",
+    "/*.ico",
+    "/*.png",
+    "/*.svg",
+    "/*.jpg",
+    "/*.jpeg",
+    "/*.webp",
+    "/*.woff",
+    "/*.woff2",
+    "/robots.txt",
+    "/site.webmanifest",
+    "/favicon.ico"
+  ]
+}

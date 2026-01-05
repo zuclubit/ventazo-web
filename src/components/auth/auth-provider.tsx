@@ -10,8 +10,10 @@
  * - This provider fetches user data via Server Action on mount
  * - Syncs with Zustand store for permission checks
  * - No client-side token storage (secure)
+ * - AUTOMATIC SESSION REFRESH via useSessionRefresh hook
  *
  * @see https://nextjs.org/docs/app/guides/authentication
+ * @see middleware.ts for server-side auto-refresh
  */
 
 import * as React from 'react';
@@ -19,6 +21,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { SplashScreen } from '@/components/common/splash-screen';
 import { getCurrentUser, logoutAction } from '@/lib/session/actions';
 import { useAuthStore } from '@/store/auth.store';
+import { useSessionRefresh } from '@/hooks/use-session-refresh';
 import type { Permission, UserRole } from '@/lib/auth/types';
 import { ROLE_PERMISSIONS } from '@/lib/auth/types';
 
@@ -162,6 +165,57 @@ export function AuthProvider({ children }: AuthProviderProps) {
   React.useEffect(() => {
     fetchUser();
   }, [fetchUser]);
+
+  // ============================================
+  // Session Auto-Refresh
+  // ============================================
+
+  /**
+   * Handle session expiration from the refresh hook
+   * Clears local state and redirects to login
+   */
+  const handleSessionExpired = React.useCallback(() => {
+    console.log('[AuthProvider] Session expired, clearing state...');
+
+    setUser(null);
+    setStoreState({
+      user: null,
+      isAuthenticated: false,
+      isInitialized: true,
+      isLoading: false,
+      tokens: null,
+      tenants: [],
+      currentTenantId: null,
+    });
+
+    // Note: The hook will handle the redirect
+  }, [setStoreState]);
+
+  /**
+   * Handle successful refresh - re-fetch user data to sync state
+   */
+  const handleRefreshSuccess = React.useCallback(() => {
+    console.log('[AuthProvider] Session refreshed successfully');
+    // Optionally re-fetch user to ensure data is in sync
+    // fetchUser();
+  }, []);
+
+  /**
+   * Handle refresh errors
+   */
+  const handleRefreshError = React.useCallback((error: Error) => {
+    console.error('[AuthProvider] Session refresh error:', error.message);
+  }, []);
+
+  // Activate automatic session refresh
+  // This hook monitors the session and refreshes tokens proactively
+  useSessionRefresh({
+    enabled: !!user, // Only refresh when user is authenticated
+    onSessionExpired: handleSessionExpired,
+    onRefreshSuccess: handleRefreshSuccess,
+    onRefreshError: handleRefreshError,
+    checkInterval: 2 * 60 * 1000, // Check every 2 minutes
+  });
 
   // Context value
   const value = React.useMemo(

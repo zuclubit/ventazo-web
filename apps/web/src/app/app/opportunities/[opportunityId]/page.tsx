@@ -72,7 +72,7 @@ import {
 } from '@/lib/opportunities';
 
 import { DeleteOpportunityDialog } from '../components/delete-opportunity-dialog';
-import { OpportunityFormDialog } from '../components/opportunity-form-dialog';
+import { OpportunityFormSheet } from '../components/opportunity-form-sheet';
 import { WinLostDialog } from '../components/win-lost-dialog';
 
 // ============================================
@@ -922,7 +922,7 @@ export default function OpportunityDetailPage() {
       </Tabs>
 
       {/* Dialogs */}
-      <OpportunityFormDialog
+      <OpportunityFormSheet
         open={isEditOpen}
         opportunity={opportunity}
         onClose={() => setIsEditOpen(false)}

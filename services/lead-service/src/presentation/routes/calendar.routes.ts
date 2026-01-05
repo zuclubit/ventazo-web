@@ -594,7 +594,8 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
-   * List events (alias for /upcoming with limit support)
+   * List events from all connected integrations
+   * Fetches directly from calendar providers (Google, Microsoft)
    */
   fastify.get('/events', {
     preHandler: [authenticate],
@@ -612,26 +613,71 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
     const { days, limit } = request.query as { days?: number; limit?: number };
     const calendarService = container.resolve(CalendarService);
 
-    const result = await calendarService.getUpcomingEvents(
+    // Get user's connected integrations
+    const integrationsResult = await calendarService.getUserIntegrations(
       user.tenantId,
-      user.id,
-      days || 30
+      user.id
     );
 
-    if (result.isFailure) {
+    if (integrationsResult.isFailure) {
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
-        message: result.error,
+        message: integrationsResult.error,
       });
     }
 
-    const events = result.value || [];
-    const limitedEvents = limit ? events.slice(0, limit) : events;
+    const integrations = integrationsResult.value || [];
+    const connectedIntegrations = integrations.filter(i => i.status === 'connected');
+
+    if (connectedIntegrations.length === 0) {
+      return { items: [], total: 0 };
+    }
+
+    // Calculate date range - include past 30 days for calendar view
+    const now = new Date();
+    const startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days in the past
+    const endDate = new Date(now.getTime() + (days || 30) * 24 * 60 * 60 * 1000);
+
+    // Fetch events from all connected integrations
+    const allEvents: Array<{
+      id: string;
+      title: string;
+      startTime: string;
+      endTime: string;
+      [key: string]: unknown;
+    }> = [];
+
+    for (const integration of connectedIntegrations) {
+      try {
+        const eventsResult = await calendarService.listEvents(integration.id, {
+          startTime: startDate,
+          endTime: endDate,
+          maxResults: 100,
+        });
+
+        if (eventsResult.isSuccess && eventsResult.value?.events) {
+          allEvents.push(...eventsResult.value.events.map(e => ({
+            ...e,
+            integrationId: integration.id,
+            provider: integration.provider,
+          })));
+        }
+      } catch (err) {
+        // Log error but continue with other integrations
+        request.log.warn({ integrationId: integration.id, error: err }, 'Failed to fetch events from integration');
+      }
+    }
+
+    // Sort by start time
+    allEvents.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+    // Apply limit
+    const limitedEvents = limit ? allEvents.slice(0, limit) : allEvents;
 
     return {
       items: limitedEvents,
-      total: events.length,
+      total: allEvents.length,
     };
   });
 
@@ -664,9 +710,9 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
       id: integration.id,
       name: integration.calendarName || `${integration.provider} Calendar`,
       provider: integration.provider,
-      email: integration.calendarEmail,
+      email: integration.calendarEmail || integration.providerEmail,
       isPrimary: integration.isPrimary || false,
-      isConnected: integration.status === 'active',
+      isConnected: integration.status === 'connected',
       lastSyncAt: integration.lastSyncAt,
     }));
 

@@ -75,7 +75,10 @@ export interface Quote {
   // Financial
   currency: string;
   subtotal: number;
+  discountType?: 'percentage' | 'fixed'; // Quote-level discount type
+  discountValue?: number; // Quote-level discount value
   discountTotal: number;
+  taxRate?: number; // Tax rate percentage (e.g., 16 for 16% IVA)
   taxTotal: number;
   total: number;
 
@@ -130,8 +133,11 @@ export interface Quote {
   customFields?: Record<string, unknown>;
   metadata?: Record<string, string>;
 
-  // Audit
+  // Ownership
   createdBy: string;
+  assignedTo?: string;
+
+  // Audit
   updatedBy?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -263,6 +269,8 @@ export interface CreateQuoteInput {
  * Update quote input
  */
 export interface UpdateQuoteInput {
+  // Status for Kanban drag & drop operations
+  status?: QuoteStatus;
   title?: string;
   description?: string;
   expirationDate?: Date;

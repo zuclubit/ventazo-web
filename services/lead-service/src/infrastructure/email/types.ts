@@ -105,6 +105,10 @@ export enum EmailTemplate {
   // Drip Campaign Templates
   DRIP_CAMPAIGN_EMAIL = 'drip-campaign-email',
 
+  // Comment/Mention Templates
+  COMMENT_MENTION = 'comment-mention',
+  COMMENT_GROUP_MENTION = 'comment-group-mention',
+
   // System Templates
   SYSTEM_ERROR_ALERT = 'system-error-alert',
   SYSTEM_MAINTENANCE = 'system-maintenance',
@@ -1803,6 +1807,120 @@ Si no deseas recibir m&aacute;s emails, puedes darte de baja aqu&iacute;: {{unsu
     </div>
     <div class="footer">
       <p>Si no deseas recibir m&aacute;s emails, <a href="{{unsubscribeUrl}}">date de baja aqu&iacute;</a>.</p>
+      <p>&copy; {{currentYear}} {{appName}}</p>
+    </div>
+  </div>
+</body>
+</html>
+    `,
+  },
+
+  // ===========================================
+  // Comment/Mention Templates
+  // ===========================================
+
+  [EmailTemplate.COMMENT_MENTION]: {
+    subject: '&#128172; {{mentionedBy}} te mencion&oacute; en un comentario - {{appName}}',
+    textTemplate: `
+Hola {{recipientName}},
+
+{{mentionedBy}} te mencion&oacute; en un comentario:
+
+"{{commentPreview}}"
+
+En: {{entityType}} - {{entityName}}
+
+Ver comentario: {{actionUrl}}
+
+---
+El equipo de {{appName}}
+    `,
+    htmlTemplate: `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <style>${BASE_STYLES}</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      {{#if logoUrl}}<img src="{{logoUrl}}" alt="{{appName}}" class="logo" width="48" height="48" style="border-radius: 8px;">{{/if}}
+      <h1>&#128172; Te Mencionaron</h1>
+    </div>
+    <div class="content">
+      <p>Hola <strong>{{recipientName}}</strong>,</p>
+      <p><strong>{{mentionedBy}}</strong> te mencion&oacute; en un comentario:</p>
+
+      <div class="card" style="border-left: 4px solid ${c.primary}; background: ${c.background};">
+        <p style="font-style: italic; color: ${c.textSecondary}; margin: 0;">"{{commentPreview}}"</p>
+      </div>
+
+      <div class="tip">
+        <p style="margin: 0;">&#128196; <strong>En:</strong> {{entityType}} - {{entityName}}</p>
+        <p style="margin: 8px 0 0 0;">&#128337; <strong>Fecha:</strong> {{commentDate}}</p>
+      </div>
+
+      <center><a href="{{actionUrl}}" class="btn">Ver Comentario</a></center>
+    </div>
+    <div class="footer">
+      <p>&copy; {{currentYear}} {{appName}}</p>
+    </div>
+  </div>
+</body>
+</html>
+    `,
+  },
+
+  [EmailTemplate.COMMENT_GROUP_MENTION]: {
+    subject: '&#128172; {{mentionedBy}} mencion&oacute; a @{{groupName}} - {{appName}}',
+    textTemplate: `
+Hola {{recipientName}},
+
+{{mentionedBy}} mencion&oacute; al grupo @{{groupName}} del que eres miembro:
+
+"{{commentPreview}}"
+
+En: {{entityType}} - {{entityName}}
+
+Ver comentario: {{actionUrl}}
+
+---
+El equipo de {{appName}}
+    `,
+    htmlTemplate: `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <style>${BASE_STYLES}</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      {{#if logoUrl}}<img src="{{logoUrl}}" alt="{{appName}}" class="logo" width="48" height="48" style="border-radius: 8px;">{{/if}}
+      <h1>&#128172; Menci&oacute;n de Grupo</h1>
+    </div>
+    <div class="content">
+      <p>Hola <strong>{{recipientName}}</strong>,</p>
+      <p><strong>{{mentionedBy}}</strong> mencion&oacute; al grupo <span class="score hot">@{{groupName}}</span> del que eres miembro:</p>
+
+      <div class="card" style="border-left: 4px solid ${c.primary}; background: ${c.background};">
+        <p style="font-style: italic; color: ${c.textSecondary}; margin: 0;">"{{commentPreview}}"</p>
+      </div>
+
+      <div class="tip">
+        <p style="margin: 0;">&#128196; <strong>En:</strong> {{entityType}} - {{entityName}}</p>
+        <p style="margin: 8px 0 0 0;">&#128337; <strong>Fecha:</strong> {{commentDate}}</p>
+      </div>
+
+      <center><a href="{{actionUrl}}" class="btn">Ver Comentario</a></center>
+    </div>
+    <div class="footer">
       <p>&copy; {{currentYear}} {{appName}}</p>
     </div>
   </div>

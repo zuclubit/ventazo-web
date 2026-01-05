@@ -34,6 +34,13 @@ export type WebSocketMessageType =
   | 'quote.viewed'
   | 'quote.accepted'
   | 'quote.rejected'
+  // Comment events
+  | 'comment.created'
+  | 'comment.updated'
+  | 'comment.deleted'
+  | 'comment.reaction.added'
+  | 'comment.reaction.removed'
+  | 'comment.mentioned'
   // Communication events
   | 'message.received'
   | 'message.sent'
@@ -102,6 +109,7 @@ export type SubscriptionType =
   | 'communication'
   | 'user'
   | 'tenant'
+  | 'kanban'
   | 'all';
 
 /**

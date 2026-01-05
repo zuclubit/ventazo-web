@@ -6,7 +6,7 @@
 /**
  * Entity types that can have notes attached
  */
-export type NoteEntityType = 'lead' | 'customer' | 'opportunity' | 'task' | 'contact';
+export type NoteEntityType = 'lead' | 'customer' | 'opportunity' | 'task' | 'contact' | 'quote';
 
 /**
  * Note content types

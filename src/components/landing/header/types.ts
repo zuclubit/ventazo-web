@@ -14,6 +14,7 @@ export interface NavItem {
   icon?: LucideIcon;
   isExternal?: boolean;
   badge?: string;
+  highlight?: boolean; // Special promotional highlighting (e.g., WorldCup 2026)
 }
 
 // CTA Button configuration

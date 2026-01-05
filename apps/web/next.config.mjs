@@ -51,6 +51,9 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb',
     },
+    // Enable View Transitions API for smooth SPA-like navigation
+    // This creates native app-like transitions between routes
+    viewTransition: true,
   },
 
   // Webpack configuration for optimization

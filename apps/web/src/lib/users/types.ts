@@ -213,12 +213,13 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   viewer: 'Solo lectura de información',
 };
 
+// Role colors - Using semantic colors with dark mode support
 export const ROLE_COLORS: Record<UserRole, string> = {
-  owner: 'bg-purple-500',
-  admin: 'bg-blue-500',
-  manager: 'bg-green-500',
-  sales_rep: 'bg-amber-500',
-  viewer: 'bg-gray-500',
+  owner: 'bg-purple-500 dark:bg-purple-600',
+  admin: 'bg-blue-500 dark:bg-blue-600',
+  manager: 'bg-green-500 dark:bg-green-600',
+  sales_rep: 'bg-amber-500 dark:bg-amber-600',
+  viewer: 'bg-gray-500 dark:bg-gray-600',
 };
 
 export const STATUS_LABELS: Record<TeamMember['status'], string> = {
@@ -227,42 +228,44 @@ export const STATUS_LABELS: Record<TeamMember['status'], string> = {
   suspended: 'Suspendido',
 };
 
+// Team member status colors with dark mode support
 export const STATUS_COLORS: Record<TeamMember['status'], string> = {
-  active: 'bg-green-500',
-  pending: 'bg-amber-500',
-  suspended: 'bg-red-500',
+  active: 'bg-green-500 dark:bg-green-600',
+  pending: 'bg-amber-500 dark:bg-amber-600',
+  suspended: 'bg-red-500 dark:bg-red-600',
 };
 
 // ============================================
 // Audit Action Labels
 // ============================================
 
+// Audit action colors with dark mode support
 export const AUDIT_ACTION_COLORS: Record<AuditAction, string> = {
-  user_login: 'bg-green-100 text-green-800',
-  user_logout: 'bg-gray-100 text-gray-800',
-  user_signup: 'bg-blue-100 text-blue-800',
-  password_change: 'bg-amber-100 text-amber-800',
-  password_reset: 'bg-amber-100 text-amber-800',
-  profile_updated: 'bg-blue-100 text-blue-800',
-  avatar_updated: 'bg-blue-100 text-blue-800',
-  member_invited: 'bg-purple-100 text-purple-800',
-  member_joined: 'bg-green-100 text-green-800',
-  member_removed: 'bg-red-100 text-red-800',
-  member_role_changed: 'bg-amber-100 text-amber-800',
-  member_suspended: 'bg-red-100 text-red-800',
-  member_reactivated: 'bg-green-100 text-green-800',
-  tenant_created: 'bg-purple-100 text-purple-800',
-  tenant_updated: 'bg-blue-100 text-blue-800',
-  tenant_settings_changed: 'bg-amber-100 text-amber-800',
-  tenant_switched: 'bg-gray-100 text-gray-800',
-  lead_created: 'bg-green-100 text-green-800',
-  lead_updated: 'bg-blue-100 text-blue-800',
-  lead_deleted: 'bg-red-100 text-red-800',
-  lead_assigned: 'bg-purple-100 text-purple-800',
-  lead_status_changed: 'bg-amber-100 text-amber-800',
-  lead_qualified: 'bg-green-100 text-green-800',
-  lead_converted: 'bg-emerald-100 text-emerald-800',
-  other: 'bg-gray-100 text-gray-800',
+  user_login: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  user_logout: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+  user_signup: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  password_change: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  password_reset: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  profile_updated: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  avatar_updated: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  member_invited: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  member_joined: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  member_removed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  member_role_changed: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  member_suspended: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  member_reactivated: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  tenant_created: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  tenant_updated: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  tenant_settings_changed: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  tenant_switched: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+  lead_created: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  lead_updated: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  lead_deleted: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  lead_assigned: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  lead_status_changed: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  lead_qualified: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  lead_converted: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+  other: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
 };
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {

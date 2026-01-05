@@ -6,9 +6,11 @@
 // ============================================
 
 import * as React from 'react';
-import { useTenantStore } from '@/store';
+import { useTenantStore, useCachedBranding } from '@/store';
 import {
   hexToHslString,
+  hexToHsl,
+  hexToRgba,
   getOptimalForeground,
   darken,
   lighten,
@@ -67,9 +69,43 @@ const CSS_VARIABLES = [
 ] as const;
 
 /**
+ * Check if theme was preloaded by inline script with same colors
+ * Returns true if we should skip application (already applied correctly)
+ */
+function shouldSkipApplication(tenantColors?: {
+  primaryColor?: string;
+  sidebarColor?: string;
+  accentColor?: string;
+  surfaceColor?: string;
+}): boolean {
+  if (typeof document === 'undefined') return false;
+
+  const root = document.documentElement;
+  const preloaded = root.dataset['themePreloaded'];
+
+  if (preloaded !== 'true') return false;
+
+  // If preloaded, check if colors match
+  const currentPrimary = root.style.getPropertyValue('--tenant-primary');
+  const targetPrimary = tenantColors?.primaryColor;
+
+  if (currentPrimary && targetPrimary && currentPrimary === targetPrimary) {
+    // Colors match - clear flag and skip
+    delete root.dataset['themePreloaded'];
+    return true;
+  }
+
+  // Colors different or no target - clear flag and continue
+  delete root.dataset['themePreloaded'];
+  return false;
+}
+
+/**
  * Apply branding colors as CSS variables
  * Converts hex colors to HSL format for CSS custom properties
  * Also sets tenant-specific variables for dynamic theming
+ *
+ * Optimized to skip if inline script already applied same colors
  */
 function applyCssVariables(branding: TenantBranding, tenantColors?: {
   sidebarColor?: string;
@@ -77,6 +113,11 @@ function applyCssVariables(branding: TenantBranding, tenantColors?: {
   accentColor?: string;
   surfaceColor?: string;
 }): void {
+  // Skip if inline script already applied the same colors (FOUC prevention)
+  if (shouldSkipApplication(tenantColors)) {
+    return;
+  }
+
   const { colors, shapes } = branding;
 
   // Primary
@@ -117,6 +158,43 @@ function applyCssVariables(branding: TenantBranding, tenantColors?: {
     // Surface variations
     setCssVariable('--tenant-surface-light', lighten(surfaceHex, 5));
     setCssVariable('--tenant-surface-border', lighten(surfaceHex, 15));
+
+    // ============================================
+    // Legacy brand colors (backward compatibility)
+    // ============================================
+    setCssVariable('--brand-sidebar', sidebarHex);
+    setCssVariable('--brand-primary', primaryHex);
+    setCssVariable('--brand-accent', accentHex);
+    setCssVariable('--brand-surface', surfaceHex);
+    setCssVariable('--brand-secondary', sidebarHex);
+
+    // HSL components for advanced styling
+    const primaryHsl = hexToHsl(primaryHex);
+    const sidebarHsl = hexToHsl(sidebarHex);
+    if (primaryHsl) {
+      setCssVariable('--brand-primary-h', String(primaryHsl.h));
+      setCssVariable('--brand-primary-s', `${primaryHsl.s}%`);
+      setCssVariable('--brand-primary-l', `${primaryHsl.l}%`);
+    }
+    if (sidebarHsl) {
+      setCssVariable('--brand-sidebar-h', String(sidebarHsl.h));
+      setCssVariable('--brand-sidebar-s', `${sidebarHsl.s}%`);
+      setCssVariable('--brand-sidebar-l', `${sidebarHsl.l}%`);
+    }
+
+    // ============================================
+    // Sidebar UI colors (derived from branding)
+    // ============================================
+    setCssVariable('--sidebar-glass-bg', hexToRgba(sidebarHex, 0.95));
+    setCssVariable('--sidebar-text-primary', '#FFFFFF');
+    setCssVariable('--sidebar-text-secondary', '#E5E5E5');
+    setCssVariable('--sidebar-text-muted', '#94A3AB');
+    setCssVariable('--sidebar-text-accent', accentHex);
+    setCssVariable('--sidebar-active-bg', hexToRgba(primaryHex, 0.18));
+    setCssVariable('--sidebar-active-border', primaryHex);
+    setCssVariable('--sidebar-hover-bg', 'rgba(255, 255, 255, 0.08)');
+    setCssVariable('--sidebar-divider', 'rgba(255, 255, 255, 0.06)');
+    setCssVariable('--sidebar-item-shadow-active', `0 4px 12px -2px ${hexToRgba(primaryHex, 0.3)}`);
   }
 
   // Secondary
@@ -128,16 +206,21 @@ function applyCssVariables(branding: TenantBranding, tenantColors?: {
   setCssVariable('--accent-foreground', hexToHslString(colors.accentForeground));
 
   // Background & Foreground
+  // CRITICAL: Calculate optimal foreground based on background for proper contrast
+  // This ensures text is always readable regardless of tenant's background color
   setCssVariable('--background', hexToHslString(colors.background));
-  setCssVariable('--foreground', hexToHslString(colors.foreground));
+  const optimalForeground = getOptimalForeground(colors.background);
+  setCssVariable('--foreground', hexToHslString(optimalForeground));
 
-  // Card
+  // Card - Calculate optimal foreground based on card background
   setCssVariable('--card', hexToHslString(colors.card));
-  setCssVariable('--card-foreground', hexToHslString(colors.cardForeground));
+  const optimalCardForeground = getOptimalForeground(colors.card);
+  setCssVariable('--card-foreground', hexToHslString(optimalCardForeground));
 
-  // Popover
+  // Popover - Calculate optimal foreground based on popover background
   setCssVariable('--popover', hexToHslString(colors.popover));
-  setCssVariable('--popover-foreground', hexToHslString(colors.popoverForeground));
+  const optimalPopoverForeground = getOptimalForeground(colors.popover);
+  setCssVariable('--popover-foreground', hexToHslString(optimalPopoverForeground));
 
   // UI Elements
   setCssVariable('--border', hexToHslString(colors.border));
@@ -154,9 +237,13 @@ function applyCssVariables(branding: TenantBranding, tenantColors?: {
   setCssVariable('--info', hexToHslString(colors.info));
   setCssVariable('--info-foreground', hexToHslString(colors.infoForeground));
 
-  // Muted
+  // Muted - Calculate optimal foreground for muted backgrounds
   setCssVariable('--muted', hexToHslString(colors.muted));
-  setCssVariable('--muted-foreground', hexToHslString(colors.mutedForeground));
+  const optimalMutedForeground = getOptimalForeground(colors.muted);
+  // For muted text, we want slightly less contrast (gray instead of pure black/white)
+  // Use the calculated direction but apply a muted gray
+  const mutedFg = optimalMutedForeground === '#000000' ? '#6B7280' : '#9CA3AF';
+  setCssVariable('--muted-foreground', hexToHslString(mutedFg));
 
   // Sidebar - derive from primary if not specified
   const sidebarBg = colors.sidebarBackground || darken(colors.primary, 35);
@@ -220,6 +307,8 @@ export function TenantThemeProvider({
   // Use Zustand store for tenant data (includes metadata.branding from onboarding)
   const currentTenant = useTenantStore((state) => state.currentTenant);
   const storeSettings = useTenantStore((state) => state.settings);
+  // Cached branding from localStorage for instant application
+  const cachedBranding = useCachedBranding();
 
   const [branding, setBranding] = React.useState<TenantBranding | null>(
     initialBranding || null
@@ -227,10 +316,38 @@ export function TenantThemeProvider({
   const [isLoading, setIsLoading] = React.useState(!initialBranding);
 
   // Load branding when tenant changes
-  // Priority: 1) metadata.branding (onboarding) 2) settings 3) store settings 4) defaults
+  // Priority: 0) cached branding 1) metadata.branding (onboarding) 2) settings 3) store settings 4) defaults
   React.useEffect(() => {
     let resolvedBranding: TenantBranding = DEFAULT_BRANDING;
     let hasCustomColors = false;
+
+    // Priority 0: Use cached branding for instant display while tenant loads
+    // This provides immediate colors from localStorage before API response
+    if (!currentTenant && cachedBranding?.primaryColor) {
+      const primaryColor = sanitizeHexColor(cachedBranding.primaryColor, DEFAULT_BRANDING.colors.primary);
+      resolvedBranding = mergeBranding(DEFAULT_BRANDING, {
+        colors: {
+          ...DEFAULT_BRANDING.colors,
+          primary: primaryColor,
+          primaryForeground: getOptimalForeground(primaryColor),
+          ring: primaryColor,
+          info: primaryColor,
+          infoForeground: getOptimalForeground(primaryColor),
+        },
+      });
+
+      const tenantColors = {
+        primaryColor: cachedBranding.primaryColor,
+        sidebarColor: cachedBranding.sidebarColor,
+        accentColor: cachedBranding.accentColor,
+        surfaceColor: cachedBranding.surfaceColor,
+      };
+
+      setBranding(resolvedBranding);
+      applyCssVariables(resolvedBranding, tenantColors);
+      setIsLoading(false);
+      return; // Wait for tenant to load
+    }
 
     // Priority 1: Check metadata.branding (where onboarding stores data)
     const metadataBranding = currentTenant?.metadata?.branding;
@@ -328,7 +445,7 @@ export function TenantThemeProvider({
     setBranding(resolvedBranding);
     applyCssVariables(resolvedBranding, tenantColors);
     setIsLoading(false);
-  }, [currentTenant, storeSettings.primaryColor, storeSettings.secondaryColor]);
+  }, [currentTenant, cachedBranding, storeSettings.primaryColor, storeSettings.secondaryColor]);
 
   // Apply theme function - for programmatic updates
   const applyTheme = React.useCallback((partial: Partial<TenantBranding>) => {

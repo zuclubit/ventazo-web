@@ -20,6 +20,7 @@ import type {
   CreateNoteData,
   UpdateNoteData,
   CustomersResponse,
+  CustomersApiResponse,
   CustomerNotesResponse,
   CustomerActivityResponse,
   CustomerStatistics,
@@ -63,6 +64,24 @@ interface UseCustomersOptions extends CustomerFilters, CustomerSort {
 }
 
 /**
+ * Transform backend response to frontend format
+ * Backend: { customers, total, page, limit }
+ * Frontend: { data, meta: { total, page, pageSize, totalPages } }
+ */
+function transformCustomersResponse(apiResponse: CustomersApiResponse): CustomersResponse {
+  const { customers, total, page, limit } = apiResponse;
+  return {
+    data: customers,
+    meta: {
+      total,
+      page,
+      pageSize: limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    },
+  };
+}
+
+/**
  * Get customers list with filters
  */
 export function useCustomers(options: UseCustomersOptions = {}) {
@@ -98,7 +117,8 @@ export function useCustomers(options: UseCustomersOptions = {}) {
 
   const endpoint = `/customers${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
-  return useApiQuery<CustomersResponse>(
+  // Use the API response type and transform to frontend format
+  const query = useApiQuery<CustomersApiResponse>(
     customerQueryKeys.list(filters as Record<string, unknown>),
     endpoint,
     {
@@ -106,6 +126,12 @@ export function useCustomers(options: UseCustomersOptions = {}) {
       enabled,
     }
   );
+
+  // Transform the response while preserving the query state
+  return {
+    ...query,
+    data: query.data ? transformCustomersResponse(query.data) : undefined,
+  };
 }
 
 /**

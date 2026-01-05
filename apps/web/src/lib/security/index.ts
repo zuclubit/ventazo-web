@@ -22,11 +22,94 @@ const HTML_ENTITIES: Record<string, string> = {
 };
 
 /**
+ * Reverse mapping for decoding HTML entities
+ */
+const HTML_DECODE_MAP: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&apos;': "'",
+  '&#x27;': "'",
+  '&#39;': "'",
+  '&#x2F;': '/',
+  '&#47;': '/',
+  '&#x60;': '`',
+  '&#96;': '`',
+  '&#x3D;': '=',
+  '&#61;': '=',
+  '&nbsp;': ' ',
+};
+
+/**
  * Escape HTML to prevent XSS attacks
  */
 export function escapeHtml(str: string): string {
   if (!str || typeof str !== 'string') return '';
   return str.replace(/[&<>"'`=/]/g, (char) => HTML_ENTITIES[char] || char);
+}
+
+/**
+ * Decode HTML entities to their original characters
+ * Use this for displaying user-generated content that may have been encoded
+ *
+ * @param str - String with HTML entities to decode
+ * @returns Decoded string
+ *
+ * @example
+ * decodeHtmlEntities("O&apos;Brien &amp; Sons") // "O'Brien & Sons"
+ * decodeHtmlEntities("&lt;script&gt;") // "<script>"
+ */
+export function decodeHtmlEntities(str: string): string {
+  if (!str || typeof str !== 'string') return '';
+
+  // First, decode named and hex entities from our map
+  let decoded = str.replace(
+    /&(?:amp|lt|gt|quot|apos|nbsp|#x[0-9a-fA-F]+|#[0-9]+);/g,
+    (entity): string => {
+      // Check our decode map first
+      const lowerEntity = entity.toLowerCase();
+      const mapped = HTML_DECODE_MAP[lowerEntity];
+      if (mapped !== undefined) {
+        return mapped;
+      }
+
+      // Handle numeric hex entities (&#xNN;)
+      if (entity.startsWith('&#x') || entity.startsWith('&#X')) {
+        const hex = entity.slice(3, -1);
+        const codePoint = parseInt(hex, 16);
+        if (!isNaN(codePoint) && codePoint > 0 && codePoint <= 0x10FFFF) {
+          return String.fromCodePoint(codePoint);
+        }
+      }
+
+      // Handle numeric decimal entities (&#NN;)
+      if (entity.startsWith('&#')) {
+        const decimal = entity.slice(2, -1);
+        const codePoint = parseInt(decimal, 10);
+        if (!isNaN(codePoint) && codePoint > 0 && codePoint <= 0x10FFFF) {
+          return String.fromCodePoint(codePoint);
+        }
+      }
+
+      // Return the entity unchanged if we can't decode it
+      return entity;
+    }
+  );
+
+  return decoded;
+}
+
+/**
+ * Safe decode for display - decodes entities while preventing XSS
+ * This is useful when you need to display encoded text that came from the API
+ *
+ * @param str - String to decode
+ * @returns Decoded string (safe for display in text nodes, NOT for innerHTML)
+ */
+export function safeDecodeForDisplay(str: string | undefined | null): string {
+  if (!str || typeof str !== 'string') return '';
+  return decodeHtmlEntities(sanitizeText(str));
 }
 
 /**
@@ -543,3 +626,11 @@ export function safeJsonStringify(
     return null;
   }
 }
+
+// ============================================
+// Security Hooks & Types - FASE 4
+// 2FA, Sessions, Password Policies
+// ============================================
+
+export * from './types';
+export * from './hooks';

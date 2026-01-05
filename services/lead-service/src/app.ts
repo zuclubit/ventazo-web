@@ -3,8 +3,9 @@ import { container } from 'tsyringe';
 import { DatabasePool } from '@zuclubit/database';
 import { createServer, startServer, ServerConfig } from './presentation/server';
 import { errorHandler } from './presentation/middlewares/error-handler.middleware';
-import { leadRoutes, pipelineRoutes, analyticsRoutes, webhookRoutes, bulkRoutes, deduplicationRoutes, contactRoutes, contactsStandaloneRoutes, communicationRoutes, searchRoutes, taskRoutes, opportunityRoutes, customerRoutes, authRoutes, memberRoutes, tenantRoutes, userSyncRoutes, invitationRoutes, onboardingRoutes, auditLogRoutes, calendarRoutes, notesRoutes, attachmentsRoutes, workflowsRoutes, pushRoutes, emailSyncRoutes, smsRoutes, enrichmentRoutes, gdprRoutes, reportsRoutes, whatsappRoutes, paymentRoutes, quoteRoutes, aiRoutes, realtimeRoutes, teamRoutes, territoryRoutes, quotaRoutes, emailTrackingRoutes, forecastingRoutes, customerSuccessRoutes, contractRoutes, permissionRoutes, productRoutes, campaignRoutes, dripSequenceRoutes, activityTrackingRoutes, documentRoutes, customer360Routes, unifiedInboxRoutes, subscriptionAnalyticsRoutes, integrationHubRoutes, mlScoringRoutes, cacheRoutes, resilienceRoutes, auditRoutes, rateLimitingRoutes, webhookDLQRoutes, tracingRoutes, lockingRoutes, segmentationRoutes, emailTemplateRoutes, advancedReportRoutes, customFieldRoutes, workflowBuilderRoutes, integrationConnectorRoutes, notificationRoutes, messagingRoutes } from './presentation/routes';
+import { leadRoutes, pipelineRoutes, analyticsRoutes, webhookRoutes, bulkRoutes, deduplicationRoutes, contactRoutes, contactsStandaloneRoutes, communicationRoutes, searchRoutes, taskRoutes, opportunityRoutes, customerRoutes, authRoutes, memberRoutes, tenantRoutes, userSyncRoutes, invitationRoutes, onboardingRoutes, auditLogRoutes, calendarRoutes, notesRoutes, attachmentsRoutes, workflowsRoutes, pushRoutes, emailSyncRoutes, smsRoutes, enrichmentRoutes, gdprRoutes, reportsRoutes, whatsappRoutes, messengerRoutes, messengerOAuthRoutes, paymentRoutes, quoteRoutes, proposalTemplateRoutes, aiRoutes, realtimeRoutes, teamRoutes, territoryRoutes, quotaRoutes, emailTrackingRoutes, forecastingRoutes, customerSuccessRoutes, contractRoutes, permissionRoutes, productRoutes, campaignRoutes, dripSequenceRoutes, activityTrackingRoutes, documentRoutes, customer360Routes, unifiedInboxRoutes, subscriptionAnalyticsRoutes, integrationHubRoutes, mlScoringRoutes, cacheRoutes, resilienceRoutes, auditRoutes, rateLimitingRoutes, webhookDLQRoutes, tracingRoutes, lockingRoutes, segmentationRoutes, emailTemplateRoutes, advancedReportRoutes, customFieldRoutes, workflowBuilderRoutes, integrationConnectorRoutes, notificationRoutes, messagingRoutes, kanbanRoutes, securityRoutes, dataManagementRoutes, userTagsRoutes, userTagsUserRoutes } from './presentation/routes';
 import { setupContainer, cleanupContainer } from './config/container';
+import { warmupPool } from './infrastructure/database';
 
 /**
  * Application Bootstrap
@@ -22,6 +23,11 @@ async function bootstrap() {
 
   // Setup container with all dependencies
   await setupContainer();
+
+  // PERFORMANCE: Warm up database connections before accepting traffic
+  // This reduces first-request latency by ~100-200ms
+  // See: docs/PERFORMANCE_OPTIMIZATION_PLAN_V2.md - Section 1.3
+  await warmupPool();
 
   // Create and configure server
   const server = await createServer(serverConfig);
@@ -61,8 +67,11 @@ async function bootstrap() {
   await server.register(gdprRoutes, { prefix: '/api/v1/gdpr' });
   await server.register(reportsRoutes, { prefix: '/api/v1/reports' });
   await server.register(whatsappRoutes, { prefix: '/api/v1/whatsapp' });
+  await server.register(messengerRoutes, { prefix: '/api/v1/messenger' });
+  await server.register(messengerOAuthRoutes, { prefix: '/api/v1/messenger' }); // OAuth under same prefix
   await server.register(paymentRoutes, { prefix: '/api/v1/payments' });
   await server.register(quoteRoutes, { prefix: '/api/v1/quotes' });
+  await server.register(proposalTemplateRoutes, { prefix: '/api/v1/proposal-templates' });
   await server.register(aiRoutes, { prefix: '/api/v1/ai' });
   await server.register(realtimeRoutes, { prefix: '/api/v1/realtime' });
   await server.register(teamRoutes, { prefix: '/api/v1/teams' });
@@ -98,6 +107,11 @@ async function bootstrap() {
   await server.register(integrationConnectorRoutes, { prefix: '/api/v1/integration-connectors' });
   await server.register(notificationRoutes, { prefix: '/api/v1/notifications' });
   await server.register(messagingRoutes, { prefix: '/api/v1/messages' });
+  await server.register(kanbanRoutes, { prefix: '/api/v1/kanban' });
+  await server.register(securityRoutes, { prefix: '/api/v1/security' });
+  await server.register(dataManagementRoutes, { prefix: '/api/v1/data' });
+  await server.register(userTagsRoutes, { prefix: '/api/v1/user-tags' }); // User tags for group notifications
+  await server.register(userTagsUserRoutes, { prefix: '/api/v1/users' }); // User-centric tag endpoints
 
   // Start server
   await startServer(server, serverConfig);

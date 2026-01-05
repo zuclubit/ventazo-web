@@ -45,6 +45,69 @@ interface CreateLeadResult {
   leadId: string;
 }
 
+// ==========================================================================
+// Performance optimization: In-memory stats cache
+// See: docs/PERFORMANCE_REMEDIATION_LOG.md - P2.1 Stats Cache
+// ==========================================================================
+
+interface StatsCacheEntry {
+  data: unknown;
+  expiresAt: number;
+}
+
+// Stats cache with 5-minute TTL
+const STATS_CACHE_TTL_MS = 300_000; // 5 minutes
+const statsCache = new Map<string, StatsCacheEntry>();
+
+/**
+ * Get cached stats or execute query
+ * Performance optimization: Reduces stats endpoint latency from ~374ms to ~5ms (on cache hit)
+ */
+async function getCachedStats(
+  tenantId: string,
+  queryBus: IQueryBus
+): Promise<{ data: unknown; fromCache: boolean }> {
+  const cacheKey = `stats:${tenantId}`;
+  const cached = statsCache.get(cacheKey);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return { data: cached.data, fromCache: true };
+  }
+
+  // Cache miss - execute query
+  const query = new GetLeadStatsQuery(tenantId);
+  const result = await queryBus.execute(query);
+
+  if (result.isSuccess) {
+    const data = result.getValue();
+    statsCache.set(cacheKey, {
+      data,
+      expiresAt: Date.now() + STATS_CACHE_TTL_MS,
+    });
+    return { data, fromCache: false };
+  }
+
+  throw new Error(result.error || 'Failed to get stats');
+}
+
+/**
+ * Invalidate stats cache for a tenant
+ * Call this after lead mutations (create, update, delete, status change)
+ */
+export function invalidateStatsCache(tenantId: string): void {
+  statsCache.delete(`stats:${tenantId}`);
+}
+
+// Periodic cache cleanup (every minute)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of statsCache.entries()) {
+    if (entry.expiresAt < now) {
+      statsCache.delete(key);
+    }
+  }
+}, 60_000);
+
 /**
  * Lead Routes Plugin
  * Fastify plugin that registers all lead-related routes following CQRS pattern
@@ -55,6 +118,232 @@ export async function leadRoutes(
 ): Promise<void> {
   const commandBus = container.resolve<ICommandBus>('ICommandBus');
   const queryBus = container.resolve<IQueryBus>('IQueryBus');
+
+  // ==========================================================================
+  // IMPORTANT: Static routes MUST be registered BEFORE dynamic :id routes
+  // Otherwise Fastify will match /pipeline, /stats etc as :id parameter
+  // ==========================================================================
+
+  // ==========================================================================
+  // GET /leads/stats/overview - Get lead statistics
+  // ==========================================================================
+  server.get(
+    '/stats/overview',
+    {
+      schema: {
+        description: 'Get lead statistics overview',
+        tags: ['leads', 'stats'],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const tenantId = getTenantId(request);
+
+      try {
+        // Performance optimization: Use cached stats
+        // See: docs/PERFORMANCE_REMEDIATION_LOG.md - P2.1 Stats Cache
+        const { data, fromCache } = await getCachedStats(tenantId, queryBus);
+
+        // Add cache header for debugging
+        reply.header('X-Cache', fromCache ? 'HIT' : 'MISS');
+
+        return reply.status(200).send(data);
+      } catch (error) {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: error instanceof Error ? error.message : 'Failed to get stats',
+        });
+      }
+    }
+  );
+
+  // ==========================================================================
+  // GET /leads/follow-ups/overdue - Get overdue follow-ups
+  // ==========================================================================
+  server.get(
+    '/follow-ups/overdue',
+    {
+      schema: {
+        description: 'Get leads with overdue follow-ups',
+        tags: ['leads', 'follow-ups'],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const tenantId = getTenantId(request);
+      const queryParams = request.query as { assignedTo?: string };
+
+      const query = new GetOverdueFollowUpsQuery(tenantId, queryParams.assignedTo);
+      const result = await queryBus.execute(query);
+
+      if (result.isFailure) {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: result.error,
+        });
+      }
+
+      return reply.status(200).send(result.getValue());
+    }
+  );
+
+  // ==========================================================================
+  // GET /leads/pipeline/stages - Get pipeline stages for tenant
+  // ==========================================================================
+  server.get(
+    '/pipeline/stages',
+    {
+      schema: {
+        description: 'Get pipeline stages for the tenant',
+        tags: ['leads', 'pipeline'],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const tenantId = getTenantId(request);
+
+      const stages = await db.query.pipelineStages.findMany({
+        where: and(
+          eq(pipelineStages.tenantId, tenantId),
+          eq(pipelineStages.isActive, true)
+        ),
+        orderBy: [asc(pipelineStages.order)],
+      });
+
+      return reply.status(200).send(stages);
+    }
+  );
+
+  // ==========================================================================
+  // POST /leads/pipeline/stages - Create pipeline stage
+  // ==========================================================================
+  const createStageSchema = z.object({
+    label: z.string().min(1).max(100),
+    description: z.string().max(500).optional(),
+    order: z.number().int().min(0).optional(),
+    color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    isDefault: z.boolean().optional(),
+  });
+
+  server.post(
+    '/pipeline/stages',
+    {
+      preHandler: validate({ body: createStageSchema }),
+      schema: {
+        description: 'Create a pipeline stage',
+        tags: ['leads', 'pipeline'],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const tenantId = getTenantId(request);
+      const body = request.body as {
+        label: string;
+        description?: string;
+        order?: number;
+        color?: string;
+        isDefault?: boolean;
+      };
+
+      // Get max order if not provided
+      let order = body.order;
+      if (order === undefined) {
+        const stages = await db.query.pipelineStages.findMany({
+          where: eq(pipelineStages.tenantId, tenantId),
+          columns: { order: true },
+        });
+        order = stages.length > 0 ? Math.max(...stages.map((s) => s.order)) + 1 : 0;
+      }
+
+      const [stage] = await db
+        .insert(pipelineStages)
+        .values({
+          tenantId,
+          label: body.label,
+          description: body.description,
+          order,
+          color: body.color || '#3B82F6',
+          isDefault: body.isDefault || false,
+        })
+        .returning();
+
+      return reply.status(201).send(stage);
+    }
+  );
+
+  // ==========================================================================
+  // GET /leads/pipeline/view - Get leads grouped by stage (for Kanban)
+  // ==========================================================================
+  server.get(
+    '/pipeline/view',
+    {
+      schema: {
+        description: 'Get leads grouped by pipeline stage for Kanban view',
+        tags: ['leads', 'pipeline'],
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const tenantId = getTenantId(request);
+
+      // Get all active stages
+      const stages = await db.query.pipelineStages.findMany({
+        where: and(
+          eq(pipelineStages.tenantId, tenantId),
+          eq(pipelineStages.isActive, true)
+        ),
+        orderBy: [asc(pipelineStages.order)],
+      });
+
+      // Get leads grouped by stage
+      const allLeads = await db.query.leads.findMany({
+        where: and(
+          eq(leads.tenantId, tenantId),
+          // Exclude converted and archived leads from pipeline
+        ),
+        orderBy: [desc(leads.updatedAt)],
+      });
+
+      // Filter out converted/archived leads for pipeline view
+      const pipelineLeads = allLeads.filter(
+        (lead) => lead.status !== 'converted' && lead.status !== 'archived'
+      );
+
+      // Group leads by stage
+      const pipelineView = stages.map((stage) => ({
+        stage,
+        leads: pipelineLeads.filter((lead) => lead.stageId === stage.id),
+        count: pipelineLeads.filter((lead) => lead.stageId === stage.id).length,
+      }));
+
+      // Add "No Stage" column for leads without a stage
+      const noStageLeads = pipelineLeads.filter((lead) => !lead.stageId);
+      if (noStageLeads.length > 0) {
+        pipelineView.unshift({
+          stage: {
+            id: 'no-stage',
+            tenantId,
+            label: 'Sin Etapa',
+            description: 'Leads sin etapa asignada',
+            order: -1,
+            color: '#6B7280',
+            isDefault: false,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          leads: noStageLeads,
+          count: noStageLeads.length,
+        });
+      }
+
+      return reply.status(200).send({
+        stages: pipelineView,
+        totalLeads: pipelineLeads.length,
+      });
+    }
+  );
+
+  // ==========================================================================
+  // DYNAMIC ROUTES - These come AFTER static routes
+  // ==========================================================================
 
   // ==========================================================================
   // POST /leads - Create a new lead
@@ -116,6 +405,9 @@ export async function leadRoutes(
           message: result.error,
         });
       }
+
+      // Performance optimization: Invalidate stats cache on lead creation
+      invalidateStatsCache(tenantId);
 
       return reply.status(201).send(result.getValue());
     }
@@ -273,6 +565,9 @@ export async function leadRoutes(
         });
       }
 
+      // Performance optimization: Invalidate stats cache on lead update
+      invalidateStatsCache(tenantId);
+
       const lead = result.getValue();
       return reply.status(200).send(LeadMapper.toResponseDTO(lead));
     }
@@ -314,6 +609,10 @@ export async function leadRoutes(
           message: result.error,
         });
       }
+
+      // Performance optimization: Invalidate stats cache on status change
+      // Status changes directly affect stats (count by status)
+      invalidateStatsCache(tenantId);
 
       const lead = result.getValue();
       return reply.status(200).send(LeadMapper.toResponseDTO(lead));
@@ -486,65 +785,6 @@ export async function leadRoutes(
   );
 
   // ==========================================================================
-  // GET /leads/stats/overview - Get lead statistics
-  // ==========================================================================
-  server.get(
-    '/stats/overview',
-    {
-      schema: {
-        description: 'Get lead statistics overview',
-        tags: ['leads', 'stats'],
-      },
-    },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const tenantId = getTenantId(request);
-
-      const query = new GetLeadStatsQuery(tenantId);
-      const result = await queryBus.execute(query);
-
-      if (result.isFailure) {
-        return reply.status(400).send({
-          statusCode: 400,
-          error: 'Bad Request',
-          message: result.error,
-        });
-      }
-
-      return reply.status(200).send(result.getValue());
-    }
-  );
-
-  // ==========================================================================
-  // GET /leads/follow-ups/overdue - Get overdue follow-ups
-  // ==========================================================================
-  server.get(
-    '/follow-ups/overdue',
-    {
-      schema: {
-        description: 'Get leads with overdue follow-ups',
-        tags: ['leads', 'follow-ups'],
-      },
-    },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const tenantId = getTenantId(request);
-      const queryParams = request.query as { assignedTo?: string };
-
-      const query = new GetOverdueFollowUpsQuery(tenantId, queryParams.assignedTo);
-      const result = await queryBus.execute(query);
-
-      if (result.isFailure) {
-        return reply.status(400).send({
-          statusCode: 400,
-          error: 'Bad Request',
-          message: result.error,
-        });
-      }
-
-      return reply.status(200).send(result.getValue());
-    }
-  );
-
-  // ==========================================================================
   // POST /leads/:id/convert - Convert lead to customer
   // ==========================================================================
   server.post<{ Params: { id: string } }>(
@@ -588,6 +828,9 @@ export async function leadRoutes(
           message: result.error,
         });
       }
+
+      // Performance optimization: Invalidate stats cache on lead conversion
+      invalidateStatsCache(tenantId);
 
       return reply.status(201).send(result.getValue());
     }
@@ -664,6 +907,9 @@ export async function leadRoutes(
 
       // Delete lead (cascade will delete notes and activity)
       await db.delete(leads).where(and(eq(leads.id, id), eq(leads.tenantId, tenantId)));
+
+      // Performance optimization: Invalidate stats cache on lead deletion
+      invalidateStatsCache(tenantId);
 
       return reply.status(204).send();
     }
@@ -992,160 +1238,6 @@ export async function leadRoutes(
       });
 
       return reply.status(204).send();
-    }
-  );
-
-  // ==========================================================================
-  // GET /leads/pipeline/stages - Get pipeline stages for tenant
-  // ==========================================================================
-  server.get(
-    '/pipeline/stages',
-    {
-      schema: {
-        description: 'Get pipeline stages for the tenant',
-        tags: ['leads', 'pipeline'],
-      },
-    },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const tenantId = getTenantId(request);
-
-      const stages = await db.query.pipelineStages.findMany({
-        where: and(
-          eq(pipelineStages.tenantId, tenantId),
-          eq(pipelineStages.isActive, true)
-        ),
-        orderBy: [asc(pipelineStages.order)],
-      });
-
-      return reply.status(200).send(stages);
-    }
-  );
-
-  // ==========================================================================
-  // POST /leads/pipeline/stages - Create pipeline stage
-  // ==========================================================================
-  const createStageSchema = z.object({
-    label: z.string().min(1).max(100),
-    description: z.string().max(500).optional(),
-    order: z.number().int().min(0).optional(),
-    color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-    isDefault: z.boolean().optional(),
-  });
-
-  server.post(
-    '/pipeline/stages',
-    {
-      preHandler: validate({ body: createStageSchema }),
-      schema: {
-        description: 'Create a pipeline stage',
-        tags: ['leads', 'pipeline'],
-      },
-    },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const tenantId = getTenantId(request);
-      const body = request.body as {
-        label: string;
-        description?: string;
-        order?: number;
-        color?: string;
-        isDefault?: boolean;
-      };
-
-      // Get max order if not provided
-      let order = body.order;
-      if (order === undefined) {
-        const stages = await db.query.pipelineStages.findMany({
-          where: eq(pipelineStages.tenantId, tenantId),
-          columns: { order: true },
-        });
-        order = stages.length > 0 ? Math.max(...stages.map((s) => s.order)) + 1 : 0;
-      }
-
-      const [stage] = await db
-        .insert(pipelineStages)
-        .values({
-          tenantId,
-          label: body.label,
-          description: body.description,
-          order,
-          color: body.color || '#3B82F6',
-          isDefault: body.isDefault || false,
-        })
-        .returning();
-
-      return reply.status(201).send(stage);
-    }
-  );
-
-  // ==========================================================================
-  // GET /leads/pipeline/view - Get leads grouped by stage (for Kanban)
-  // ==========================================================================
-  server.get(
-    '/pipeline/view',
-    {
-      schema: {
-        description: 'Get leads grouped by pipeline stage for Kanban view',
-        tags: ['leads', 'pipeline'],
-      },
-    },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const tenantId = getTenantId(request);
-
-      // Get all active stages
-      const stages = await db.query.pipelineStages.findMany({
-        where: and(
-          eq(pipelineStages.tenantId, tenantId),
-          eq(pipelineStages.isActive, true)
-        ),
-        orderBy: [asc(pipelineStages.order)],
-      });
-
-      // Get leads grouped by stage
-      const allLeads = await db.query.leads.findMany({
-        where: and(
-          eq(leads.tenantId, tenantId),
-          // Exclude converted and archived leads from pipeline
-        ),
-        orderBy: [desc(leads.updatedAt)],
-      });
-
-      // Filter out converted/archived leads for pipeline view
-      const pipelineLeads = allLeads.filter(
-        (lead) => lead.status !== 'converted' && lead.status !== 'archived'
-      );
-
-      // Group leads by stage
-      const pipelineView = stages.map((stage) => ({
-        stage,
-        leads: pipelineLeads.filter((lead) => lead.stageId === stage.id),
-        count: pipelineLeads.filter((lead) => lead.stageId === stage.id).length,
-      }));
-
-      // Add "No Stage" column for leads without a stage
-      const noStageLeads = pipelineLeads.filter((lead) => !lead.stageId);
-      if (noStageLeads.length > 0) {
-        pipelineView.unshift({
-          stage: {
-            id: 'no-stage',
-            tenantId,
-            label: 'Sin Etapa',
-            description: 'Leads sin etapa asignada',
-            order: -1,
-            color: '#6B7280',
-            isDefault: false,
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          leads: noStageLeads,
-          count: noStageLeads.length,
-        });
-      }
-
-      return reply.status(200).send({
-        stages: pipelineView,
-        totalLeads: pipelineLeads.length,
-      });
     }
   );
 }

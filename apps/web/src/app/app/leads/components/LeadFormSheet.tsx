@@ -849,9 +849,11 @@ export function LeadFormSheet({
         <div
           className={cn(
             'shrink-0',
-            'px-4 pt-3 pb-4 sm:px-5 sm:pt-4',
-            // Safe area for notched devices
-            'pb-[max(1rem,env(safe-area-inset-bottom))]',
+            'px-4 pt-3 sm:px-5 sm:pt-4',
+            // Mobile: account for bottom bar (64px) + safe area + padding
+            'pb-[calc(var(--bottom-bar-height,64px)+env(safe-area-inset-bottom,0px)+1rem)]',
+            // Desktop: normal padding (no bottom bar)
+            'sm:pb-4',
             'border-t border-border/40',
             'bg-background/95 backdrop-blur-sm'
           )}

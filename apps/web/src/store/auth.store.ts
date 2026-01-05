@@ -45,6 +45,7 @@ interface AuthState {
   ) => Promise<boolean>;
   logout: () => Promise<void>;
   initialize: (tenantId?: string) => Promise<void>;
+  refreshSession: (switchToTenantId?: string) => Promise<boolean>;
   switchTenant: (tenantId: string) => Promise<boolean>;
   clearError: () => void;
 
@@ -202,6 +203,66 @@ export const useAuthStore = create<AuthState>()(
           state.isLoading = false;
           state.isInitialized = true;
         });
+      }
+    },
+
+    /**
+     * Refresh session - Force re-fetch of tenants and optionally switch to a new tenant
+     * Used after accepting an invitation to update the tenant list
+     */
+    refreshSession: async (switchToTenantId) => {
+      set((state) => {
+        state.isLoading = true;
+        state.error = null;
+      });
+
+      try {
+        // Force re-fetch by calling restoreSession with the target tenant
+        const result = await restoreSession(switchToTenantId);
+
+        if (result) {
+          set((state) => {
+            state.user = result.user;
+            state.tokens = result.tokens;
+            state.tenants = result.tenants;
+            state.currentTenantId = result.user.tenantId;
+            state.isAuthenticated = true;
+            state.isLoading = false;
+          });
+
+          // Fetch full tenant details including branding
+          if (result.user.tenantId && result.tokens.accessToken) {
+            try {
+              const tenantDetails = await fetchTenantDetails(
+                result.tokens.accessToken,
+                result.user.tenantId
+              );
+              if (tenantDetails) {
+                useTenantStore.getState().setTenant(tenantDetails);
+              }
+            } catch (tenantError) {
+              console.warn('Failed to fetch tenant details:', tenantError);
+            }
+          }
+
+          return true;
+        }
+
+        set((state) => {
+          state.isLoading = false;
+        });
+        return false;
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Failed to refresh session';
+        console.warn('Session refresh failed:', message);
+
+        set((state) => {
+          state.isLoading = false;
+          state.error = message;
+        });
+
+        return false;
       }
     },
 

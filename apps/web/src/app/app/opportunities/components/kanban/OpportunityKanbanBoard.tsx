@@ -1,15 +1,22 @@
 'use client';
 
 /**
- * OpportunityKanbanBoard Component
+ * OpportunityKanbanBoard Component - v2.0
  *
- * Main Kanban board for opportunities with:
+ * Enhanced Kanban board for opportunities with:
+ * - Scroll indicators with navigation arrows (NEW)
+ * - Fade gradients at edges (NEW)
+ * - Keyboard navigation (Arrow keys, Home/End) (NEW)
  * - Drag and drop between stages (dnd-kit)
- * - Horizontal scroll on desktop
- * - Snap scroll on mobile
+ * - Stage transition validation
+ * - Visual feedback for allowed/disallowed drops
+ * - Per-card loading states
  * - Drag overlay for visual feedback
  *
- * Homologated with LeadKanbanBoard design patterns.
+ * Clean Architecture: Presentation layer only.
+ * Business logic for validation is in useOpportunityKanban hook.
+ *
+ * @version 2.0.0
  */
 
 import * as React from 'react';
@@ -27,11 +34,13 @@ import {
   type DragOverEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { KanbanContainer } from '@/components/kanban';
 import type { Opportunity, OpportunityPipelineStage, PipelineColumn } from '@/lib/opportunities';
+import type { StageTransitionValidation } from '../../hooks/useOpportunityKanban';
 import { OpportunityKanbanColumn } from './OpportunityKanbanColumn';
-import { OpportunityKanbanCard } from './OpportunityKanbanCard';
+import { OpportunityCardV3Overlay } from '../OpportunityCardV3';
 
 // ============================================
 // Types
@@ -44,6 +53,10 @@ export interface OpportunityKanbanBoardProps {
   isLoading?: boolean;
   /** Whether a move operation is in progress */
   isMoving?: boolean;
+  /** Validate if a move is allowed */
+  canMoveToStage?: (opportunityId: string, stageId: string) => StageTransitionValidation;
+  /** Check if a specific opportunity is being moved */
+  isOpportunityMoving?: (opportunityId: string) => boolean;
   /** Handler when opportunity is moved to a new stage */
   onMoveToStage?: (opportunityId: string, stageId: string) => void;
   /** Handler when opportunity card is clicked */
@@ -70,6 +83,8 @@ export function OpportunityKanbanBoard({
   columns,
   isLoading = false,
   isMoving = false,
+  canMoveToStage,
+  isOpportunityMoving,
   onMoveToStage,
   onOpportunityClick,
   onOpportunityEdit,
@@ -82,6 +97,7 @@ export function OpportunityKanbanBoard({
   // State for tracking the active drag
   const [activeOpportunity, setActiveOpportunity] = React.useState<Opportunity | null>(null);
   const [overId, setOverId] = React.useState<string | null>(null);
+  const [dropValidation, setDropValidation] = React.useState<StageTransitionValidation | null>(null);
 
   // Configure sensors
   const pointerSensor = useSensor(PointerSensor, {
@@ -135,11 +151,41 @@ export function OpportunityKanbanBoard({
     [findOpportunityById]
   );
 
-  // Handle drag over
+  // Handle drag over with validation
   const handleDragOver = React.useCallback((event: DragOverEvent) => {
-    const { over } = event;
-    setOverId(over?.id as string || null);
-  }, []);
+    const { active, over } = event;
+    const overIdValue = over?.id as string || null;
+    setOverId(overIdValue);
+
+    // Validate drop target
+    if (active && overIdValue && canMoveToStage) {
+      const activeId = active.id as string;
+
+      // Determine target stage ID
+      let targetStageId: string | null = null;
+      const overColumn = columns.find((col) => col.stage.id === overIdValue);
+      if (overColumn) {
+        targetStageId = overColumn.stage.id;
+      } else {
+        // Over an opportunity, find its column
+        const opportunityColumn = columns.find((col) =>
+          col.opportunities.some((opp) => opp.id === overIdValue)
+        );
+        if (opportunityColumn) {
+          targetStageId = opportunityColumn.stage.id;
+        }
+      }
+
+      if (targetStageId) {
+        const validation = canMoveToStage(activeId, targetStageId);
+        setDropValidation(validation);
+      } else {
+        setDropValidation(null);
+      }
+    } else {
+      setDropValidation(null);
+    }
+  }, [columns, canMoveToStage]);
 
   // Handle drag end
   const handleDragEnd = React.useCallback(
@@ -149,12 +195,13 @@ export function OpportunityKanbanBoard({
       // Reset state
       setActiveOpportunity(null);
       setOverId(null);
+      setDropValidation(null);
 
       // No drop target
       if (!over) return;
 
       const activeId = active.id as string;
-      const overId = over.id as string;
+      const overIdValue = over.id as string;
 
       // Find current column
       const currentColumn = findColumnByOpportunityId(activeId);
@@ -165,12 +212,12 @@ export function OpportunityKanbanBoard({
       let targetStageId: string;
 
       // Check if over a column directly
-      const overColumn = columns.find((col) => col.stage.id === overId);
+      const overColumn = columns.find((col) => col.stage.id === overIdValue);
       if (overColumn) {
         targetStageId = overColumn.stage.id;
       } else {
         // Over an opportunity, find its column
-        const opportunityColumn = findColumnByOpportunityId(overId);
+        const opportunityColumn = findColumnByOpportunityId(overIdValue);
         if (!opportunityColumn) return;
         targetStageId = opportunityColumn.stage.id;
       }
@@ -178,7 +225,7 @@ export function OpportunityKanbanBoard({
       // If same column, no action needed
       if (currentColumn.stage.id === targetStageId) return;
 
-      // Trigger move
+      // Trigger move (validation happens in the handler)
       onMoveToStage?.(activeId, targetStageId);
     },
     [columns, findColumnByOpportunityId, onMoveToStage]
@@ -188,6 +235,7 @@ export function OpportunityKanbanBoard({
   const handleDragCancel = React.useCallback(() => {
     setActiveOpportunity(null);
     setOverId(null);
+    setDropValidation(null);
   }, []);
 
   // Loading state
@@ -215,65 +263,80 @@ export function OpportunityKanbanBoard({
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
+    <KanbanContainer
+      aria-label="Tablero Kanban de Oportunidades"
+      className={className}
+      scrollOptions={{
+        columnWidth: 300,
+        columnGap: 16,
+        threshold: 20,
+      }}
     >
-      {/* Moving indicator */}
-      {isMoving && (
-        <div className="absolute top-2 right-2 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          <span>Moviendo...</span>
-        </div>
-      )}
-
-      {/* Columns Container */}
-      <div
-        className={cn(
-          'flex gap-4 pb-4',
-          'overflow-x-auto scrollbar-none',
-          // Mobile: snap scroll
-          'snap-x snap-mandatory md:snap-none',
-          // Smooth scrolling
-          'scroll-smooth',
-          className
-        )}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
-        {columns.map((column) => (
-          <div
-            key={column.stage.id}
-            className="snap-center md:snap-align-none flex-shrink-0"
-          >
-            <OpportunityKanbanColumn
-              stage={column.stage}
-              opportunities={column.opportunities}
-              totalAmount={column.totalAmount}
-              totalForecast={column.totalForecast}
-              isOver={overId === column.stage.id}
-              onOpportunityClick={onOpportunityClick}
-              onOpportunityEdit={onOpportunityEdit}
-              onOpportunityWin={onOpportunityWin}
-              onOpportunityLost={onOpportunityLost}
-              onOpportunityView={onOpportunityView}
-              onAddOpportunity={onAddOpportunity}
-            />
+        {/* Moving indicator */}
+        {isMoving && (
+          <div className="absolute top-2 right-2 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>Moviendo...</span>
           </div>
-        ))}
-      </div>
-
-      {/* Drag Overlay */}
-      <DragOverlay>
-        {activeOpportunity && (
-          <OpportunityKanbanCard
-            opportunity={activeOpportunity}
-            isOverlay
-          />
         )}
-      </DragOverlay>
-    </DndContext>
+
+        {/* Columns Container */}
+        <div
+          className={cn(
+            'inline-flex flex-nowrap',
+            'h-full min-h-0',
+            'items-stretch',
+            'gap-3 sm:gap-4 lg:gap-5',
+            'px-3 sm:px-4 lg:px-5',
+            'pb-3'
+          )}
+          role="region"
+          aria-label="Columnas del Pipeline"
+        >
+          {columns.map((column) => {
+            // Determine if this column is a valid drop target
+            const isOver = overId === column.stage.id;
+            const isValidDropTarget = isOver && dropValidation?.allowed !== false;
+            const isInvalidDropTarget = isOver && dropValidation?.allowed === false;
+
+            return (
+              <OpportunityKanbanColumn
+                key={column.stage.id}
+                stage={column.stage}
+                opportunities={column.opportunities}
+                totalAmount={column.totalAmount}
+                totalForecast={column.totalForecast}
+                isOver={isOver}
+                isValidDropTarget={isValidDropTarget}
+                isInvalidDropTarget={isInvalidDropTarget}
+                dropValidationMessage={isInvalidDropTarget ? dropValidation?.reason : undefined}
+                isOpportunityMoving={isOpportunityMoving}
+                onOpportunityClick={onOpportunityClick}
+                onOpportunityEdit={onOpportunityEdit}
+                onOpportunityWin={onOpportunityWin}
+                onOpportunityLost={onOpportunityLost}
+                onOpportunityView={onOpportunityView}
+                onAddOpportunity={onAddOpportunity}
+              />
+            );
+          })}
+        </div>
+
+        {/* Drag Overlay - Uses premium V3 design */}
+        <DragOverlay dropAnimation={null}>
+          {activeOpportunity && (
+            <OpportunityCardV3Overlay opportunity={activeOpportunity} />
+          )}
+        </DragOverlay>
+      </DndContext>
+    </KanbanContainer>
   );
 }

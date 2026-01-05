@@ -63,7 +63,10 @@ export type NotificationEventType =
   | 'workflow.triggered'
   | 'workflow.completed'
   | 'drip.enrolled'
-  | 'drip.completed';
+  | 'drip.completed'
+  // Comment/Mention Events
+  | 'comment.mention'
+  | 'comment.group_mention';
 
 export interface NotificationPreference {
   id: string;
@@ -388,6 +391,20 @@ export const DEFAULT_NOTIFICATION_CONFIG: Record<NotificationEventType, {
     priority: 'medium',
     allowBatching: false,
     recipientRoles: ['owner'],
+  },
+
+  // Comment/Mention Events
+  'comment.mention': {
+    defaultChannels: ['email', 'push'],
+    priority: 'high',
+    allowBatching: false,
+    recipientRoles: ['mentioned_user'],
+  },
+  'comment.group_mention': {
+    defaultChannels: ['email', 'push'],
+    priority: 'high',
+    allowBatching: false,
+    recipientRoles: ['group_members'],
   },
 };
 

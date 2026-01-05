@@ -59,10 +59,10 @@ export const STATUS_LABELS: Record<OpportunityStatus, string> = {
 };
 
 export const STATUS_COLORS: Record<OpportunityStatus, string> = {
-  open: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  won: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  lost: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-  stalled: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+  open: 'bg-[var(--opportunity-open-bg)] text-[var(--opportunity-open)] border border-[var(--opportunity-open-border)]',
+  won: 'bg-[var(--opportunity-won-bg)] text-[var(--opportunity-won)] border border-[var(--opportunity-won-border)]',
+  lost: 'bg-[var(--opportunity-lost-bg)] text-[var(--opportunity-lost)] border border-[var(--opportunity-lost-border)]',
+  stalled: 'bg-[var(--opportunity-stalled-bg)] text-[var(--opportunity-stalled)] border border-[var(--opportunity-stalled-border)]',
 };
 
 export const PRIORITY_LABELS: Record<OpportunityPriority, string> = {
@@ -73,10 +73,10 @@ export const PRIORITY_LABELS: Record<OpportunityPriority, string> = {
 };
 
 export const PRIORITY_COLORS: Record<OpportunityPriority, string> = {
-  low: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300',
-  medium: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  high: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-  critical: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+  low: 'bg-[var(--priority-low-bg)] text-[var(--priority-low)] border border-[var(--priority-low-border)]',
+  medium: 'bg-[var(--priority-medium-bg)] text-[var(--priority-medium)] border border-[var(--priority-medium-border)]',
+  high: 'bg-[var(--priority-high-bg)] text-[var(--priority-high)] border border-[var(--priority-high-border)]',
+  critical: 'bg-[var(--priority-critical-bg)] text-[var(--priority-critical)] border border-[var(--priority-critical-border)]',
 };
 
 export const STAGE_TYPE_LABELS: Record<OpportunityStageType, string> = {
@@ -86,9 +86,9 @@ export const STAGE_TYPE_LABELS: Record<OpportunityStageType, string> = {
 };
 
 export const STAGE_TYPE_COLORS: Record<OpportunityStageType, string> = {
-  open: 'bg-blue-500',
-  won: 'bg-green-500',
-  lost: 'bg-red-500',
+  open: 'bg-[var(--opportunity-open)]',
+  won: 'bg-[var(--opportunity-won)]',
+  lost: 'bg-[var(--opportunity-lost)]',
 };
 
 export const ACTIVITY_LABELS: Record<OpportunityActivityType, string> = {

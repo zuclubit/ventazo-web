@@ -11,7 +11,7 @@ export type StorageProvider = 's3' | 'gcs' | 'azure' | 'supabase' | 'local';
 /**
  * Entity types that can have attachments
  */
-export type AttachmentEntityType = 'lead' | 'customer' | 'opportunity' | 'task' | 'note' | 'communication' | 'contact';
+export type AttachmentEntityType = 'lead' | 'customer' | 'opportunity' | 'task' | 'quote' | 'note' | 'communication' | 'contact';
 
 /**
  * Access levels for files
@@ -366,14 +366,28 @@ export const ALLOWED_FILE_TYPES: Record<FileCategory, string[]> = {
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    // Images for supporting documentation
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
   ],
   proposal: [
     'application/pdf',
     'application/vnd.ms-powerpoint',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    // Images for mockups, diagrams, screenshots
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
   ],
   invoice: [
     'application/pdf',
+    // Images for scanned invoices, receipts
+    'image/jpeg',
+    'image/png',
   ],
   presentation: [
     'application/vnd.ms-powerpoint',

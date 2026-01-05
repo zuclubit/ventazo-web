@@ -8,6 +8,14 @@
  * - Consistent typography scale
  * - 44px touch targets
  * - Soft shadows and harmonious colors
+ *
+ * Mobile Scroll Optimization (v2.0):
+ * - Drag handle only on mobile (prevents scroll conflicts)
+ * - Full card draggable on desktop
+ * - touch-action CSS for proper scroll behavior
+ *
+ * @version 2.1.0
+ * @phase FASE 6 - Integrated with CARD_TOKENS Design System
  */
 
 import * as React from 'react';
@@ -37,6 +45,14 @@ import {
 import type { Lead } from '@/lib/leads';
 import { LeadStatus, STATUS_LABELS } from '@/lib/leads';
 import { cn } from '@/lib/utils';
+import { useMobileDetection } from '@/hooks/use-mobile-detection';
+
+// Extended Lead type for optimistic updates
+interface OptimisticLead extends Lead {
+  isOptimistic?: boolean;
+}
+import { decodeHtmlEntities } from '@/lib/security';
+import { CARD_TOKENS } from '@/components/cards';
 
 import { LeadSourceIcon } from '../LeadSourceBadge';
 import { UrgencyBanner } from '../LeadUrgencyIndicator';
@@ -61,19 +77,20 @@ export interface KanbanCardProps {
 // ============================================
 
 /**
- * Status styles using CSS variables for dynamic theming
- * These can be customized per-tenant via CSS variables
+ * Status styles using CSS variables for FULL dynamic theming v4.0
+ * All colors are controlled via CSS variables set by useKanbanTheme
+ * This ensures consistent theming across the entire Kanban board
  */
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   new: {
-    bg: 'bg-blue-500/15 dark:bg-blue-500/20',
-    text: 'text-blue-600 dark:text-blue-400',
-    border: 'border-blue-200 dark:border-blue-500/30'
+    bg: 'bg-[var(--status-info-bg)]',
+    text: 'text-[var(--status-info-text)]',
+    border: 'border-[var(--status-info-border)]'
   },
   contacted: {
-    bg: 'bg-amber-500/15 dark:bg-amber-500/20',
-    text: 'text-amber-600 dark:text-amber-400',
-    border: 'border-amber-200 dark:border-amber-500/30'
+    bg: 'bg-[var(--status-warning-bg)]',
+    text: 'text-[var(--status-warning-text)]',
+    border: 'border-[var(--status-warning-border)]'
   },
   qualified: {
     bg: 'bg-violet-500/15 dark:bg-violet-500/20',
@@ -82,9 +99,9 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
   },
   proposal: {
     // Use tenant primary color for proposal stage
-    bg: 'bg-[var(--tenant-primary)]/15 dark:bg-[var(--tenant-primary)]/20',
-    text: 'text-[var(--tenant-primary)] dark:text-[var(--tenant-primary-light)]',
-    border: 'border-[var(--tenant-primary-light)] dark:border-[var(--tenant-primary)]/30'
+    bg: 'bg-[rgba(var(--tenant-primary-rgb),0.15)]',
+    text: 'text-[var(--tenant-primary)]',
+    border: 'border-[var(--tenant-primary-glow)]'
   },
   negotiation: {
     bg: 'bg-pink-500/15 dark:bg-pink-500/20',
@@ -92,15 +109,15 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }
     border: 'border-pink-200 dark:border-pink-500/30'
   },
   won: {
-    // Use tenant accent for won deals
-    bg: 'bg-[var(--tenant-accent)]/15 dark:bg-[var(--tenant-accent)]/20',
-    text: 'text-emerald-600 dark:text-emerald-400',
-    border: 'border-[var(--tenant-accent-light)] dark:border-[var(--tenant-accent)]/30'
+    // Use tenant accent for won deals (success state)
+    bg: 'bg-[var(--status-success-bg)]',
+    text: 'text-[var(--status-success-text)]',
+    border: 'border-[var(--status-success-border)]'
   },
   lost: {
-    bg: 'bg-red-500/15 dark:bg-red-500/20',
-    text: 'text-red-500 dark:text-red-400',
-    border: 'border-red-200 dark:border-red-500/30'
+    bg: 'bg-[var(--status-error-bg)]',
+    text: 'text-[var(--status-error-text)]',
+    border: 'border-[var(--status-error-border)]'
   },
 };
 
@@ -150,6 +167,13 @@ function ScoreBadge({ score }: { score: number }) {
   const level = getScoreLevel(score);
   const isHot = score >= 70;
 
+  // Labels for accessibility
+  const levelLabels = {
+    hot: 'Caliente',
+    warm: 'Tibio',
+    cold: 'Frío',
+  };
+
   // Use CSS classes that reference CSS variables for dynamic theming
   const levelClasses = {
     hot: 'score-badge-premium hot',
@@ -159,6 +183,8 @@ function ScoreBadge({ score }: { score: number }) {
 
   return (
     <span
+      role="img"
+      aria-label={`Score: ${score} - ${levelLabels[level]}`}
       className={cn(
         'inline-flex items-center justify-center gap-0.5',
         'min-w-[2rem] h-6 px-2 rounded-full',
@@ -168,7 +194,7 @@ function ScoreBadge({ score }: { score: number }) {
       )}
     >
       {score}
-      {isHot && <Flame className="h-3 w-3 animate-pulse" />}
+      {isHot && <Flame className="h-3 w-3 animate-pulse" aria-hidden="true" />}
     </span>
   );
 }
@@ -178,26 +204,31 @@ function ScoreBadge({ score }: { score: number }) {
 // ============================================
 
 function StatusBadge({ status }: { status: LeadStatus }) {
+  // Theme-aware default using muted tokens
   const defaultStyle = {
-    bg: 'bg-slate-500/20',
-    text: 'text-slate-300',
-    border: 'border-slate-500/30'
+    bg: 'bg-muted',
+    text: 'text-muted-foreground',
+    border: 'border-border'
   };
   const styles = STATUS_STYLES[status] ?? defaultStyle;
+  const label = STATUS_LABELS[status] || status;
 
   return (
     <span
+      role="status"
+      aria-label={`Estado del lead: ${label}`}
       className={cn(
         'inline-flex items-center',
         'px-2 py-0.5',
-        'rounded-md border',
+        CARD_TOKENS.radius.badge,
+        'border',
         'text-[10px] font-medium',
         styles.bg,
         styles.text,
         styles.border
       )}
     >
-      {STATUS_LABELS[status] || status}
+      {label}
     </span>
   );
 }
@@ -227,10 +258,11 @@ function ActionButton({
       aria-label={label}
       className={cn(
         'flex items-center justify-center',
-        'w-9 h-9 rounded-lg',
+        CARD_TOKENS.touchTarget.buttonSm,
+        CARD_TOKENS.radius.cardSm,
         'text-muted-foreground',
-        'transition-all duration-150',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+        CARD_TOKENS.transition.micro,
+        CARD_TOKENS.focus.ring,
         !disabled && 'hover:scale-105 active:scale-95',
         disabled && 'opacity-30 cursor-not-allowed',
         className
@@ -267,9 +299,27 @@ export function KanbanCard({
     data: { type: 'lead', lead },
   });
 
+  // Use centralized mobile detection (P0-1 optimization)
+  // Before: Each card had its own resize listener
+  // After: Single listener at app level via MobileDetectionProvider
+  const { isMobile } = useMobileDetection();
+
   const isCurrentlyDragging = isDragging || isSortableDragging;
   const isHotLead = lead.score >= 70;
   const hasPhone = !!lead.phone?.trim();
+
+  // Check for optimistic flag (P1 Fix: visual feedback for pending operations)
+  const isOptimistic = (lead as OptimisticLead).isOptimistic === true;
+
+  // Decode HTML entities in names for proper display
+  const decodedFullName = React.useMemo(
+    () => decodeHtmlEntities(lead.fullName || ''),
+    [lead.fullName]
+  );
+  const decodedCompanyName = React.useMemo(
+    () => decodeHtmlEntities(lead.companyName || ''),
+    [lead.companyName]
+  );
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -297,51 +347,72 @@ export function KanbanCard({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'touch-none',
+        // Mobile: allow scroll, only drag handle blocks touch
+        // Desktop: full card can initiate drag
+        'lg:touch-none',
         isCurrentlyDragging && !isOverlay && 'z-0',
         isOverlay && 'shadow-2xl',
         className
       )}
     >
       <div
-        {...attributes}
-        {...listeners}
+        // Desktop: full card is draggable
+        // Mobile: card is clickable, drag handle is separate
+        {...(!isMobile ? { ...attributes, ...listeners } : {})}
         onClick={!isOverlay && !isCurrentlyDragging ? onClick : undefined}
         className={cn(
           // Base
           'group relative',
           'p-3',
-          'rounded-xl border',
-          'transition-all duration-200',
-          // Background - Theme-aware
-          'bg-white dark:bg-slate-800/90',
-          'border-slate-200/80 dark:border-slate-700/60',
+          CARD_TOKENS.radius.card,
+          'border',
+          CARD_TOKENS.transition.fast,
+          // Background & Border - Theme-aware using shadcn tokens
+          'bg-card border-border/50',
           // Shadow - Enhanced for dark mode
           'shadow-sm dark:shadow-lg dark:shadow-black/20',
-          // Hover
-          'hover:shadow-md dark:hover:shadow-xl dark:hover:shadow-black/30',
-          'hover:border-slate-300 dark:hover:border-slate-600',
-          'hover:-translate-y-0.5',
+          // Hover - Interactive card states from CARD_TOKENS
+          CARD_TOKENS.card.interactive,
           // Hot lead accent
-          isHotLead && 'border-l-2 border-l-orange-500',
+          isHotLead && 'border-l-2 border-l-[var(--score-hot)]',
+          // Optimistic state (P1 Fix: visual feedback for pending create)
+          isOptimistic && 'opacity-70 animate-pulse border-dashed border-primary/50',
           // Dragging
-          isCurrentlyDragging && 'shadow-xl dark:shadow-2xl rotate-1 scale-[1.02]',
-          // Cursor
-          isCurrentlyDragging ? 'cursor-grabbing' : 'cursor-grab'
+          isCurrentlyDragging && CARD_TOKENS.card.dragging,
+          // Cursor - different for mobile vs desktop
+          isCurrentlyDragging ? 'cursor-grabbing' : 'lg:cursor-grab cursor-pointer'
         )}
       >
-        {/* Drag Handle - Desktop only */}
+        {/* Mobile Drag Handle - Always visible, touch-none */}
+        <div
+          className={cn(
+            'lg:hidden', // Only on mobile/tablet
+            'absolute left-0 top-0 bottom-0 w-8',
+            'flex items-center justify-center',
+            'touch-none cursor-grab active:cursor-grabbing',
+            'bg-gradient-to-r from-muted to-transparent',
+            'rounded-l-xl',
+            'transition-opacity duration-200',
+            isCurrentlyDragging ? 'opacity-100' : 'opacity-60'
+          )}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground/60" />
+        </div>
+
+        {/* Drag Handle - Desktop only (visual indicator on hover) */}
         <div className="hidden lg:flex opacity-0 group-hover:opacity-100 transition-opacity absolute left-1 top-1/2 -translate-y-1/2">
           <GripVertical className="h-4 w-4 text-muted-foreground/40" />
         </div>
 
-        {/* Content */}
-        <div className="flex items-start gap-3">
+        {/* Content - offset on mobile to account for drag handle */}
+        <div className="flex items-start gap-3 ml-6 lg:ml-0">
           {/* Avatar */}
           <div className="relative shrink-0">
-            <Avatar className="h-10 w-10 border border-slate-200 dark:border-slate-600">
-              <AvatarFallback className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 text-sm font-semibold">
-                {getInitials(lead.fullName)}
+            <Avatar className="h-10 w-10 border border-border">
+              <AvatarFallback className="bg-muted text-muted-foreground text-sm font-semibold">
+                {getInitials(decodedFullName)}
               </AvatarFallback>
             </Avatar>
             {isHotLead && (
@@ -356,19 +427,19 @@ export function KanbanCard({
             {/* Name + Score Row */}
             <div className="flex items-center gap-2">
               <span className="font-semibold text-[14px] text-foreground truncate flex-1">
-                {lead.fullName}
+                {decodedFullName}
               </span>
               <ScoreBadge score={lead.score} />
             </div>
 
             {/* Company + Source Row */}
-            {(lead.companyName || lead.source) && (
+            {(decodedCompanyName || lead.source) && (
               <div className="flex items-center gap-2">
-                {lead.companyName && (
+                {decodedCompanyName && (
                   <div className="flex items-center gap-1 min-w-0 flex-1">
                     <Building2 className="h-3 w-3 text-muted-foreground/60 shrink-0" />
                     <span className="text-[12px] text-muted-foreground truncate">
-                      {lead.companyName}
+                      {decodedCompanyName}
                     </span>
                   </div>
                 )}
@@ -404,21 +475,31 @@ export function KanbanCard({
               onClick={handleWhatsApp}
               disabled={!hasPhone}
               label="WhatsApp"
-              className="hover:bg-[var(--whatsapp)]/15 dark:hover:bg-[var(--whatsapp)]/20 hover:text-[var(--whatsapp)]"
+              className="hover:bg-[var(--action-whatsapp-bg-hover)] hover:text-[var(--action-whatsapp-text)] hover:border-[var(--action-whatsapp-border)]"
             />
             <ActionButton
               icon={Phone}
               onClick={handleCall}
               disabled={!hasPhone}
               label="Llamar"
-              className="hover:bg-[var(--tenant-accent)]/15 dark:hover:bg-[var(--tenant-accent)]/20 hover:text-[var(--tenant-accent)]"
+              className="hover:bg-[var(--action-call-bg-hover)] hover:text-[var(--action-call-text)] hover:border-[var(--action-call-border)]"
             />
 
             {/* More Options */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
-                  <MoreHorizontal className="h-4 w-4" />
+                <button
+                  aria-label="Más opciones"
+                  className={cn(
+                    'flex items-center justify-center',
+                    CARD_TOKENS.touchTarget.buttonSm,
+                    CARD_TOKENS.radius.cardSm,
+                    'text-muted-foreground hover:bg-muted',
+                    CARD_TOKENS.transition.micro,
+                    CARD_TOKENS.focus.ring
+                  )}
+                >
+                  <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
@@ -426,12 +507,12 @@ export function KanbanCard({
                   Editar
                 </DropdownMenuItem>
                 {lead.status === LeadStatus.QUALIFIED && onConvert && (
-                  <DropdownMenuItem onClick={onConvert} className="py-2 text-[var(--tenant-primary)]">
+                  <DropdownMenuItem onClick={onConvert} className="py-2 text-[var(--status-success-text)]">
                     Convertir
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onDelete} className="py-2 text-red-500 dark:text-red-400">
+                <DropdownMenuItem onClick={onDelete} className="py-2 text-[var(--status-error-text)]">
                   Eliminar
                 </DropdownMenuItem>
               </DropdownMenuContent>

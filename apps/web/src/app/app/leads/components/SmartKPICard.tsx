@@ -6,12 +6,15 @@
  * KPI card with trend indicator, icon, and premium glassmorphism styling.
  * Supports variants: default, highlight (primary border), warning (urgent)
  * Clickable for filtering functionality.
+ *
+ * @phase FASE 6 - Uses CARD_TOKENS from Design System
  */
 
 import * as React from 'react';
 import { TrendingUp, TrendingDown, Minus, Loader2, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { CARD_TOKENS, getCardInteractiveClasses } from '@/components/cards';
 
 // ============================================
 // Types
@@ -163,12 +166,14 @@ export function SmartKPICard({
   return (
     <Card
       className={cn(
-        'relative overflow-hidden transition-all duration-300',
+        'relative overflow-hidden',
         'backdrop-blur-xl bg-card/80',
+        CARD_TOKENS.transition.normal,
         config.border,
         'borderColor' in config && config.borderColor,
-        isClickable && 'cursor-pointer hover:shadow-lg hover:-translate-y-0.5',
+        getCardInteractiveClasses(isClickable),
         isActive && config.activeBorder,
+        CARD_TOKENS.focus.ring,
         className
       )}
       onClick={onClick}

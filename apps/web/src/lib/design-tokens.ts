@@ -199,133 +199,135 @@ export const BREAKPOINTS = {
 
 // ============================================
 // Status Colors (for consistent status indicators)
+// Using CSS variables for dynamic theming
 // ============================================
 
 export const STATUS_COLORS = {
-  // Lead/Opportunity Status
+  // Lead/Opportunity Status - Using pipeline CSS vars (already exist)
   new: {
-    bg: 'bg-blue-100 dark:bg-blue-900/30',
-    text: 'text-blue-800 dark:text-blue-300',
-    border: 'border-blue-200 dark:border-blue-800',
-    dot: 'bg-blue-500',
+    bg: 'bg-[var(--pipeline-new-bg)]',
+    text: 'text-[var(--pipeline-new-text)]',
+    border: 'border-[var(--pipeline-new-border)]',
+    dot: 'bg-[var(--stage-new)]',
   },
   contacted: {
-    bg: 'bg-yellow-100 dark:bg-yellow-900/30',
-    text: 'text-yellow-800 dark:text-yellow-300',
-    border: 'border-yellow-200 dark:border-yellow-800',
-    dot: 'bg-yellow-500',
+    bg: 'bg-[var(--pipeline-contacted-bg)]',
+    text: 'text-[var(--pipeline-contacted-text)]',
+    border: 'border-[var(--pipeline-contacted-border)]',
+    dot: 'bg-[var(--stage-contacted)]',
   },
   qualified: {
-    bg: 'bg-purple-100 dark:bg-purple-900/30',
-    text: 'text-purple-800 dark:text-purple-300',
-    border: 'border-purple-200 dark:border-purple-800',
-    dot: 'bg-purple-500',
+    bg: 'bg-[var(--pipeline-qualified-bg)]',
+    text: 'text-[var(--pipeline-qualified-text)]',
+    border: 'border-[var(--pipeline-qualified-border)]',
+    dot: 'bg-[var(--stage-qualified)]',
   },
   proposal: {
-    bg: 'bg-indigo-100 dark:bg-indigo-900/30',
-    text: 'text-indigo-800 dark:text-indigo-300',
-    border: 'border-indigo-200 dark:border-indigo-800',
-    dot: 'bg-indigo-500',
+    bg: 'bg-[var(--pipeline-proposal-bg)]',
+    text: 'text-[var(--pipeline-proposal-text)]',
+    border: 'border-[var(--pipeline-proposal-border)]',
+    dot: 'bg-[var(--stage-proposal)]',
   },
   negotiation: {
-    bg: 'bg-orange-100 dark:bg-orange-900/30',
-    text: 'text-orange-800 dark:text-orange-300',
-    border: 'border-orange-200 dark:border-orange-800',
-    dot: 'bg-orange-500',
+    bg: 'bg-[var(--pipeline-negotiation-bg)]',
+    text: 'text-[var(--pipeline-negotiation-text)]',
+    border: 'border-[var(--pipeline-negotiation-border)]',
+    dot: 'bg-[var(--stage-negotiation)]',
   },
   won: {
-    bg: 'bg-green-100 dark:bg-green-900/30',
-    text: 'text-green-800 dark:text-green-300',
-    border: 'border-green-200 dark:border-green-800',
-    dot: 'bg-green-500',
+    bg: 'bg-[var(--pipeline-won-bg)]',
+    text: 'text-[var(--pipeline-won-text)]',
+    border: 'border-[var(--pipeline-won-border)]',
+    dot: 'bg-[var(--stage-won)]',
   },
   lost: {
-    bg: 'bg-red-100 dark:bg-red-900/30',
-    text: 'text-red-800 dark:text-red-300',
-    border: 'border-red-200 dark:border-red-800',
-    dot: 'bg-red-500',
+    bg: 'bg-[var(--pipeline-lost-bg)]',
+    text: 'text-[var(--pipeline-lost-text)]',
+    border: 'border-[var(--pipeline-lost-border)]',
+    dot: 'bg-[var(--stage-lost)]',
   },
-  // Task Status
+  // Task Status - Using status CSS vars
   pending: {
-    bg: 'bg-gray-100 dark:bg-gray-900/30',
-    text: 'text-gray-800 dark:text-gray-300',
-    border: 'border-gray-200 dark:border-gray-800',
-    dot: 'bg-gray-500',
+    bg: 'bg-[var(--status-pending-bg)]',
+    text: 'text-[var(--status-pending)]',
+    border: 'border-[var(--status-pending-border)]',
+    dot: 'bg-[var(--status-pending)]',
   },
   in_progress: {
-    bg: 'bg-blue-100 dark:bg-blue-900/30',
-    text: 'text-blue-800 dark:text-blue-300',
-    border: 'border-blue-200 dark:border-blue-800',
-    dot: 'bg-blue-500',
+    bg: 'bg-[var(--status-in-progress-bg)]',
+    text: 'text-[var(--status-in-progress)]',
+    border: 'border-[var(--status-in-progress-border)]',
+    dot: 'bg-[var(--status-in-progress)]',
   },
   completed: {
-    bg: 'bg-green-100 dark:bg-green-900/30',
-    text: 'text-green-800 dark:text-green-300',
-    border: 'border-green-200 dark:border-green-800',
-    dot: 'bg-green-500',
+    bg: 'bg-[var(--status-completed-bg)]',
+    text: 'text-[var(--status-completed)]',
+    border: 'border-[var(--status-completed-border)]',
+    dot: 'bg-[var(--status-completed)]',
   },
   cancelled: {
-    bg: 'bg-gray-100 dark:bg-gray-900/30',
-    text: 'text-gray-500 dark:text-gray-400',
-    border: 'border-gray-200 dark:border-gray-800',
-    dot: 'bg-gray-400',
+    bg: 'bg-[var(--status-cancelled-bg)]',
+    text: 'text-[var(--status-cancelled)]',
+    border: 'border-[var(--status-cancelled-border)]',
+    dot: 'bg-[var(--status-cancelled)]',
   },
   overdue: {
-    bg: 'bg-red-100 dark:bg-red-900/30',
-    text: 'text-red-800 dark:text-red-300',
-    border: 'border-red-200 dark:border-red-800',
-    dot: 'bg-red-500',
+    bg: 'bg-[var(--status-cancelled-bg)]',
+    text: 'text-[var(--status-cancelled)]',
+    border: 'border-[var(--status-cancelled-border)]',
+    dot: 'bg-[var(--status-cancelled)]',
   },
 } as const;
 
 // ============================================
-// Priority Colors
+// Priority Colors - Using CSS variables
 // ============================================
 
 export const PRIORITY_COLORS = {
   low: {
-    bg: 'bg-gray-100 dark:bg-gray-900/30',
-    text: 'text-gray-600 dark:text-gray-400',
-    border: 'border-gray-200 dark:border-gray-800',
+    bg: 'bg-[var(--priority-low-bg)]',
+    text: 'text-[var(--priority-low)]',
+    border: 'border-[var(--priority-low-border)]',
   },
   medium: {
-    bg: 'bg-blue-100 dark:bg-blue-900/30',
-    text: 'text-blue-700 dark:text-blue-300',
-    border: 'border-blue-200 dark:border-blue-800',
+    bg: 'bg-[var(--priority-medium-bg)]',
+    text: 'text-[var(--priority-medium)]',
+    border: 'border-[var(--priority-medium-border)]',
   },
   high: {
-    bg: 'bg-orange-100 dark:bg-orange-900/30',
-    text: 'text-orange-700 dark:text-orange-300',
-    border: 'border-orange-200 dark:border-orange-800',
+    bg: 'bg-[var(--priority-high-bg)]',
+    text: 'text-[var(--priority-high)]',
+    border: 'border-[var(--priority-high-border)]',
   },
   urgent: {
-    bg: 'bg-red-100 dark:bg-red-900/30',
-    text: 'text-red-700 dark:text-red-300',
-    border: 'border-red-200 dark:border-red-800',
+    bg: 'bg-[var(--priority-urgent-bg)]',
+    text: 'text-[var(--priority-urgent)]',
+    border: 'border-[var(--priority-urgent-border)]',
   },
 } as const;
 
 // ============================================
-// Score Colors
+// Score Colors - Using CSS variables
+// Note: Score uses orange for hot (high priority feel), not green
 // ============================================
 
 export const SCORE_COLORS = {
   hot: {
     range: [70, 100],
-    bg: 'bg-green-500',
-    text: 'text-green-600 dark:text-green-400',
+    bg: 'bg-[var(--score-hot-bg)]',
+    text: 'text-[var(--score-hot)]',
     label: 'Hot',
   },
   warm: {
     range: [40, 69],
-    bg: 'bg-yellow-500',
-    text: 'text-yellow-600 dark:text-yellow-400',
+    bg: 'bg-[var(--score-warm-bg)]',
+    text: 'text-[var(--score-warm)]',
     label: 'Warm',
   },
   cold: {
     range: [0, 39],
-    bg: 'bg-blue-500',
-    text: 'text-blue-600 dark:text-blue-400',
+    bg: 'bg-[var(--score-cold-bg)]',
+    text: 'text-[var(--score-cold)]',
     label: 'Cold',
   },
 } as const;

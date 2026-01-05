@@ -1068,6 +1068,235 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ============================================
+            WORLDCUP ANALYTICS SECTION - Promotional
+            Demand forecasting for FIFA World Cup 2026
+            ============================================ */}
+        <section id="worldcup" className="relative -mt-px overflow-hidden py-20 md:py-28" style={{ background: 'linear-gradient(165deg, #0A534E 0%, #0B5752 30%, #0C5F5A 60%, #0A534E 100%)' }}>
+          {/* Ambient glows - with golden accent for World Cup theme */}
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute -left-32 top-0 h-[500px] w-[500px] rounded-full bg-[#14B8A6]/8 blur-[140px]" />
+            <div className="absolute -right-20 top-1/4 h-[400px] w-[400px] rounded-full bg-[#FFD700]/6 blur-[120px]" />
+            <div className="absolute bottom-0 left-1/3 h-[350px] w-[350px] rounded-full bg-[#F97316]/5 blur-[100px]" />
+          </div>
+
+          {/* Subtle pattern overlay */}
+          <div className="pointer-events-none absolute inset-0 opacity-[0.02]" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30z' fill='%2314B8A6'/%3E%3C/svg%3E")`,
+            backgroundSize: '60px 60px'
+          }} />
+
+          <div className="container relative">
+            <div className="mx-auto max-w-7xl">
+              {/* Two-column layout */}
+              <div className="grid gap-10 lg:grid-cols-12 lg:gap-16 xl:gap-20">
+
+                {/* Left Column - Content */}
+                <div className="lg:col-span-7">
+                  {/* Badge with World Cup theme */}
+                  <div className="mb-6 inline-flex items-center gap-2.5 rounded-full border border-[#FFD700]/20 bg-[#FFD700]/8 px-5 py-2.5 backdrop-blur-sm">
+                    <div className="relative flex h-5 w-5 items-center justify-center">
+                      <Globe className="relative h-4 w-4 text-[#FFD700]" strokeWidth={2} />
+                    </div>
+                    <span className="text-sm font-medium text-[#FFD700]">Mundial 2026</span>
+                    <span className="rounded-full bg-[#F97316]/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#FB923C]">Nuevo</span>
+                  </div>
+
+                  {/* Main Title */}
+                  <h2 className="mb-6 text-[2rem] font-bold leading-[1.1] tracking-tight text-[#F5F7FA] sm:text-[2.5rem] lg:text-[2.75rem]">
+                    Prepara tu negocio para el{' '}
+                    <span className="relative inline-block">
+                      <span className="bg-gradient-to-r from-[#FFD700] via-[#FB923C] to-[#F97316] bg-clip-text text-transparent">
+                        Mundial 2026
+                      </span>
+                      <span className="pointer-events-none absolute -inset-x-2 -inset-y-1 -z-10 rounded-xl bg-[#FFD700]/10 blur-xl" />
+                    </span>
+                  </h2>
+
+                  {/* Description */}
+                  <p className="mb-8 max-w-[560px] text-[17px] leading-[1.7] text-[#D1DCE0]">
+                    <span className="font-semibold text-white">6.5 millones de visitantes</span> llegarán a las 16 ciudades sede.
+                    Predice la demanda, ajusta precios y optimiza tu personal con IA.
+                  </p>
+
+                  {/* Feature List */}
+                  <ul className="mb-10 space-y-4">
+                    <li className="flex items-start gap-4">
+                      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#14B8A6]/15">
+                        <TrendingUp className="h-4 w-4 text-[#2DD4BF]" strokeWidth={2.5} />
+                      </div>
+                      <div>
+                        <span className="text-[15px] font-medium text-white">Predicción de demanda por IA</span>
+                        <span className="ml-1.5 text-[15px] text-[#C7D1DA]">— anticipa picos de venta por partido</span>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-4">
+                      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#F97316]/15">
+                        <Receipt className="h-4 w-4 text-[#FB923C]" strokeWidth={2.5} />
+                      </div>
+                      <div>
+                        <span className="text-[15px] font-medium text-white">Precios dinámicos sugeridos</span>
+                        <span className="ml-1.5 text-[15px] text-[#C7D1DA]">— maximiza ingresos con data real</span>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-4">
+                      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#14B8A6]/15">
+                        <Users className="h-4 w-4 text-[#2DD4BF]" strokeWidth={2.5} />
+                      </div>
+                      <div>
+                        <span className="text-[15px] font-medium text-white">Recomendaciones de personal</span>
+                        <span className="ml-1.5 text-[15px] text-[#C7D1DA]">— staffing óptimo por horario</span>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-4">
+                      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#FFD700]/15">
+                        <Bell className="h-4 w-4 text-[#FFD700]" strokeWidth={2.5} />
+                      </div>
+                      <div>
+                        <span className="text-[15px] font-medium text-white">Alertas proactivas</span>
+                        <span className="ml-1.5 text-[15px] text-[#C7D1DA]">— notificaciones 48h antes de cada partido</span>
+                      </div>
+                    </li>
+                  </ul>
+
+                  {/* CTA Row */}
+                  <div className="flex flex-wrap items-center gap-5">
+                    <Button asChild size="lg" className="h-12 gap-2 rounded-xl bg-gradient-to-r from-[#F97316] to-[#FB923C] px-7 text-[15px] font-semibold text-white shadow-[0_6px_20px_-4px_rgba(249,115,22,0.5)] transition-all hover:shadow-[0_10px_28px_-4px_rgba(249,115,22,0.6)]">
+                      <Link href="/register?ref=worldcup2026">
+                        Acceso anticipado
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                    <div className="flex items-center gap-4 text-sm text-[#B6C5C8]">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-[#2DD4BF]" />
+                        Gratis hasta Jun 2026
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Stats & Preview */}
+                <div className="relative lg:col-span-5">
+                  {/* Decorative connection lines */}
+                  <div className="pointer-events-none absolute -inset-8 hidden lg:block">
+                    <svg className="h-full w-full" viewBox="0 0 400 450" fill="none">
+                      <path d="M40 100 Q140 50 200 140 T360 120" stroke="#FFD700" strokeWidth="1" strokeDasharray="8 6" opacity="0.15" />
+                      <path d="M20 300 Q120 350 200 280 T380 320" stroke="#14B8A6" strokeWidth="1" strokeDasharray="6 8" opacity="0.1" />
+                    </svg>
+                  </div>
+
+                  {/* Main Preview Card */}
+                  <div className="relative mx-auto max-w-[420px] lg:mx-0 lg:max-w-none">
+                    {/* Glow effect */}
+                    <div className="absolute -inset-6 rounded-[36px] bg-gradient-to-br from-[#FFD700]/15 via-[#F97316]/10 to-[#14B8A6]/8 blur-[50px]" />
+
+                    <div className="relative overflow-hidden rounded-[26px] border border-white/[0.08] bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-6 shadow-[0_16px_48px_-16px_rgba(0,0,0,0.4)]">
+                      {/* Header */}
+                      <div className="mb-5 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#FFD700] to-[#F97316] shadow-lg shadow-[#F97316]/30">
+                            <BarChart3 className="h-5 w-5 text-white" strokeWidth={2} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-white">Demand Forecast</p>
+                            <p className="text-xs text-white/70">Ciudad de México</p>
+                          </div>
+                        </div>
+                        <div className="rounded-lg bg-[#14B8A6]/20 px-2.5 py-1">
+                          <span className="text-xs font-semibold text-[#5EEAD4]">LIVE</span>
+                        </div>
+                      </div>
+
+                      {/* Match Info */}
+                      <div className="mb-5 rounded-xl border border-white/[0.08] bg-white/[0.04] p-4">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs text-white/60">Próximo partido</span>
+                          <span className="text-xs font-medium text-[#FDBA74]">15 Jun 2026</span>
+                        </div>
+                        <div className="flex items-center justify-center gap-4">
+                          <div className="text-center">
+                            <span className="text-2xl">🇲🇽</span>
+                            <p className="text-xs font-medium text-white/80">MEX</p>
+                          </div>
+                          <span className="text-lg font-bold text-white/50">vs</span>
+                          <div className="text-center">
+                            <span className="text-2xl">🇺🇸</span>
+                            <p className="text-xs font-medium text-white/80">USA</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Demand Index */}
+                      <div className="mb-5">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs text-white/60">Índice de demanda</span>
+                          <span className="text-xs font-semibold text-[#5EEAD4]">MUY ALTA</span>
+                        </div>
+                        <div className="relative h-3 overflow-hidden rounded-full bg-white/[0.12]">
+                          <div className="absolute inset-y-0 left-0 w-[92%] rounded-full bg-gradient-to-r from-[#14B8A6] via-[#FB923C] to-[#F97316]" />
+                        </div>
+                        <div className="mt-1.5 flex justify-between text-[10px] text-white/50">
+                          <span>Normal</span>
+                          <span className="font-bold text-[#FDBA74]">192%</span>
+                        </div>
+                      </div>
+
+                      {/* Recommendations Grid */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-xl bg-[#14B8A6]/15 p-3 text-center">
+                          <p className="text-lg font-bold text-[#5EEAD4]">+42%</p>
+                          <p className="text-[10px] text-white/70">Precio sugerido</p>
+                        </div>
+                        <div className="rounded-xl bg-[#F97316]/15 p-3 text-center">
+                          <p className="text-lg font-bold text-[#FDBA74]">+85%</p>
+                          <p className="text-[10px] text-white/70">Personal extra</p>
+                        </div>
+                        <div className="rounded-xl bg-[#FFD700]/15 p-3 text-center">
+                          <p className="text-lg font-bold text-[#FDE68A]">+57%</p>
+                          <p className="text-[10px] text-white/70">Inventario</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Floating Badge - Cities */}
+                    <div className="absolute -left-4 bottom-1/4 hidden rounded-xl border border-white/[0.12] bg-[#0A534E]/95 px-3 py-2 backdrop-blur-md lg:block">
+                      <div className="flex items-center gap-2">
+                        <div className="flex -space-x-1">
+                          <span className="text-sm">🇺🇸</span>
+                          <span className="text-sm">🇲🇽</span>
+                          <span className="text-sm">🇨🇦</span>
+                        </div>
+                        <span className="text-xs font-medium text-white/90">16 ciudades</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Stats Row */}
+              <div className="mt-16 grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 text-center backdrop-blur-sm">
+                  <p className="text-2xl font-bold text-[#FDE68A]">104</p>
+                  <p className="text-sm font-medium text-white/70">Partidos</p>
+                </div>
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 text-center backdrop-blur-sm">
+                  <p className="text-2xl font-bold text-[#5EEAD4]">48</p>
+                  <p className="text-sm font-medium text-white/70">Selecciones</p>
+                </div>
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 text-center backdrop-blur-sm">
+                  <p className="text-2xl font-bold text-[#FDBA74]">6.5M</p>
+                  <p className="text-sm font-medium text-white/70">Visitantes esperados</p>
+                </div>
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 text-center backdrop-blur-sm">
+                  <p className="text-2xl font-bold text-white">39</p>
+                  <p className="text-sm font-medium text-white/70">Días de evento</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Communication Channels - Based on Logo Colors */}
         <section className="relative -mt-px overflow-hidden py-20 md:py-28" style={{ background: 'linear-gradient(180deg, #0A534E 0%, #0D9488 25%, #115E59 50%, #0F766E 75%, #134E4A 100%)' }}>
           {/* Ambient glows */}

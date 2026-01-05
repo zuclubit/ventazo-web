@@ -6,6 +6,7 @@
  * Premium 2025 navigation with glass hover states and accent colors.
  * Features proper active state detection for all routes.
  *
+ * @phase FASE Y.1 - Migrated to CSS variables for dynamic tenant theming
  * @module components/layout/sidebar-nav
  */
 
@@ -16,21 +17,19 @@ import { usePathname } from 'next/navigation';
 
 import {
   BarChart3,
-  BookOpen,
-  Building2,
+  Bot,
   Calendar,
   CheckSquare,
   ChevronDown,
+  Columns3,
   ExternalLink,
   FileText,
   Home,
-  Layers,
   Mail,
+  Megaphone,
   MessageSquare,
+  Package,
   Settings,
-  Target,
-  Users,
-  Wallet,
   Workflow,
 } from 'lucide-react';
 
@@ -70,21 +69,19 @@ export interface NavSection {
 
 const navigation: NavSection[] = [
   {
-    title: 'Principal',
+    title: 'Inicio',
     items: [
       { title: 'Dashboard', href: '/app', icon: Home, exactMatch: true },
-      { title: 'Leads', href: '/app/leads', icon: Users },
-      { title: 'Oportunidades', href: '/app/opportunities', icon: Target },
-      { title: 'Clientes', href: '/app/customers', icon: Building2 },
-      { title: 'Tareas', href: '/app/tasks', icon: CheckSquare },
+      { title: 'Asistente IA', href: '/app/assistant', icon: Bot, badge: 'Nuevo' },
     ],
   },
   {
-    title: 'Ventas',
+    title: 'Operaciones',
     items: [
-      { title: 'Pipeline', href: '/app/leads/pipeline', icon: Layers },
+      { title: 'Centro de Ventas', href: '/app/kanban', icon: Columns3 },
       { title: 'Cotizaciones', href: '/app/quotes', icon: FileText },
-      { title: 'Facturación', href: '/app/settings/billing', icon: Wallet },
+      { title: 'Tareas', href: '/app/tasks', icon: CheckSquare },
+      { title: 'Calendario', href: '/app/calendar', icon: Calendar },
     ],
   },
   {
@@ -92,27 +89,20 @@ const navigation: NavSection[] = [
     items: [
       { title: 'Email', href: '/app/email', icon: Mail },
       { title: 'WhatsApp', href: '/app/whatsapp', icon: MessageSquare },
-      { title: 'Calendario', href: '/app/calendar', icon: Calendar },
+      { title: 'Campañas', href: '/app/campaigns', icon: Megaphone },
     ],
   },
   {
     title: 'Automatización',
     items: [
       { title: 'Workflows', href: '/app/workflows', icon: Workflow },
-      { title: 'Reportes', href: '/app/reports', icon: BarChart3 },
+      { title: 'Servicios', href: '/app/services', icon: Package },
     ],
   },
   {
-    title: 'Desarrolladores',
+    title: 'Análisis',
     items: [
-      {
-        title: 'API Docs',
-        href:
-          process.env['NEXT_PUBLIC_API_DOCS_URL'] ||
-          'https://zuclubit-lead-service.fly.dev/reference',
-        icon: BookOpen,
-        isExternal: true,
-      },
+      { title: 'Analytics', href: '/app/analytics', icon: BarChart3 },
     ],
   },
 ];
@@ -183,8 +173,8 @@ function NavLink({ item, isActive, isCollapsed }: NavLinkProps) {
               className={cn(
                 'h-9 w-9',
                 isActive
-                  ? 'bg-[#0D9488]/20 text-[#5EEAD4] hover:bg-[#0D9488]/30'
-                  : 'text-[#6B7A7D] hover:text-white hover:bg-white/10'
+                  ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] hover:bg-[var(--sidebar-active-bg-hover)]'
+                  : 'text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]'
               )}
               size="icon"
               variant="ghost"
@@ -195,13 +185,13 @@ function NavLink({ item, isActive, isCollapsed }: NavLinkProps) {
           </LinkComponent>
         </TooltipTrigger>
         <TooltipContent
-          className="flex items-center gap-2 bg-[#052828] border-white/10 text-white"
+          className="flex items-center gap-2 bg-[var(--sidebar-tooltip-bg)] border-[var(--sidebar-border)] text-[var(--sidebar-text)]"
           side="right"
         >
           {item.title}
           {item.isExternal && <ExternalLink className="h-3 w-3" />}
           {item.badge && (
-            <span className="ml-auto rounded-full bg-gradient-to-r from-[#0D9488] to-[#14B8A6] px-1.5 py-0.5 text-xs text-white">
+            <span className="ml-auto rounded-full bg-gradient-to-r from-[var(--tenant-primary)] to-[var(--tenant-accent)] px-1.5 py-0.5 text-xs text-white">
               {item.badge}
             </span>
           )}
@@ -216,20 +206,20 @@ function NavLink({ item, isActive, isCollapsed }: NavLinkProps) {
         className={cn(
           'w-full justify-start gap-2 transition-all duration-200',
           isActive
-            ? 'bg-[#0D9488]/20 text-[#5EEAD4] hover:bg-[#0D9488]/30'
-            : 'text-[#94A3AB] hover:text-white hover:bg-white/10'
+            ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] hover:bg-[var(--sidebar-active-bg-hover)]'
+            : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-hover-bg)]'
         )}
         variant="ghost"
       >
         <item.icon
-          className={cn('h-4 w-4 shrink-0', isActive && 'text-[#5EEAD4]')}
+          className={cn('h-4 w-4 shrink-0', isActive && 'text-[var(--sidebar-active-text)]')}
         />
         <span className="truncate">{item.title}</span>
         {item.isExternal && (
-          <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-[#6B7A7D]" />
+          <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-[var(--sidebar-text-muted)]" />
         )}
         {item.badge && (
-          <span className="ml-auto rounded-full bg-gradient-to-r from-[#0D9488] to-[#14B8A6] px-1.5 py-0.5 text-xs text-white shrink-0">
+          <span className="ml-auto rounded-full bg-gradient-to-r from-[var(--tenant-primary)] to-[var(--tenant-accent)] px-1.5 py-0.5 text-xs text-white shrink-0">
             {item.badge}
           </span>
         )}
@@ -257,8 +247,8 @@ function SettingsLink({ isCollapsed, isActive }: SettingsLinkProps) {
               className={cn(
                 'h-9 w-9',
                 isActive
-                  ? 'bg-[#0D9488]/20 text-[#5EEAD4] hover:bg-[#0D9488]/30'
-                  : 'text-[#6B7A7D] hover:text-white hover:bg-white/10'
+                  ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] hover:bg-[var(--sidebar-active-bg-hover)]'
+                  : 'text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]'
               )}
               size="icon"
               variant="ghost"
@@ -269,7 +259,7 @@ function SettingsLink({ isCollapsed, isActive }: SettingsLinkProps) {
           </Link>
         </TooltipTrigger>
         <TooltipContent
-          className="bg-[#052828] border-white/10 text-white"
+          className="bg-[var(--sidebar-tooltip-bg)] border-[var(--sidebar-border)] text-[var(--sidebar-text)]"
           side="right"
         >
           Configuración
@@ -284,12 +274,12 @@ function SettingsLink({ isCollapsed, isActive }: SettingsLinkProps) {
         className={cn(
           'w-full justify-start gap-2 transition-all duration-200',
           isActive
-            ? 'bg-[#0D9488]/20 text-[#5EEAD4] hover:bg-[#0D9488]/30'
-            : 'text-[#94A3AB] hover:text-white hover:bg-white/10'
+            ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] hover:bg-[var(--sidebar-active-bg-hover)]'
+            : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-hover-bg)]'
         )}
         variant="ghost"
       >
-        <Settings className={cn('h-4 w-4', isActive && 'text-[#5EEAD4]')} />
+        <Settings className={cn('h-4 w-4', isActive && 'text-[var(--sidebar-active-text)]')} />
         Configuración
       </Button>
     </Link>
@@ -303,8 +293,8 @@ function SettingsLink({ isCollapsed, isActive }: SettingsLinkProps) {
 export function SidebarNav({ isCollapsed = false }: SidebarNavProps) {
   const pathname = usePathname();
   const [openSections, setOpenSections] = React.useState<string[]>([
-    'Principal',
-    'Ventas',
+    'Inicio',
+    'Operaciones',
   ]);
 
   const toggleSection = (title: string) => {
@@ -329,7 +319,7 @@ export function SidebarNav({ isCollapsed = false }: SidebarNavProps) {
                 <button
                   aria-controls={`section-${section.title.toLowerCase().replace(/\s+/g, '-')}`}
                   aria-expanded={openSections.includes(section.title)}
-                  className="flex w-full items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-[#6B7A7D] hover:text-[#94A3AB] transition-colors"
+                  className="flex w-full items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] transition-colors"
                   type="button"
                   onClick={() => toggleSection(section.title)}
                 >

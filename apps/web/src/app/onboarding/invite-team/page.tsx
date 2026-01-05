@@ -48,49 +48,49 @@ import { cn } from '@/lib/utils';
 
 const premiumInputClasses = cn(
   'h-12 rounded-xl border-white/10 bg-white/[0.03]',
-  'text-white placeholder:text-[#7A8F8F]',
-  'focus:border-[#0EB58C]/50 focus:ring-2 focus:ring-[#0EB58C]/20',
+  'text-white placeholder:text-[var(--onboarding-text-muted)]',
+  'focus:border-[var(--tenant-primary)]/50 focus:ring-2 focus:ring-[var(--tenant-primary)]/20',
   'hover:border-white/20 transition-all duration-200'
 );
 
 const premiumSelectTriggerClasses = cn(
   'h-12 rounded-xl border-white/10 bg-white/[0.03]',
-  'text-white data-[placeholder]:text-[#7A8F8F]',
-  'focus:border-[#0EB58C]/50 focus:ring-2 focus:ring-[#0EB58C]/20',
+  'text-white data-[placeholder]:text-[var(--onboarding-text-muted)]',
+  'focus:border-[var(--tenant-primary)]/50 focus:ring-2 focus:ring-[var(--tenant-primary)]/20',
   'hover:border-white/20 transition-all duration-200'
 );
 
 const premiumSelectContentClasses = cn(
-  'rounded-xl border-white/10 bg-[#001A1A]/95 backdrop-blur-xl',
+  'rounded-xl border-white/10 bg-[var(--onboarding-bg-dark)]/95 backdrop-blur-xl',
   'shadow-[0_8px_32px_rgba(0,0,0,0.5)]'
 );
 
 const premiumSelectItemClasses = cn(
   'text-white rounded-lg cursor-pointer',
-  'focus:bg-[#0EB58C]/20 focus:text-white',
-  'data-[state=checked]:bg-[#0EB58C]/20'
+  'focus:bg-[var(--tenant-primary)]/20 focus:text-white',
+  'data-[state=checked]:bg-[var(--tenant-primary)]/20'
 );
 
 const premiumButtonPrimary = cn(
   'h-12 rounded-xl font-semibold',
-  'bg-gradient-to-r from-[#003C3B] to-[#0EB58C]',
-  'text-white shadow-lg shadow-[#0EB58C]/25',
-  'hover:shadow-xl hover:shadow-[#0EB58C]/30 hover:scale-[1.02]',
+  'bg-gradient-to-r from-[var(--ventazo-dark)] to-[var(--tenant-primary)]',
+  'text-white shadow-lg shadow-[var(--tenant-primary)]/25',
+  'hover:shadow-xl hover:shadow-[var(--tenant-primary)]/30 hover:scale-[1.02]',
   'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100',
   'transition-all duration-200'
 );
 
 const premiumButtonGhost = cn(
   'h-12 rounded-xl font-medium',
-  'text-[#B8C4C4] hover:text-white',
+  'text-[var(--onboarding-text-secondary)] hover:text-white',
   'hover:bg-white/[0.05]',
   'transition-all duration-200'
 );
 
 const premiumButtonOutline = cn(
   'h-12 rounded-xl font-medium',
-  'border-white/10 bg-transparent text-[#B8C4C4]',
-  'hover:border-[#0EB58C]/50 hover:text-white hover:bg-white/[0.03]',
+  'border-white/10 bg-transparent text-[var(--onboarding-text-secondary)]',
+  'hover:border-[var(--tenant-primary)]/50 hover:text-white hover:bg-white/[0.03]',
   'transition-all duration-200'
 );
 
@@ -256,15 +256,15 @@ export default function InviteTeamPage() {
         {results && results.sent > 0 && (
           <div className={cn(
             'rounded-xl p-4 mb-4',
-            'bg-[#0EB58C]/10 border border-[#0EB58C]/30'
+            'bg-[var(--tenant-primary)]/10 border border-[var(--tenant-primary)]/30'
           )}>
-            <div className="flex items-center gap-2 text-[#0EB58C]">
+            <div className="flex items-center gap-2 text-[var(--tenant-primary)]">
               <CheckCircle2 className="h-5 w-5" />
               <span className="font-medium text-white">
                 {results.sent} {locale === 'en' ? 'invitation(s) sent' : 'invitación(es) enviada(s)'}
               </span>
             </div>
-            <p className="mt-1 text-sm text-[#B8C4C4]">{t.common.loading}</p>
+            <p className="mt-1 text-sm text-[var(--onboarding-text-secondary)]">{t.common.loading}</p>
           </div>
         )}
 
@@ -283,12 +283,12 @@ export default function InviteTeamPage() {
         {!hasMembers && (
           <div className="text-center py-8">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.05] border border-white/10">
-              <UserPlus className="h-8 w-8 text-[#0EB58C]" />
+              <UserPlus className="h-8 w-8 text-[var(--tenant-primary)]" />
             </div>
             <h3 className="font-medium mb-1 text-white">
               {locale === 'en' ? 'Working with a team?' : '¿Trabajas con un equipo?'}
             </h3>
-            <p className="text-sm text-[#7A8F8F] mb-4">
+            <p className="text-sm text-[var(--onboarding-text-muted)] mb-4">
               {t.inviteTeam.subtitle}
             </p>
             <Button onClick={addMember} variant="outline" className={premiumButtonOutline}>
@@ -308,7 +308,7 @@ export default function InviteTeamPage() {
               >
                 <div className="flex-1 grid gap-2 sm:grid-cols-[1fr,140px]">
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7A8F8F]" />
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--onboarding-text-muted)]" />
                     <Input
                       className={cn(premiumInputClasses, 'pl-9')}
                       placeholder={t.inviteTeam.fields.emailPlaceholder}
@@ -341,7 +341,7 @@ export default function InviteTeamPage() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="shrink-0 h-10 w-10 rounded-lg text-[#7A8F8F] hover:text-red-400 hover:bg-red-500/10"
+                  className="shrink-0 h-10 w-10 rounded-lg text-[var(--onboarding-text-muted)] hover:text-red-400 hover:bg-red-500/10"
                   onClick={() => removeMember(member.id)}
                 >
                   <X className="h-4 w-4" />

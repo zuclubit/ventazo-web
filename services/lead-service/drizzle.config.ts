@@ -15,7 +15,7 @@ const buildConnectionString = () => {
   const password = encodeURIComponent(process.env.POSTGRES_PASSWORD || 'dev123');
   const database = process.env.POSTGRES_DB || 'leads';
 
-  return `postgresql://${user}:${password}@${host}:${port}/${database}`;
+  return `postgresql://${user}:${password}@${host}:${port}/${database}?sslmode=require`;
 };
 
 export default {

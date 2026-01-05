@@ -31,6 +31,8 @@ import {
   smsMessages,
   whatsappMessages,
   whatsappConversations,
+  messengerMessages,
+  messengerConversations,
 } from '../database/schema';
 
 @injectable()
@@ -652,6 +654,19 @@ export class UnifiedInboxService {
           isShared: true,
           isSystemView: true,
           position: 5,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'messenger',
+          tenantId,
+          name: 'Messenger',
+          filters: { channels: ['messenger'] },
+          sortBy: 'newest',
+          isDefault: false,
+          isShared: true,
+          isSystemView: true,
+          position: 6,
           createdAt: new Date(),
           updatedAt: new Date(),
         },

@@ -305,7 +305,7 @@ export default function BillingPage() {
 
         {/* Upgrade Dialog */}
         <Dialog open={isUpgradeDialogOpen} onOpenChange={setIsUpgradeDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Mejora tu plan</DialogTitle>
               <DialogDescription>

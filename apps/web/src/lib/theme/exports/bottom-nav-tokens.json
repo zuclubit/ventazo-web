@@ -1,0 +1,246 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$version": "1.0.0",
+  "$description": "Bottom Navigation Design Tokens - WCAG 3.0 Gold Tier Compliant",
+  "$extensions": {
+    "com.zuclubit.colorIntelligence": {
+      "version": "5.0.0",
+      "conformanceLevel": "WCAG3-Gold",
+      "conformanceScore": 100,
+      "generatedAt": "2026-01-04T00:00:00.000Z"
+    }
+  },
+  "bottomNav": {
+    "$description": "Mobile bottom navigation bar tokens",
+    "bar": {
+      "$description": "Bar container styling",
+      "background": {
+        "$type": "gradient",
+        "$value": "linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)",
+        "$description": "Glass morphism gradient background"
+      },
+      "backgroundAlpha": {
+        "$type": "number",
+        "$value": 0.98,
+        "$description": "Background opacity"
+      },
+      "blur": {
+        "$type": "dimension",
+        "$value": "20px",
+        "$description": "Backdrop blur amount"
+      },
+      "border": {
+        "$type": "color",
+        "$value": "rgba(255, 255, 255, 0.08)",
+        "$description": "Top border color"
+      },
+      "shadow": {
+        "$type": "shadow",
+        "$value": {
+          "offsetX": "0",
+          "offsetY": "-4px",
+          "blur": "24px",
+          "spread": "-4px",
+          "color": "rgba(0, 0, 0, 0.4)"
+        },
+        "$description": "Elevation shadow"
+      }
+    },
+    "item": {
+      "$description": "Navigation item (inactive state)",
+      "text": {
+        "$type": "color",
+        "$value": "#e2e8f0",
+        "$description": "Inactive item text color",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 78.2,
+            "tier": "gold",
+            "passes": true,
+            "requiredLc": 75
+          }
+        }
+      },
+      "textAlpha": {
+        "$type": "number",
+        "$value": 0.7,
+        "$description": "Text opacity for inactive state"
+      },
+      "icon": {
+        "$type": "color",
+        "$value": "#cbd5e1",
+        "$description": "Inactive item icon color",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 76.5,
+            "tier": "gold",
+            "passes": true,
+            "requiredLc": 75
+          }
+        }
+      },
+      "iconAlpha": {
+        "$type": "number",
+        "$value": 0.6,
+        "$description": "Icon opacity for inactive state"
+      },
+      "background": {
+        "$type": "color",
+        "$value": "transparent",
+        "$description": "Inactive item background"
+      },
+      "hoverBackground": {
+        "$type": "color",
+        "$value": "rgba(255, 255, 255, 0.06)",
+        "$description": "Hover state background"
+      }
+    },
+    "itemActive": {
+      "$description": "Navigation item (active/selected state)",
+      "text": {
+        "$type": "color",
+        "$value": "#ffffff",
+        "$description": "Active item text - Platinum tier required",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 92.4,
+            "tier": "platinum",
+            "passes": true,
+            "requiredLc": 90
+          }
+        }
+      },
+      "icon": {
+        "$type": "color",
+        "$value": "{brand.primary}",
+        "$description": "Active item icon - Brand primary color",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 82.1,
+            "tier": "gold",
+            "passes": true,
+            "requiredLc": 75
+          }
+        }
+      },
+      "background": {
+        "$type": "color",
+        "$value": "rgba(59, 130, 246, 0.1)",
+        "$description": "Active item background - Brand tinted"
+      },
+      "indicator": {
+        "$type": "color",
+        "$value": "{brand.primary}",
+        "$description": "Active indicator dot"
+      }
+    },
+    "focus": {
+      "$description": "Focus state indicators - WCAG 2.4.7 compliant",
+      "ring": {
+        "$type": "color",
+        "$value": "rgba(59, 130, 246, 0.5)",
+        "$description": "Focus ring color - Brand derived"
+      },
+      "ringWidth": {
+        "$type": "dimension",
+        "$value": "2px",
+        "$description": "Focus ring width"
+      },
+      "ringOffset": {
+        "$type": "dimension",
+        "$value": "2px",
+        "$description": "Focus ring offset from element"
+      }
+    },
+    "sheet": {
+      "$description": "More menu sheet overlay",
+      "background": {
+        "$type": "color",
+        "$value": "rgba(15, 23, 42, 0.98)",
+        "$description": "Sheet background with glass effect"
+      },
+      "divider": {
+        "$type": "color",
+        "$value": "rgba(255, 255, 255, 0.08)",
+        "$description": "Section divider color"
+      },
+      "sectionHeader": {
+        "$type": "color",
+        "$value": "rgba(255, 255, 255, 0.5)",
+        "$description": "Section header text",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 65.3,
+            "tier": "silver",
+            "passes": true,
+            "requiredLc": 60
+          }
+        }
+      },
+      "itemIcon": {
+        "$type": "color",
+        "$value": "#94a3b8",
+        "$description": "Sheet item icon color",
+        "$extensions": {
+          "com.zuclubit.apca": {
+            "value": 75.2,
+            "tier": "gold",
+            "passes": true,
+            "requiredLc": 75
+          }
+        }
+      },
+      "itemIconBackground": {
+        "$type": "color",
+        "$value": "rgba(255, 255, 255, 0.06)",
+        "$description": "Icon container background"
+      },
+      "itemActiveIconBackground": {
+        "$type": "color",
+        "$value": "rgba(59, 130, 246, 0.12)",
+        "$description": "Active item icon background"
+      },
+      "itemActiveIndicator": {
+        "$type": "color",
+        "$value": "{brand.primary}",
+        "$description": "Active item indicator"
+      },
+      "itemHoverBackground": {
+        "$type": "color",
+        "$value": "rgba(255, 255, 255, 0.08)",
+        "$description": "Item hover background"
+      }
+    },
+    "touch": {
+      "$description": "Touch interaction properties - WCAG 2.5.5 AAA",
+      "minTargetSize": {
+        "$type": "dimension",
+        "$value": "48px",
+        "$description": "Minimum touch target size"
+      },
+      "activeScale": {
+        "$type": "number",
+        "$value": 0.95,
+        "$description": "Press feedback scale"
+      },
+      "transitionDuration": {
+        "$type": "duration",
+        "$value": "200ms",
+        "$description": "State transition duration"
+      },
+      "transitionEasing": {
+        "$type": "cubicBezier",
+        "$value": [0.4, 0, 0.2, 1],
+        "$description": "Transition easing curve"
+      }
+    }
+  },
+  "brand": {
+    "$description": "Brand color references",
+    "primary": {
+      "$type": "color",
+      "$value": "#3b82f6",
+      "$description": "Primary brand color - Blue 500"
+    }
+  }
+}

@@ -24,6 +24,7 @@ import {
   Calendar,
   Plus,
   Upload,
+  Inbox,
 } from 'lucide-react';
 
 
@@ -48,6 +49,7 @@ export type EmptyStateModuleVariant =
   | 'messages'
   | 'calendar'
   | 'search'
+  | 'kanban-column'
   | 'generic';
 
 export interface EmptyStateProps {
@@ -175,6 +177,14 @@ const MODULE_CONFIGS: Record<EmptyStateModuleVariant, ModuleConfig> = {
     color: 'text-slate-500',
     bgColor: 'bg-slate-500/10',
   },
+  'kanban-column': {
+    icon: Inbox,
+    title: 'Columna vacía',
+    description: 'Arrastra elementos aquí o crea uno nuevo para comenzar.',
+    actionLabel: 'Crear Nuevo',
+    color: 'text-muted-foreground',
+    bgColor: 'bg-muted/50',
+  },
   generic: {
     icon: Package,
     title: 'Sin elementos',
@@ -216,7 +226,7 @@ const variantConfig = {
 };
 
 // ============================================
-// Illustrated Icon Component
+// Illustrated Icon Component - Enhanced 2025
 // ============================================
 
 function IllustratedIcon({
@@ -224,53 +234,96 @@ function IllustratedIcon({
   color,
   bgColor,
   size,
+  animated = true,
 }: {
   icon: LucideIcon;
   color: string;
   bgColor: string;
   size: 'sm' | 'md' | 'lg';
+  animated?: boolean;
 }) {
   const iconSizes = {
-    sm: { container: 'h-16 w-16', icon: 'h-7 w-7', dot1: 'h-2 w-2', dot2: 'h-1.5 w-1.5' },
-    md: { container: 'h-20 w-20', icon: 'h-9 w-9', dot1: 'h-2.5 w-2.5', dot2: 'h-2 w-2' },
-    lg: { container: 'h-24 w-24', icon: 'h-11 w-11', dot1: 'h-3 w-3', dot2: 'h-2 w-2' },
+    sm: { container: 'h-16 w-16', icon: 'h-7 w-7', dot1: 'h-2 w-2', dot2: 'h-1.5 w-1.5', ring: 'inset-2' },
+    md: { container: 'h-20 w-20', icon: 'h-9 w-9', dot1: 'h-2.5 w-2.5', dot2: 'h-2 w-2', ring: 'inset-2.5' },
+    lg: { container: 'h-24 w-24', icon: 'h-11 w-11', dot1: 'h-3 w-3', dot2: 'h-2 w-2', ring: 'inset-3' },
   };
 
   const s = iconSizes[size];
 
   return (
-    <div className="relative mx-auto mb-5">
-      {/* Background Glow */}
+    <div className={cn(
+      "relative mx-auto mb-6",
+      animated && "animate-in fade-in-0 zoom-in-95 duration-500"
+    )}>
+      {/* Background Glow - Pulsing */}
       <div className={cn(
-        'absolute inset-0 blur-2xl rounded-full opacity-50',
-        bgColor
+        'absolute inset-0 blur-3xl rounded-full opacity-40',
+        bgColor,
+        animated && 'animate-pulse'
+      )} />
+
+      {/* Outer Ring - Subtle rotation */}
+      <div className={cn(
+        'absolute inset-0 rounded-full border border-current/5',
+        animated && 'animate-[spin_20s_linear_infinite]'
       )} />
 
       {/* Icon Container */}
       <div className={cn(
         'relative flex items-center justify-center',
-        'rounded-full border-2 border-dashed',
+        'rounded-full',
+        'border-2 border-dashed border-current/15',
         bgColor,
-        'border-current/20',
-        s.container
+        'backdrop-blur-sm',
+        s.container,
+        'transition-transform duration-300 hover:scale-105'
       )}>
-        {/* Inner Ring */}
-        <div className="absolute inset-2 rounded-full border border-current/10" />
+        {/* Inner Ring - Gradient effect */}
+        <div className={cn(
+          "absolute rounded-full border border-current/10",
+          s.ring
+        )} />
+
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/10 via-transparent to-black/5" />
 
         {/* Icon */}
-        <Icon className={cn(s.icon, color)} strokeWidth={1.5} />
+        <Icon
+          className={cn(
+            s.icon,
+            color,
+            'drop-shadow-sm',
+            animated && 'animate-in fade-in-0 duration-700 delay-200'
+          )}
+          strokeWidth={1.5}
+        />
 
-        {/* Decorative Dots */}
+        {/* Decorative Dots with animation */}
         <div className={cn(
           'absolute -top-0.5 -right-0.5 rounded-full',
           bgColor,
-          s.dot1
-        )} />
+          s.dot1,
+          'shadow-sm',
+          animated && 'animate-bounce'
+        )}
+        style={{ animationDuration: '2s', animationDelay: '0.5s' }}
+        />
         <div className={cn(
           'absolute -bottom-1 -left-1 rounded-full',
           bgColor,
           'opacity-60',
-          s.dot2
+          s.dot2,
+          'shadow-sm',
+          animated && 'animate-bounce'
+        )}
+        style={{ animationDuration: '2.5s', animationDelay: '1s' }}
+        />
+
+        {/* Top-left accent dot */}
+        <div className={cn(
+          'absolute -top-1 -left-0.5 rounded-full',
+          bgColor,
+          'opacity-40 h-1.5 w-1.5'
         )} />
       </div>
     </div>

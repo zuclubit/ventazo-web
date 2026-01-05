@@ -53,44 +53,85 @@ export const getEventsConfig = () => {
 };
 
 /**
- * Authentication configuration (Supabase)
+ * Authentication configuration (Native JWT)
+ *
+ * Required secrets:
+ * - JWT_SECRET: For signing/verifying native JWT tokens (minimum 32 chars)
+ * - INTERNAL_API_KEY: For server-to-server communication with frontend (minimum 32 chars)
+ *
+ * Legacy (for Supabase storage only, not auth):
+ * - SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY
  */
 export interface AuthConfig {
+  jwtSecret: string;
+  jwtIssuer: string;
+  accessTokenExpiry: string;
+  refreshTokenExpiry: string;
+  internalApiKey: string;
+  // Supabase config (for storage only, not auth)
   supabaseUrl: string;
   supabaseAnonKey: string;
   supabaseServiceKey: string;
-  jwtSecret: string;
 }
 
 export const getAuthConfig = (): AuthConfig => {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  // SECURITY: Only use JWT_SECRET, no fallback to SUPABASE_JWT_SECRET
+  const jwtSecret = process.env.JWT_SECRET;
+  const jwtIssuer = process.env.JWT_ISSUER || 'zuclubit-crm';
+  const accessTokenExpiry = process.env.ACCESS_TOKEN_EXPIRY || '1h';
+  const refreshTokenExpiry = process.env.REFRESH_TOKEN_EXPIRY || '7d';
+  const internalApiKey = process.env.INTERNAL_API_KEY || '';
 
-  // In development, allow missing Supabase config with defaults
+  // Supabase config (for storage, not for auth)
+  const supabaseUrl = process.env.SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || '';
+
+  // In development, allow missing secrets with defaults
   if (process.env.NODE_ENV === 'development') {
     return {
+      jwtSecret: jwtSecret || 'zuclubit-crm-dev-jwt-secret-change-in-production-min-32-chars',
+      jwtIssuer,
+      accessTokenExpiry,
+      refreshTokenExpiry,
+      internalApiKey: internalApiKey || 'zuclubit-dev-internal-api-key-32chars',
       supabaseUrl: supabaseUrl || 'http://localhost:54321',
       supabaseAnonKey: supabaseAnonKey || 'dev-anon-key',
       supabaseServiceKey: supabaseServiceKey || 'dev-service-key',
-      jwtSecret: jwtSecret || 'dev-jwt-secret-at-least-32-characters-long',
     };
   }
 
-  // In production, require all config
-  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey || !jwtSecret) {
+  // In production, require JWT_SECRET
+  if (!jwtSecret) {
     throw new Error(
-      'Missing required Supabase configuration. ' +
-      'Set SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, and SUPABASE_JWT_SECRET'
+      'Missing required JWT_SECRET configuration. ' +
+      'Set JWT_SECRET environment variable (minimum 32 characters)'
+    );
+  }
+
+  // In production, require INTERNAL_API_KEY for OAuth flow
+  if (!internalApiKey) {
+    throw new Error(
+      'Missing required INTERNAL_API_KEY configuration. ' +
+      'Set INTERNAL_API_KEY environment variable (minimum 32 characters) for OAuth flow.'
+    );
+  }
+
+  if (internalApiKey.length < 32) {
+    throw new Error(
+      'INTERNAL_API_KEY must be at least 32 characters long.'
     );
   }
 
   return {
+    jwtSecret,
+    jwtIssuer,
+    accessTokenExpiry,
+    refreshTokenExpiry,
+    internalApiKey,
     supabaseUrl,
     supabaseAnonKey,
     supabaseServiceKey,
-    jwtSecret,
   };
 };
 
@@ -254,6 +295,59 @@ export const getFirebaseConfig = (): FirebaseConfig => {
     privateKey,
     clientEmail,
     useADC,
+    isEnabled,
+  };
+};
+
+/**
+ * PDF Service Configuration
+ */
+export interface PdfServiceConfig {
+  url: string;
+  timeout: number;
+  isEnabled: boolean;
+}
+
+export const getPdfServiceConfig = (): PdfServiceConfig => {
+  const url = process.env.PDF_SERVICE_URL || 'https://ventazo-pdf-service.fly.dev';
+  const timeout = parseInt(process.env.PDF_SERVICE_TIMEOUT || '30000', 10);
+
+  return {
+    url,
+    timeout,
+    isEnabled: !!url,
+  };
+};
+
+/**
+ * Bot Helper AI Configuration
+ * Native integration with zuclubit-bot-helper for multi-provider AI services.
+ */
+export interface BotHelperConfig {
+  apiUrl: string;
+  sharedSecret: string;
+  timeout: number;
+  preferredProvider: 'openai' | 'anthropic' | 'groq' | 'google' | 'mistral' | undefined;
+  preferredModel: string | undefined;
+  isEnabled: boolean;
+}
+
+export const getBotHelperConfig = (): BotHelperConfig => {
+  const apiUrl = process.env.BOT_HELPER_API_URL || '';
+  const sharedSecret = process.env.BOT_HELPER_SHARED_SECRET || '';
+  const timeout = parseInt(process.env.BOT_HELPER_TIMEOUT || '30000', 10);
+  const preferredProvider = process.env.BOT_HELPER_PREFERRED_PROVIDER as BotHelperConfig['preferredProvider'];
+  const preferredModel = process.env.BOT_HELPER_PREFERRED_MODEL;
+
+  // Bot-helper is enabled if both URL and shared secret are configured
+  const isEnabled = !!apiUrl && !!sharedSecret;
+
+  return {
+    apiUrl,
+    sharedSecret,
+    timeout,
+    preferredProvider,
+    preferredModel,
     isEnabled,
   };
 };

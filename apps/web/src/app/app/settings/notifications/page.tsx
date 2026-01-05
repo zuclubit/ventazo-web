@@ -17,6 +17,7 @@ import {
   Save,
   Smartphone,
 } from 'lucide-react';
+import { NotificationsPageSkeleton } from '../components';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -243,9 +244,7 @@ export default function NotificationPreferencesPage() {
   if (isLoading) {
     return (
       <div className="container py-6">
-        <div className="flex items-center justify-center p-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <NotificationsPageSkeleton />
       </div>
     );
   }

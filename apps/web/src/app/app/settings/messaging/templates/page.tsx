@@ -16,9 +16,11 @@ import {
   Phone,
   Plus,
   Search,
+  Send,
   Trash2,
   X,
 } from 'lucide-react';
+import { MessagingTemplatesGridSkeleton } from '../../components';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -71,6 +73,7 @@ import {
   type MessageTemplate,
 } from '@/lib/messaging';
 import { cn } from '@/lib/utils';
+import { SendTemplateDialog } from './components';
 
 // ============================================
 // Constants
@@ -92,6 +95,7 @@ interface TemplateCardProps {
   template: MessageTemplate;
   onEdit: (template: MessageTemplate) => void;
   onPreview: (template: MessageTemplate) => void;
+  onSend: (template: MessageTemplate) => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   isDeleting: boolean;
@@ -102,6 +106,7 @@ function TemplateCard({
   template,
   onEdit,
   onPreview,
+  onSend,
   onDuplicate,
   onDelete,
   isDeleting,
@@ -138,6 +143,10 @@ function TemplateCard({
               <DropdownMenuItem onClick={() => onEdit(template)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onSend(template)}>
+                <Send className="h-4 w-4 mr-2" />
+                Enviar
               </DropdownMenuItem>
               <DropdownMenuItem disabled={isDuplicating} onClick={() => onDuplicate(template.id)}>
                 {isDuplicating ? (
@@ -247,7 +256,7 @@ function TemplateEditor({ template, open, onOpenChange, onSave, isSaving }: Temp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{template ? 'Editar Template' : 'Nuevo Template'}</DialogTitle>
           <DialogDescription>
@@ -461,7 +470,7 @@ function PreviewDialog({ template, open, onOpenChange }: PreviewDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Previsualizar: {template.name}</DialogTitle>
           <DialogDescription>
@@ -553,6 +562,7 @@ export default function MessageTemplatesPage() {
   const [selectedChannel, setSelectedChannel] = React.useState<MessageChannel | 'all'>('all');
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [sendOpen, setSendOpen] = React.useState(false);
   const [selectedTemplate, setSelectedTemplate] = React.useState<MessageTemplate | null>(null);
 
   // Queries
@@ -591,6 +601,11 @@ export default function MessageTemplatesPage() {
   const handlePreview = (template: MessageTemplate) => {
     setSelectedTemplate(template);
     setPreviewOpen(true);
+  };
+
+  const handleSend = (template: MessageTemplate) => {
+    setSelectedTemplate(template);
+    setSendOpen(true);
   };
 
   const handleSave = (data: CreateTemplateRequest) => {
@@ -677,9 +692,7 @@ export default function MessageTemplatesPage() {
 
       {/* Templates Grid */}
       {isLoading ? (
-        <div className="flex items-center justify-center p-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <MessagingTemplatesGridSkeleton />
       ) : filteredTemplates.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center p-12 text-center">
@@ -710,6 +723,7 @@ export default function MessageTemplatesPage() {
               onDuplicate={(id) => duplicateTemplate.mutate(id)}
               onEdit={handleEdit}
               onPreview={handlePreview}
+              onSend={handleSend}
             />
           ))}
         </div>
@@ -729,6 +743,13 @@ export default function MessageTemplatesPage() {
         open={previewOpen}
         template={selectedTemplate}
         onOpenChange={setPreviewOpen}
+      />
+
+      {/* Send Template Dialog */}
+      <SendTemplateDialog
+        open={sendOpen}
+        template={selectedTemplate}
+        onOpenChange={setSendOpen}
       />
     </div>
   );

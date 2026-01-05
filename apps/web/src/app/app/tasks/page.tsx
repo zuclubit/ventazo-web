@@ -1,50 +1,39 @@
 'use client';
 
+/**
+ * Tasks Page - v4.0 (Sheet-Based Modals)
+ *
+ * Updated to use Sheet components for consistent UX across modules.
+ * Follows the same patterns as the Quotes module.
+ *
+ * Key improvements v4.0:
+ * - Sheet-based create/edit modals (right side panel)
+ * - Responsive: bottom sheet on mobile, right panel on desktop
+ * - View mode in TaskDetailSheet for inline viewing
+ * - Smooth transitions between view/edit modes
+ *
+ * @version 4.0.0
+ */
+
 import * as React from 'react';
-
 import { useRouter } from 'next/navigation';
-
 import {
-  AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  Calendar,
   CheckCircle,
   ChevronLeft,
   ChevronRight,
-  Filter,
   ListTodo,
-  Loader2,
-  Minus,
-  MoreHorizontal,
   Plus,
-  RefreshCw,
-  Search,
-  Trash2,
-  UserCheck,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import {
   Table,
   TableBody,
@@ -55,36 +44,68 @@ import {
 } from '@/components/ui/table';
 import { RBACGuard } from '@/lib/auth';
 import {
-  ENTITY_TYPE_LABELS,
-  formatDaysUntilDue,
   getDueDateColor,
   getEntityInfo,
   isTaskOverdue,
-  PRIORITY_COLORS,
-  PRIORITY_LABELS,
-  STATUS_COLORS,
-  STATUS_LABELS,
-  TASK_PRIORITY,
-  TASK_STATUS,
-  TASK_TYPE,
-  TYPE_LABELS,
   useTaskManagement,
   type Task,
   type TaskPriority,
   type TaskStatus,
   type TaskType,
+  type TaskViewMode,
 } from '@/lib/tasks';
 
+import { PageContainer } from '@/components/layout';
 import { CompleteTaskDialog } from './components/complete-task-dialog';
 import { DeleteTaskDialog } from './components/delete-task-dialog';
-import { TaskFormDialog } from './components/task-form-dialog';
+// Sheet components (new - homologated with Quotes module)
+import { TaskCreateSheet } from './components/TaskCreateSheet';
+import { TaskDetailSheet } from './components/TaskDetailSheet';
+import { TaskKanbanBoard } from './components/kanban';
+import { TaskStatsBar } from './components/TaskStatsBar';
+import { TaskToolbar } from './components/TaskToolbar';
+import {
+  TaskListSkeleton,
+  TaskKanbanBoardSkeleton,
+  TaskStatsBarSkeleton,
+  TaskToolbarSkeleton,
+} from './components/TasksSkeleton';
+import { useTasksKanban } from './hooks';
+import { cn } from '@/lib/utils';
 
 // ============================================
-// Tasks List Page
+// Helper Functions
+// ============================================
+
+function getInitials(name: string): string {
+  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '-';
+  return new Date(dateStr).toLocaleDateString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+  });
+}
+
+// Priority border colors for list view (using CSS variables from globals.css)
+const PRIORITY_BORDER: Record<TaskPriority, string> = {
+  urgent: 'border-l-[var(--urgency-critical)]',
+  high: 'border-l-[var(--urgency-high)]',
+  medium: 'border-l-[var(--urgency-medium)]',
+  low: 'border-l-[var(--urgency-low)]',
+};
+
+// ============================================
+// Tasks Page Component
 // ============================================
 
 export default function TasksPage() {
   const router = useRouter();
+
+  // View mode
+  const [viewMode, setViewMode] = React.useState<TaskViewMode>('kanban');
 
   // Filters
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -95,6 +116,9 @@ export default function TasksPage() {
   const [page, setPage] = React.useState(1);
   const pageSize = 20;
 
+  // Stats filter (from inline stats bar)
+  const [statsFilter, setStatsFilter] = React.useState<'open' | 'overdue' | 'completed' | 'mine' | null>(null);
+
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   React.useEffect(() => {
@@ -102,18 +126,49 @@ export default function TasksPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Dialogs
-  const [isCreateOpen, setIsCreateOpen] = React.useState(false);
-  const [editTask, setEditTask] = React.useState<Task | null>(null);
+  // Apply stats filter to status filter
+  React.useEffect(() => {
+    if (statsFilter === 'open') {
+      setStatusFilter('all');
+      setOverdueFilter(false);
+    } else if (statsFilter === 'overdue') {
+      setOverdueFilter(true);
+    } else if (statsFilter === 'completed') {
+      setStatusFilter('completed');
+      setOverdueFilter(false);
+    } else if (statsFilter === 'mine') {
+      // For 'mine' filter, we'd need to add assignedToMe filter
+      // For now, just reset
+      setStatusFilter('all');
+      setOverdueFilter(false);
+    }
+  }, [statsFilter]);
+
+  // Sheets & Dialogs
+  const [isCreateSheetOpen, setIsCreateSheetOpen] = React.useState(false);
+  const [selectedTask, setSelectedTask] = React.useState<Task | null>(null);
+  const [detailMode, setDetailMode] = React.useState<'view' | 'edit'>('view');
   const [deleteTask, setDeleteTask] = React.useState<Task | null>(null);
   const [completeTask, setCompleteTask] = React.useState<Task | null>(null);
 
-  // Data
+  // Open task in view mode
+  const handleViewTask = React.useCallback((task: Task) => {
+    setSelectedTask(task);
+    setDetailMode('view');
+  }, []);
+
+  // Open task in edit mode
+  const handleEditTask = React.useCallback((task: Task) => {
+    setSelectedTask(task);
+    setDetailMode('edit');
+  }, []);
+
+  // Data for List view
   const {
     tasks,
     meta,
     statistics,
-    isLoading,
+    isLoading: isListLoading,
     isStatisticsLoading,
     refetchTasks,
     completeTaskAsync,
@@ -131,44 +186,25 @@ export default function TasksPage() {
     sortOrder: 'asc',
   });
 
+  // Data for Kanban view
+  const {
+    columns,
+    isLoading: isKanbanLoading,
+    isMoving,
+    isTaskMoving,
+    moveToStatus,
+    canMoveToStatus,
+    refetchTasks: refetchKanban,
+  } = useTasksKanban({
+    includeCompleted: true,
+    onCompletedAttempt: (task) => setCompleteTask(task),
+    onCancelledAttempt: () => {},
+  });
+
   // Reset page on filter change
   React.useEffect(() => {
     setPage(1);
   }, [debouncedSearch, statusFilter, priorityFilter, typeFilter, overdueFilter]);
-
-  // Get initials
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  // Format date
-  const formatDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('es-MX', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
-
-  // Get priority icon
-  const getPriorityIcon = (priority: TaskPriority) => {
-    switch (priority) {
-      case 'urgent':
-        return <AlertTriangle className="h-3 w-3" />;
-      case 'high':
-        return <ArrowUp className="h-3 w-3" />;
-      case 'low':
-        return <ArrowDown className="h-3 w-3" />;
-      default:
-        return <Minus className="h-3 w-3" />;
-    }
-  };
 
   // Quick complete handler
   const handleQuickComplete = async (task: Task, e: React.MouseEvent) => {
@@ -180,482 +216,342 @@ export default function TasksPage() {
     }
   };
 
+  // Refresh
+  const handleRefresh = () => {
+    if (viewMode === 'kanban') {
+      refetchKanban();
+    } else {
+      refetchTasks();
+    }
+  };
+
+  const isLoading = viewMode === 'kanban' ? isKanbanLoading : isListLoading;
+
   return (
-    <div className="space-y-6 p-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tareas</h1>
-          <p className="text-muted-foreground">
-            Gestiona tus tareas y actividades pendientes
-          </p>
-        </div>
-        <RBACGuard fallback={null} minRole="sales_rep">
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Tarea
-          </Button>
-        </RBACGuard>
-      </div>
-
-      <Separator />
-
-      {/* Statistics Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Abiertas</CardTitle>
-            <ListTodo className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {isStatisticsLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                (statistics?.byStatus?.pending ?? 0) + (statistics?.byStatus?.inProgress ?? 0)
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              tareas pendientes
+    <PageContainer variant={viewMode === 'kanban' ? 'full-bleed' : 'default'}>
+      {/* Header - Homologated with Kanban design */}
+      <div className="shrink-0 px-4 sm:px-6 pt-4 pb-3 header-container space-y-3">
+        {/* Title row */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="page-title">Tareas</h1>
+            <p className="page-subtitle mt-0.5">
+              Gestiona y organiza tus actividades
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Vencidas</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {isStatisticsLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                statistics?.overdue ?? 0
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              requieren atencion
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completadas Hoy</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {isStatisticsLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                statistics?.completedToday ?? 0
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              tareas finalizadas
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Asignadas a Mi</CardTitle>
-            <UserCheck className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {isStatisticsLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                statistics?.assignedToMe ?? 0
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              pendientes
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center text-base">
-            <Filter className="mr-2 h-4 w-4" />
-            Filtros
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            {/* Search */}
-            <div className="flex-1 min-w-[200px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="pl-9"
-                  placeholder="Buscar tareas..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Status Filter */}
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value as TaskStatus | 'all')}
-            >
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                {TASK_STATUS.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {STATUS_LABELS[status]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Priority Filter */}
-            <Select
-              value={priorityFilter}
-              onValueChange={(value) => setPriorityFilter(value as TaskPriority | 'all')}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Prioridad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {TASK_PRIORITY.map((priority) => (
-                  <SelectItem key={priority} value={priority}>
-                    {PRIORITY_LABELS[priority]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Type Filter */}
-            <Select
-              value={typeFilter}
-              onValueChange={(value) => setTypeFilter(value as TaskType | 'all')}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {TASK_TYPE.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {TYPE_LABELS[type]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Overdue Filter */}
-            <Button
-              className={overdueFilter ? 'bg-red-500 hover:bg-red-600' : ''}
-              size="sm"
-              variant={overdueFilter ? 'default' : 'outline'}
-              onClick={() => setOverdueFilter(!overdueFilter)}
-            >
-              <AlertTriangle className="mr-2 h-4 w-4" />
-              Solo Vencidas
-            </Button>
-
-            {/* Refresh */}
-            <Button size="icon" variant="outline" onClick={() => refetchTasks()}>
-              <RefreshCw className="h-4 w-4" />
-            </Button>
           </div>
-        </CardContent>
-      </Card>
+          <RBACGuard fallback={null} minRole="sales_rep">
+            <Button size="sm" onClick={() => setIsCreateSheetOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Nueva
+            </Button>
+          </RBACGuard>
+        </div>
 
-      {/* Tasks Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Listado de Tareas</CardTitle>
-          <CardDescription>
-            {meta?.total ?? 0} tareas encontradas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : tasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <ListTodo className="h-12 w-12 text-muted-foreground/50" />
-              <p className="mt-4 text-lg font-medium">Sin tareas</p>
-              <p className="text-sm text-muted-foreground">
-                No se encontraron tareas con los filtros seleccionados
-              </p>
-              <RBACGuard fallback={null} minRole="sales_rep">
-                <Button className="mt-4" onClick={() => setIsCreateOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Crear primera tarea
-                </Button>
-              </RBACGuard>
-            </div>
+        {/* Stats Bar - inline, 44px */}
+        <TaskStatsBar
+          statistics={statistics}
+          isLoading={isStatisticsLoading}
+          activeFilter={statsFilter}
+          onFilterClick={setStatsFilter}
+        />
+
+        {/* Toolbar - search + filters + view toggle */}
+        <TaskToolbar
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          priorityFilter={priorityFilter}
+          onPriorityFilterChange={setPriorityFilter}
+          typeFilter={typeFilter}
+          onTypeFilterChange={setTypeFilter}
+          overdueFilter={overdueFilter}
+          onOverdueFilterChange={setOverdueFilter}
+          onRefresh={handleRefresh}
+        />
+      </div>
+
+      {/* Main Content */}
+      <PageContainer.Body>
+        <PageContainer.Content
+          scroll={viewMode === 'kanban' ? 'horizontal' : 'vertical'}
+          padding={viewMode === 'kanban' ? 'none' : 'md'}
+        >
+          {viewMode === 'kanban' ? (
+            /* Kanban View */
+            <TaskKanbanBoard
+              columns={columns}
+              isLoading={isKanbanLoading}
+              isMoving={isMoving}
+              canMoveToStatus={canMoveToStatus}
+              isTaskMoving={isTaskMoving}
+              onMoveToStatus={moveToStatus}
+              onTaskClick={handleViewTask}
+              onTaskEdit={handleEditTask}
+              onTaskDelete={(task) => setDeleteTask(task)}
+              onTaskComplete={(task) => setCompleteTask(task)}
+            />
           ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40px]"></TableHead>
-                    <TableHead>Tarea</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Prioridad</TableHead>
-                    <TableHead>Vencimiento</TableHead>
-                    <TableHead>Relacionado</TableHead>
-                    <TableHead>Asignado</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tasks.map((task) => {
-                    const overdue = isTaskOverdue(task);
-                    const entityInfo = getEntityInfo(task);
-                    const isCompleted = task.status === 'completed';
+            /* List View - Simplified table */
+            <div className="px-4 sm:px-6 pb-6">
+              {isListLoading ? (
+                <TaskListSkeleton rows={8} />
+              ) : tasks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <ListTodo className="h-10 w-10 text-muted-foreground/30" />
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Sin tareas
+                  </p>
+                  <RBACGuard fallback={null} minRole="sales_rep">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-4"
+                      onClick={() => setIsCreateSheetOpen(true)}
+                    >
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      Crear tarea
+                    </Button>
+                  </RBACGuard>
+                </div>
+              ) : (
+                <>
+                  {/* Minimal count */}
+                  <p className="text-[11px] text-muted-foreground mb-3">
+                    {meta?.total ?? 0} tareas
+                  </p>
 
-                    return (
-                      <TableRow
-                        key={task.id}
-                        className={`cursor-pointer ${overdue ? 'bg-red-50 dark:bg-red-950/20' : ''}`}
-                        onClick={() => router.push(`/app/tasks/${task.id}`)}
-                      >
-                        {/* Quick Complete Button */}
-                        <TableCell>
-                          {!isCompleted && task.status !== 'cancelled' && (
-                            <Button
-                              className="h-6 w-6"
-                              disabled={isCompleting}
-                              size="icon"
-                              variant="ghost"
-                              onClick={(e) => handleQuickComplete(task, e)}
+                  {/* Table */}
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="w-8"></TableHead>
+                          <TableHead className="text-xs">Tarea</TableHead>
+                          <TableHead className="text-xs w-24">Vence</TableHead>
+                          <TableHead className="text-xs w-20">Asignado</TableHead>
+                          <TableHead className="w-8"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tasks.map((task) => {
+                          const overdue = isTaskOverdue(task);
+                          const entityInfo = getEntityInfo(task);
+                          const isCompleted = task.status === 'completed';
+
+                          return (
+                            <TableRow
+                              key={task.id}
+                              className={cn(
+                                'cursor-pointer transition-colors',
+                                'hover:bg-muted/50',
+                                // Priority left border
+                                'border-l-[3px]',
+                                PRIORITY_BORDER[task.priority],
+                                // Overdue: subtle bg using semantic tokens
+                                overdue && 'bg-[var(--due-overdue-bg)]'
+                              )}
+                              onClick={() => handleViewTask(task)}
                             >
-                              <CheckCircle className="h-4 w-4 text-muted-foreground hover:text-green-500" />
-                            </Button>
-                          )}
-                          {isCompleted && (
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                          )}
-                        </TableCell>
+                              {/* Complete button */}
+                              <TableCell className="py-2 px-2">
+                                {!isCompleted && task.status !== 'cancelled' ? (
+                                  <Button
+                                    className="h-6 w-6"
+                                    disabled={isCompleting}
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={(e) => handleQuickComplete(task, e)}
+                                  >
+                                    <CheckCircle className="h-4 w-4 text-muted-foreground hover:text-[var(--task-status-completed)]" />
+                                  </Button>
+                                ) : isCompleted ? (
+                                  <CheckCircle className="h-4 w-4 text-[var(--task-status-completed)] ml-1" />
+                                ) : null}
+                              </TableCell>
 
-                        {/* Task Title */}
-                        <TableCell>
-                          <div>
-                            <p className={`font-medium ${isCompleted ? 'line-through text-muted-foreground' : ''}`}>
-                              {task.title}
-                            </p>
-                            {task.description && (
-                              <p className="text-sm text-muted-foreground line-clamp-1">
-                                {task.description}
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
+                              {/* Title + Entity */}
+                              <TableCell className="py-2">
+                                <div>
+                                  <p className={cn(
+                                    'text-[13px] font-medium line-clamp-1',
+                                    isCompleted && 'line-through text-muted-foreground'
+                                  )}>
+                                    {task.title}
+                                  </p>
+                                  {entityInfo && (
+                                    <p className="text-[11px] text-muted-foreground truncate">
+                                      {entityInfo.name}
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
 
-                        {/* Status */}
-                        <TableCell>
-                          <Badge className={STATUS_COLORS[task.status]}>
-                            {STATUS_LABELS[task.status]}
-                          </Badge>
-                        </TableCell>
+                              {/* Due date */}
+                              <TableCell className="py-2">
+                                <span className={cn(
+                                  'text-[12px]',
+                                  getDueDateColor(task.dueDate, isCompleted)
+                                )}>
+                                  {task.dueDate ? formatDate(task.dueDate) : '-'}
+                                </span>
+                              </TableCell>
 
-                        {/* Type */}
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">
-                            {TYPE_LABELS[task.type]}
-                          </span>
-                        </TableCell>
+                              {/* Assignee */}
+                              <TableCell className="py-2">
+                                {task.assignee ? (
+                                  <Avatar className="h-5 w-5">
+                                    <AvatarFallback className="text-[9px]">
+                                      {getInitials(task.assignee.name)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                ) : (
+                                  <span className="text-[11px] text-muted-foreground/50">-</span>
+                                )}
+                              </TableCell>
 
-                        {/* Priority */}
-                        <TableCell>
-                          <Badge className={PRIORITY_COLORS[task.priority]}>
-                            {getPriorityIcon(task.priority)}
-                            <span className="ml-1">{PRIORITY_LABELS[task.priority]}</span>
-                          </Badge>
-                        </TableCell>
-
-                        {/* Due Date */}
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3 text-muted-foreground" />
-                            <span className={getDueDateColor(task.dueDate, isCompleted)}>
-                              {task.dueDate ? formatDaysUntilDue(task.dueDate) : '-'}
-                            </span>
-                          </div>
-                          {task.dueDate && (
-                            <p className="text-xs text-muted-foreground">
-                              {formatDate(task.dueDate)}
-                            </p>
-                          )}
-                        </TableCell>
-
-                        {/* Related Entity */}
-                        <TableCell>
-                          {entityInfo ? (
-                            <div
-                              className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(entityInfo.path);
-                              }}
-                            >
-                              <Badge className="text-xs" variant="outline">
-                                {ENTITY_TYPE_LABELS[entityInfo.type]}
-                              </Badge>
-                              <span className="truncate max-w-[100px]">{entityInfo.name}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-
-                        {/* Assignee */}
-                        <TableCell>
-                          {task.assignee ? (
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-xs">
-                                  {getInitials(task.assignee.name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-sm truncate max-w-[80px]">
-                                {task.assignee.name}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">Sin asignar</span>
-                          )}
-                        </TableCell>
-
-                        {/* Actions */}
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button size="icon" variant="ghost">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/app/tasks/${task.id}`);
-                                }}
-                              >
-                                Ver detalles
-                              </DropdownMenuItem>
-                              <RBACGuard fallback={null} minRole="sales_rep">
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditTask(task);
-                                  }}
-                                >
-                                  Editar
-                                </DropdownMenuItem>
-                                {!isCompleted && task.status !== 'cancelled' && (
-                                  <>
-                                    <DropdownMenuSeparator />
+                              {/* Actions - hidden by default */}
+                              <TableCell className="py-2 px-2">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                                    >
+                                      <span className="sr-only">Menú</span>
+                                      ···
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-32">
                                     <DropdownMenuItem
-                                      className="text-green-600"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setCompleteTask(task);
+                                        handleEditTask(task);
+                                      }}
+                                      className="text-[13px]"
+                                    >
+                                      Editar
+                                    </DropdownMenuItem>
+                                    {!isCompleted && task.status !== 'cancelled' && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          className="text-[13px] text-[var(--task-status-completed-text)]"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setCompleteTask(task);
+                                          }}
+                                        >
+                                          Completar
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-[13px] text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteTask(task);
                                       }}
                                     >
-                                      <CheckCircle className="mr-2 h-4 w-4" />
-                                      Completar
+                                      Eliminar
                                     </DropdownMenuItem>
-                                  </>
-                                )}
-                              </RBACGuard>
-                              <RBACGuard fallback={null} minRole="manager">
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeleteTask(task);
-                                  }}
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </RBACGuard>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-
-              {/* Pagination */}
-              {meta && meta.totalPages > 1 && (
-                <div className="flex items-center justify-between border-t pt-4 mt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Pagina {meta.page} de {meta.totalPages}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      disabled={page <= 1}
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Anterior
-                    </Button>
-                    <Button
-                      disabled={page >= meta.totalPages}
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setPage((p) => p + 1)}
-                    >
-                      Siguiente
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Create/Edit Dialog */}
-      <TaskFormDialog
-        open={isCreateOpen || !!editTask}
-        task={editTask}
-        onClose={() => {
-          setIsCreateOpen(false);
-          setEditTask(null);
+                  {/* Pagination - simplified */}
+                  {meta && meta.totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-3">
+                      <span className="text-[11px] text-muted-foreground">
+                        {meta.page}/{meta.totalPages}
+                      </span>
+                      <div className="flex gap-1">
+                        <Button
+                          disabled={page <= 1}
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          disabled={page >= meta.totalPages}
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => setPage((p) => p + 1)}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </PageContainer.Content>
+      </PageContainer.Body>
+
+      {/* Sheets (new - right side panel) */}
+      <TaskCreateSheet
+        open={isCreateSheetOpen}
+        onClose={() => setIsCreateSheetOpen(false)}
+        onSuccess={() => {
+          if (viewMode === 'kanban') {
+            refetchKanban();
+          } else {
+            refetchTasks();
+          }
         }}
       />
 
-      {/* Delete Dialog */}
+      <TaskDetailSheet
+        task={selectedTask}
+        open={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        defaultMode={detailMode}
+        onSuccess={(updatedTask) => {
+          setSelectedTask(updatedTask);
+          if (viewMode === 'kanban') {
+            refetchKanban();
+          } else {
+            refetchTasks();
+          }
+        }}
+        onDelete={() => {
+          setSelectedTask(null);
+          if (viewMode === 'kanban') {
+            refetchKanban();
+          } else {
+            refetchTasks();
+          }
+        }}
+      />
+
+      {/* Confirmation Dialogs */}
       <DeleteTaskDialog
         open={!!deleteTask}
         task={deleteTask}
         onClose={() => setDeleteTask(null)}
       />
 
-      {/* Complete Dialog */}
       <CompleteTaskDialog
         open={!!completeTask}
         task={completeTask}
         onClose={() => setCompleteTask(null)}
       />
-    </div>
+    </PageContainer>
   );
 }

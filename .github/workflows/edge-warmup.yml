@@ -1,0 +1,66 @@
+# Edge Function Warmup Workflow
+# Performance optimization: Pre-warm Cloudflare Pages edge functions to prevent cold starts
+# See: docs/PERFORMANCE_REMEDIATION_LOG.md - P1.2 TTFB Stabilization
+#
+# This workflow runs every 5 minutes to keep edge functions warm,
+# ensuring consistent TTFB < 400ms for public pages.
+
+name: Edge Function Warmup
+
+on:
+  schedule:
+    # Run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    # Allow manual trigger for testing
+
+jobs:
+  warmup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Warm up edge functions
+        run: |
+          echo "🔥 Warming up Cloudflare Pages edge functions..."
+
+          # Warm up main production domain (parallel for speed)
+          echo "→ Warming crm.zuclubit.com..."
+          curl -s -o /dev/null -w "Landing: %{time_total}s\n" https://crm.zuclubit.com/ &
+          curl -s -o /dev/null -w "Login: %{time_total}s\n" https://crm.zuclubit.com/login &
+          curl -s -o /dev/null -w "Register: %{time_total}s\n" https://crm.zuclubit.com/register &
+          wait
+
+          # Warm up Cloudflare Pages domain (parallel)
+          echo "→ Warming ventazo.pages.dev..."
+          curl -s -o /dev/null -w "Landing: %{time_total}s\n" https://ventazo.pages.dev/ &
+          curl -s -o /dev/null -w "Login: %{time_total}s\n" https://ventazo.pages.dev/login &
+          wait
+
+          # Warm up API backend (including new /warmup endpoint)
+          echo "→ Warming API backend..."
+          curl -s -o /dev/null -w "Health: %{time_total}s\n" https://zuclubit-lead-service.fly.dev/healthz
+          curl -s -o /dev/null -w "Reference: %{time_total}s\n" https://zuclubit-lead-service.fly.dev/reference/
+
+          # PERFORMANCE: Call dedicated warmup endpoint to pre-heat DB connections
+          # See: docs/PERFORMANCE_OPTIMIZATION_PLAN_V2.md - Section 3.1
+          echo "→ Warming database connections..."
+          WARMUP_RESPONSE=$(curl -s https://zuclubit-lead-service.fly.dev/warmup)
+          echo "Warmup: $WARMUP_RESPONSE"
+
+          # Warm up auth endpoint (triggers tenant cache warmup)
+          echo "→ Warming auth endpoints..."
+          curl -s -o /dev/null -w "Captcha Status: %{time_total}s\n" https://zuclubit-lead-service.fly.dev/api/v1/auth/captcha/status
+
+          echo "✅ Warmup complete"
+
+      - name: Report slow responses
+        if: always()
+        run: |
+          # Check if any response was too slow (> 1s)
+          LANDING_TIME=$(curl -s -o /dev/null -w "%{time_total}" https://crm.zuclubit.com/)
+
+          if (( $(echo "$LANDING_TIME > 1.0" | bc -l) )); then
+            echo "⚠️ WARNING: Landing page TTFB is slow: ${LANDING_TIME}s"
+          else
+            echo "✓ Landing page TTFB is healthy: ${LANDING_TIME}s"
+          fi

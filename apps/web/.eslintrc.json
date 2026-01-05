@@ -88,7 +88,18 @@
         "reservedFirst": true
       }
     ],
-    "no-console": ["warn", { "allow": ["warn", "error"] }]
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Literal[value=/^#[0-9A-Fa-f]{6}$/]",
+        "message": "Use CSS variables with fallbacks instead of hardcoded hex colors. Pattern: var(--variable-name, #FALLBACK). See docs/THEME_ARCHITECTURE_CANONICAL.md"
+      },
+      {
+        "selector": "TemplateLiteral[quasis.0.value.raw=/^#[0-9A-Fa-f]{6}$/]",
+        "message": "Use CSS variables with fallbacks instead of hardcoded hex colors in template literals."
+      }
+    ]
   },
   "ignorePatterns": [
     "node_modules/",

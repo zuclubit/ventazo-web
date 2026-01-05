@@ -115,10 +115,10 @@ export function CompleteTaskDialog({ task, open, onClose }: CompleteTaskDialogPr
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-[90vw] sm:max-w-md mx-4 sm:mx-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-500" />
+            <CheckCircle className="h-5 w-5 text-[var(--task-status-completed)]" />
             Completar Tarea
           </DialogTitle>
           <DialogDescription>
@@ -200,12 +200,17 @@ export function CompleteTaskDialog({ task, open, onClose }: CompleteTaskDialogPr
               />
             )}
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>
+            <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="w-full sm:w-auto min-h-[44px]"
+              >
                 Cancelar
               </Button>
               <Button
-                className="bg-green-600 hover:bg-green-700"
+                className="w-full sm:w-auto min-h-[44px] bg-[var(--task-status-completed)] hover:bg-[var(--task-status-completed-hover)] text-white"
                 disabled={completeTask.isPending}
                 type="submit"
               >

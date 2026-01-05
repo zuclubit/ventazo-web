@@ -173,3 +173,138 @@ export function getStatusColorClass(status: string): string {
 
   return statusColors[status] ?? 'status-new';
 }
+
+// =============================================================================
+// Dynamic Avatar Colors
+// =============================================================================
+
+/**
+ * Color palette for dynamic avatar backgrounds
+ * These colors are carefully selected to:
+ * - Work well in both light and dark modes
+ * - Be visually distinct from each other
+ * - Provide good contrast with white text
+ * - Follow modern design aesthetics (Slack/Discord style)
+ */
+const AVATAR_COLORS = [
+  { bg: '#6366f1', text: '#ffffff' }, // Indigo
+  { bg: '#8b5cf6', text: '#ffffff' }, // Violet
+  { bg: '#a855f7', text: '#ffffff' }, // Purple
+  { bg: '#d946ef', text: '#ffffff' }, // Fuchsia
+  { bg: '#ec4899', text: '#ffffff' }, // Pink
+  { bg: '#f43f5e', text: '#ffffff' }, // Rose
+  { bg: '#ef4444', text: '#ffffff' }, // Red
+  { bg: '#f97316', text: '#ffffff' }, // Orange
+  { bg: '#eab308', text: '#1f2937' }, // Yellow
+  { bg: '#84cc16', text: '#1f2937' }, // Lime
+  { bg: '#22c55e', text: '#ffffff' }, // Green
+  { bg: '#10b981', text: '#ffffff' }, // Emerald
+  { bg: '#14b8a6', text: '#ffffff' }, // Teal
+  { bg: '#06b6d4', text: '#ffffff' }, // Cyan
+  { bg: '#0ea5e9', text: '#ffffff' }, // Sky
+  { bg: '#3b82f6', text: '#ffffff' }, // Blue
+] as const;
+
+/**
+ * Generate a simple hash from a string
+ * Used to consistently map names to colors
+ */
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+}
+
+/**
+ * Get a consistent color pair for an avatar based on name or ID
+ * Returns the same color for the same input every time
+ */
+export function getAvatarColor(identifier: string): { bg: string; text: string } {
+  const defaultColor = { bg: '#6366f1', text: '#ffffff' };
+  if (!identifier) {
+    return AVATAR_COLORS[0] ?? defaultColor;
+  }
+  const hash = hashString(identifier.toLowerCase().trim());
+  const index = hash % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index] ?? defaultColor;
+}
+
+/**
+ * Get avatar color as Tailwind-compatible inline style
+ */
+export function getAvatarStyle(identifier: string): React.CSSProperties {
+  const colors = getAvatarColor(identifier);
+  return {
+    backgroundColor: colors.bg,
+    color: colors.text,
+  };
+}
+
+/**
+ * Get a CSS class string for avatar colors (for SSR compatibility)
+ * Returns a data attribute that can be styled with CSS
+ */
+export function getAvatarColorClass(identifier: string): string {
+  const hash = hashString((identifier || '').toLowerCase().trim());
+  const index = hash % AVATAR_COLORS.length;
+  return `avatar-color-${index}`;
+}
+
+// =============================================================================
+// Mention Parsing and Rendering
+// =============================================================================
+
+export interface ParsedMention {
+  type: 'user' | 'group';
+  id: string;
+  name: string;
+  startIndex: number;
+  endIndex: number;
+}
+
+/**
+ * Parse mentions from comment content
+ * Format: @[Name](userId) or @[GroupName](tag:tagId)
+ */
+export function parseMentions(content: string): ParsedMention[] {
+  const mentions: ParsedMention[] = [];
+  const mentionRegex = /@\[([^\]]+)\]\((?:tag:)?([^)]+)\)/g;
+  let match;
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    const isGroup = match[0].includes('tag:');
+    const name = match[1];
+    const id = match[2];
+    if (name && id) {
+      mentions.push({
+        type: isGroup ? 'group' : 'user',
+        name,
+        id,
+        startIndex: match.index,
+        endIndex: match.index + match[0].length,
+      });
+    }
+  }
+
+  return mentions;
+}
+
+/**
+ * Convert content with mentions to HTML with styled spans
+ */
+export function renderContentWithMentions(content: string): string {
+  const mentionRegex = /@\[([^\]]+)\]\((?:tag:)?([^)]+)\)/g;
+
+  return content.replace(mentionRegex, (match, name, id) => {
+    const isGroup = match.includes('tag:');
+    const mentionClass = isGroup
+      ? 'mention mention-group'
+      : 'mention mention-user';
+    const icon = isGroup ? '👥 ' : '';
+    return `<span class="${mentionClass}" data-id="${id}">${icon}@${name}</span>`;
+  });
+}

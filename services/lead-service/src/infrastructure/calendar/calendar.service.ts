@@ -188,6 +188,7 @@ export class CalendarService {
 
   /**
    * Create new calendar integration
+   * Uses actual database columns: tokens (JSONB), settings (JSONB), status (varchar)
    */
   private async createIntegration(
     tenantId: string,
@@ -204,7 +205,7 @@ export class CalendarService {
       const result = await this.pool.query<CalendarIntegration>(
         `INSERT INTO calendar_integrations
          (id, tenant_id, user_id, provider, provider_account_id, provider_email,
-          tokens, default_calendar_id, sync_enabled, status, settings, created_at, updated_at)
+          tokens, calendar_id, sync_enabled, status, settings, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          RETURNING
            id,
@@ -214,7 +215,7 @@ export class CalendarService {
            provider_account_id as "providerAccountId",
            provider_email as "providerEmail",
            tokens,
-           default_calendar_id as "defaultCalendarId",
+           calendar_id as "defaultCalendarId",
            sync_enabled as "syncEnabled",
            last_sync_at as "lastSyncAt",
            status,
@@ -242,7 +243,8 @@ export class CalendarService {
         return Result.fail(result.error || 'Failed to create integration');
       }
 
-      return Result.ok(result.value.rows[0]);
+      const row = result.value.rows[0];
+      return Result.ok(this.transformIntegrationRow(row));
     } catch (error) {
       return Result.fail(
         `Failed to create integration: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -251,7 +253,51 @@ export class CalendarService {
   }
 
   /**
+   * Transform database row to CalendarIntegration format
+   * Handles actual DB columns: tokens (JSONB), settings (JSONB), status (varchar)
+   */
+  private transformIntegrationRow(row: Record<string, unknown>): CalendarIntegration {
+    // Parse tokens from JSONB or use as object
+    let tokens: CalendarOAuthToken;
+    if (typeof row.tokens === 'string') {
+      tokens = JSON.parse(row.tokens);
+    } else if (row.tokens && typeof row.tokens === 'object') {
+      tokens = row.tokens as CalendarOAuthToken;
+    } else {
+      tokens = { accessToken: '', scopes: [] };
+    }
+
+    // Parse settings from JSONB or use defaults
+    let settings: CalendarIntegrationSettings;
+    if (typeof row.settings === 'string') {
+      settings = JSON.parse(row.settings);
+    } else if (row.settings && typeof row.settings === 'object') {
+      settings = row.settings as CalendarIntegrationSettings;
+    } else {
+      settings = DEFAULT_CALENDAR_SETTINGS;
+    }
+
+    return {
+      id: row.id as string,
+      tenantId: row.tenantId as string,
+      userId: row.userId as string,
+      provider: row.provider as CalendarProvider,
+      providerAccountId: row.providerAccountId as string,
+      providerEmail: row.providerEmail as string || row.providerAccountId as string,
+      defaultCalendarId: row.defaultCalendarId as string,
+      tokens,
+      syncEnabled: row.syncEnabled as boolean,
+      lastSyncAt: row.lastSyncAt as string | undefined,
+      status: row.status as CalendarConnectionStatus || CalendarConnectionStatus.CONNECTED,
+      settings,
+      createdAt: row.createdAt as string,
+      updatedAt: row.updatedAt as string,
+    };
+  }
+
+  /**
    * Update integration tokens
+   * Uses actual database columns
    */
   private async updateIntegrationTokens(
     integrationId: string,
@@ -259,7 +305,7 @@ export class CalendarService {
     status: CalendarConnectionStatus
   ): Promise<Result<CalendarIntegration>> {
     try {
-      const result = await this.pool.query<CalendarIntegration>(
+      const result = await this.pool.query<Record<string, unknown>>(
         `UPDATE calendar_integrations
          SET tokens = $1, status = $2, updated_at = $3
          WHERE id = $4
@@ -271,7 +317,7 @@ export class CalendarService {
            provider_account_id as "providerAccountId",
            provider_email as "providerEmail",
            tokens,
-           default_calendar_id as "defaultCalendarId",
+           calendar_id as "defaultCalendarId",
            sync_enabled as "syncEnabled",
            last_sync_at as "lastSyncAt",
            status,
@@ -289,7 +335,7 @@ export class CalendarService {
         return Result.fail('Integration not found');
       }
 
-      return Result.ok(result.value.rows[0]);
+      return Result.ok(this.transformIntegrationRow(result.value.rows[0]));
     } catch (error) {
       return Result.fail(
         `Failed to update tokens: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -299,6 +345,7 @@ export class CalendarService {
 
   /**
    * Get integration by provider
+   * Uses actual database columns
    */
   async getIntegrationByProvider(
     tenantId: string,
@@ -306,7 +353,7 @@ export class CalendarService {
     provider: CalendarProvider
   ): Promise<Result<CalendarIntegration | null>> {
     try {
-      const result = await this.pool.query<CalendarIntegration>(
+      const result = await this.pool.query<Record<string, unknown>>(
         `SELECT
            id,
            tenant_id as "tenantId",
@@ -315,7 +362,7 @@ export class CalendarService {
            provider_account_id as "providerAccountId",
            provider_email as "providerEmail",
            tokens,
-           default_calendar_id as "defaultCalendarId",
+           calendar_id as "defaultCalendarId",
            sync_enabled as "syncEnabled",
            last_sync_at as "lastSyncAt",
            status,
@@ -331,7 +378,11 @@ export class CalendarService {
         return Result.fail(result.error || 'Query failed');
       }
 
-      return Result.ok(result.value.rows[0] || null);
+      if (result.value.rows.length === 0) {
+        return Result.ok(null);
+      }
+
+      return Result.ok(this.transformIntegrationRow(result.value.rows[0]));
     } catch (error) {
       return Result.fail(
         `Failed to get integration: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -341,10 +392,11 @@ export class CalendarService {
 
   /**
    * Get integration by ID
+   * Uses actual database columns
    */
   async getIntegrationById(integrationId: string): Promise<Result<CalendarIntegration | null>> {
     try {
-      const result = await this.pool.query<CalendarIntegration>(
+      const result = await this.pool.query<Record<string, unknown>>(
         `SELECT
            id,
            tenant_id as "tenantId",
@@ -353,7 +405,7 @@ export class CalendarService {
            provider_account_id as "providerAccountId",
            provider_email as "providerEmail",
            tokens,
-           default_calendar_id as "defaultCalendarId",
+           calendar_id as "defaultCalendarId",
            sync_enabled as "syncEnabled",
            last_sync_at as "lastSyncAt",
            status,
@@ -369,7 +421,11 @@ export class CalendarService {
         return Result.fail(result.error || 'Query failed');
       }
 
-      return Result.ok(result.value.rows[0] || null);
+      if (result.value.rows.length === 0) {
+        return Result.ok(null);
+      }
+
+      return Result.ok(this.transformIntegrationRow(result.value.rows[0]));
     } catch (error) {
       return Result.fail(
         `Failed to get integration: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -379,13 +435,14 @@ export class CalendarService {
 
   /**
    * Get all integrations for a user
+   * Uses actual database columns
    */
   async getUserIntegrations(
     tenantId: string,
     userId: string
   ): Promise<Result<CalendarIntegration[]>> {
     try {
-      const result = await this.pool.query<CalendarIntegration>(
+      const result = await this.pool.query<Record<string, unknown>>(
         `SELECT
            id,
            tenant_id as "tenantId",
@@ -394,7 +451,7 @@ export class CalendarService {
            provider_account_id as "providerAccountId",
            provider_email as "providerEmail",
            tokens,
-           default_calendar_id as "defaultCalendarId",
+           calendar_id as "defaultCalendarId",
            sync_enabled as "syncEnabled",
            last_sync_at as "lastSyncAt",
            status,
@@ -411,7 +468,7 @@ export class CalendarService {
         return Result.fail(result.error || 'Query failed');
       }
 
-      return Result.ok(result.value.rows);
+      return Result.ok(result.value.rows.map(row => this.transformIntegrationRow(row)));
     } catch (error) {
       return Result.fail(
         `Failed to get integrations: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -459,6 +516,7 @@ export class CalendarService {
 
   /**
    * Update integration settings
+   * Uses actual database columns (settings is JSONB)
    */
   async updateIntegrationSettings(
     integrationId: string,
@@ -473,10 +531,15 @@ export class CalendarService {
       const currentSettings = integrationResult.value.settings;
       const newSettings = { ...currentSettings, ...settings };
 
-      const result = await this.pool.query<CalendarIntegration>(
+      // Update sync_enabled if syncEvents setting is provided
+      const syncEnabled = settings.syncEvents !== undefined
+        ? settings.syncEvents
+        : integrationResult.value.syncEnabled;
+
+      const result = await this.pool.query<Record<string, unknown>>(
         `UPDATE calendar_integrations
-         SET settings = $1, updated_at = $2
-         WHERE id = $3
+         SET settings = $1, sync_enabled = $2, updated_at = $3
+         WHERE id = $4
          RETURNING
            id,
            tenant_id as "tenantId",
@@ -485,21 +548,25 @@ export class CalendarService {
            provider_account_id as "providerAccountId",
            provider_email as "providerEmail",
            tokens,
-           default_calendar_id as "defaultCalendarId",
+           calendar_id as "defaultCalendarId",
            sync_enabled as "syncEnabled",
            last_sync_at as "lastSyncAt",
            status,
            settings,
            created_at as "createdAt",
            updated_at as "updatedAt"`,
-        [JSON.stringify(newSettings), new Date(), integrationId]
+        [JSON.stringify(newSettings), syncEnabled, new Date(), integrationId]
       );
 
       if (result.isFailure || !result.value) {
         return Result.fail(result.error || 'Failed to update settings');
       }
 
-      return Result.ok(result.value.rows[0]);
+      if (result.value.rows.length === 0) {
+        return Result.fail('Integration not found');
+      }
+
+      return Result.ok(this.transformIntegrationRow(result.value.rows[0]));
     } catch (error) {
       return Result.fail(
         `Failed to update settings: ${error instanceof Error ? error.message : 'Unknown error'}`

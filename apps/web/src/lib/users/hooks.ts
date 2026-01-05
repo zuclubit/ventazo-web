@@ -54,11 +54,12 @@ export const userQueryKeys = {
 
 /**
  * Get current user's profile
+ * Note: Backend endpoint is /auth/me, not /users/me
  */
 export function useCurrentUserProfile() {
   return useApiQuery<UserProfile>(
     userQueryKeys.me(),
-    '/users/me',
+    '/auth/me',
     {
       staleTime: 5 * 60 * 1000, // 5 minutes
     }
@@ -98,6 +99,7 @@ export function useUserTenants() {
 
 /**
  * Update current user's profile
+ * Note: Backend endpoint is /auth/me, not /users/me
  */
 export function useUpdateProfile() {
   const queryClient = useQueryClient();
@@ -105,7 +107,7 @@ export function useUpdateProfile() {
 
   return useApiMutation<UserProfile, UpdateProfileData>(
     async (data, client) => {
-      return client.patch<UserProfile>('/users/me', data);
+      return client.patch<UserProfile>('/auth/me', data);
     },
     {
       onSuccess: (updatedProfile) => {
@@ -133,6 +135,7 @@ export function useUpdateProfile() {
 
 /**
  * Upload avatar using standardized file upload
+ * Note: Avatar upload is handled via Supabase Storage, not backend API
  * @deprecated Use useImageUpload hook directly for more control
  */
 export function useUploadAvatar() {
@@ -140,8 +143,8 @@ export function useUploadAvatar() {
 
   return useApiMutation<{ avatarUrl: string }, FormData>(
     async (formData, _client) => {
-      // For file upload, we need custom handling
-      const response = await fetch('/users/me/avatar', {
+      // For file upload, we need custom handling via API proxy or Supabase
+      const response = await fetch('/api/upload/avatar', {
         method: 'POST',
         body: formData,
       });
@@ -161,10 +164,11 @@ export function useUploadAvatar() {
 /**
  * Upload avatar using standardized image upload hook
  * Recommended over useUploadAvatar for better progress tracking
+ * Note: Avatar upload is handled via Next.js API route
  */
 export function useAvatarUpload() {
   return useImageUpload<{ avatarUrl: string }>({
-    endpoint: '/users/me/avatar',
+    endpoint: '/api/upload/avatar',
     fieldName: 'avatar',
     invalidateKeys: [userQueryKeys.me()],
     successMessage: 'Avatar actualizado exitosamente',
@@ -196,7 +200,7 @@ export function useTeamMembers(filters?: TeamMembersFilters) {
   if (filters?.role) queryParams.set('role', filters.role);
   if (filters?.search) queryParams.set('search', filters.search);
 
-  const endpoint = `/tenant/members${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const endpoint = `/members${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   return useApiQuery<TeamMembersResponse>(
     userQueryKeys.teamMembersList(filters as Record<string, unknown>),
@@ -213,7 +217,7 @@ export function useTeamMembers(filters?: TeamMembersFilters) {
 export function useTeamMember(memberId: string) {
   return useApiQuery<TeamMember>(
     userQueryKeys.teamMember(memberId),
-    `/tenant/members/${memberId}`,
+    `/members/${memberId}`,
     {
       enabled: !!memberId,
     }
@@ -228,7 +232,8 @@ export function useUpdateMemberRole() {
 
   return useApiMutation<TeamMember, UpdateMemberRoleData>(
     async ({ memberId, role }, client) => {
-      return client.patch<TeamMember>(`/tenant/members/${memberId}/role`, { role });
+      // Backend uses generic PATCH /:id with body { role }
+      return client.patch<TeamMember>(`/members/${memberId}`, { role });
     },
     {
       onSuccess: (updatedMember, variables) => {
@@ -253,7 +258,7 @@ export function useDeleteMember() {
 
   return useApiMutation<void, string>(
     async (memberId, client) => {
-      return client.delete(`/tenant/members/${memberId}`);
+      return client.delete(`/members/${memberId}`);
     },
     {
       onSuccess: (_, memberId) => {
@@ -275,7 +280,8 @@ export function useSuspendMember() {
 
   return useApiMutation<TeamMember, string>(
     async (memberId, client) => {
-      return client.patch<TeamMember>(`/tenant/members/${memberId}/suspend`);
+      // Backend uses generic PATCH /:id with body { isActive: false }
+      return client.patch<TeamMember>(`/members/${memberId}`, { isActive: false });
     },
     {
       onSuccess: () => {
@@ -293,7 +299,8 @@ export function useReactivateMember() {
 
   return useApiMutation<TeamMember, string>(
     async (memberId, client) => {
-      return client.patch<TeamMember>(`/tenant/members/${memberId}/reactivate`);
+      // Backend uses generic PATCH /:id with body { isActive: true }
+      return client.patch<TeamMember>(`/members/${memberId}`, { isActive: true });
     },
     {
       onSuccess: () => {
@@ -309,11 +316,12 @@ export function useReactivateMember() {
 
 /**
  * Get pending invitations
+ * Backend route: GET /api/v1/invitations
  */
 export function useInvitations() {
   return useApiQuery<InvitationsResponse>(
     userQueryKeys.invitations(),
-    '/tenant/invitations',
+    '/invitations',
     {
       staleTime: 60 * 1000, // 1 minute
     }
@@ -322,13 +330,14 @@ export function useInvitations() {
 
 /**
  * Send invitation to new member
+ * Backend route: POST /api/v1/invitations
  */
 export function useInviteMember() {
   const queryClient = useQueryClient();
 
   return useApiMutation<Invitation, InviteMemberData>(
     async (data, client) => {
-      return client.post<Invitation>('/tenant/members/invite', data);
+      return client.post<Invitation>('/invitations', data);
     },
     {
       onSuccess: () => {
@@ -341,13 +350,14 @@ export function useInviteMember() {
 
 /**
  * Resend invitation
+ * Backend route: POST /api/v1/invitations/:id/resend
  */
 export function useResendInvitation() {
   const queryClient = useQueryClient();
 
   return useApiMutation<Invitation, string>(
     async (invitationId, client) => {
-      return client.post<Invitation>(`/tenant/invitations/${invitationId}/resend`);
+      return client.post<Invitation>(`/invitations/${invitationId}/resend`);
     },
     {
       onSuccess: () => {
@@ -359,13 +369,14 @@ export function useResendInvitation() {
 
 /**
  * Cancel invitation
+ * Backend route: DELETE /api/v1/invitations/:id
  */
 export function useCancelInvitation() {
   const queryClient = useQueryClient();
 
   return useApiMutation<void, string>(
     async (invitationId, client) => {
-      return client.delete(`/tenant/invitations/${invitationId}`);
+      return client.delete(`/invitations/${invitationId}`);
     },
     {
       onSuccess: () => {
@@ -424,6 +435,59 @@ export function useUserAuditLogs(userId: string, filters?: Omit<AuditLogFilters,
     ...filters,
     userId,
   });
+}
+
+// ============================================
+// Users List Hook (for @mentions)
+// ============================================
+
+interface UseUsersOptions {
+  limit?: number;
+  enabled?: boolean;
+}
+
+interface UsersListItem {
+  id: string;
+  fullName: string;
+  email: string;
+  avatarUrl?: string;
+}
+
+interface UsersListResponse {
+  users: UsersListItem[];
+  total: number;
+}
+
+/**
+ * Get list of users for mentions/autocomplete
+ * Uses team members endpoint internally
+ */
+export function useUsers(options: UseUsersOptions = {}) {
+  const { limit = 50, enabled = true } = options;
+
+  const query = useTeamMembers({
+    pageSize: limit,
+    status: 'active',
+  });
+
+  // Transform TeamMembersResponse to simpler UsersListResponse
+  const data: UsersListResponse | undefined = query.data
+    ? {
+        users: query.data.data.map((member) => ({
+          id: member.userId,
+          fullName: member.fullName ?? member.email,
+          email: member.email,
+          avatarUrl: member.avatarUrl ?? undefined,
+        })),
+        total: query.data.meta?.total ?? query.data.data.length,
+      }
+    : undefined;
+
+  return {
+    ...query,
+    data,
+    isLoading: !enabled ? false : query.isLoading,
+  };
 }
 
 // ============================================

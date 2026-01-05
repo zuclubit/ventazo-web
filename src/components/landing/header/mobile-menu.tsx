@@ -133,12 +133,20 @@ export function MobileMenu({ items, ctaButtons, isOpen, onClose }: MobileMenuPro
                 }}
               >
                 <Link
-                  className="flex items-center gap-4 rounded-2xl px-4 py-4 text-lg font-medium text-white/80 transition-all hover:bg-white/10 hover:text-white"
+                  className={cn(
+                    "flex items-center gap-4 rounded-2xl px-4 py-4 text-lg font-medium transition-all hover:bg-white/10",
+                    item.highlight
+                      ? "bg-gradient-to-r from-[#FDE68A]/15 to-[#FDBA74]/15 text-[#FDE68A] border border-[#FDE68A]/25 hover:from-[#FDE68A]/25 hover:to-[#FDBA74]/25"
+                      : "text-white/90 hover:text-white"
+                  )}
                   href={item.href}
                   onClick={onClose}
                 >
                   {item.icon && <item.icon className="h-5 w-5 text-ventazo-400" />}
                   {item.label}
+                  {item.highlight && (
+                    <span className="ml-2 inline-block h-2 w-2 animate-pulse rounded-full bg-[#FDE68A]" />
+                  )}
                   {item.badge && (
                     <span className="ml-auto rounded-full bg-coral-500 px-2 py-0.5 text-xs font-medium text-white">
                       {item.badge}

@@ -12,7 +12,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { registerTenantGetter } from '@/lib/api';
 import { I18nProvider } from '@/lib/i18n/context';
 import { TenantProvider } from '@/lib/tenant/tenant-context';
-import { TenantThemeProvider } from '@/lib/theme';
+import { TenantThemeProvider, GovernanceProvider } from '@/lib/theme';
 import { useTenantStore } from '@/store';
 
 // ============================================
@@ -92,19 +92,24 @@ export function Providers({ children }: ProvidersProps) {
         <AuthProvider>
           <TenantProvider>
             <TenantApiInitializer>
-              <TenantThemeProvider>
-                <NextThemesProvider
-                  disableTransitionOnChange
-                  enableSystem
-                  attribute="class"
-                  defaultTheme="system"
-                >
-                  <DynamicBrandingSync />
-                  <TooltipProvider delayDuration={0}>
-                    {children}
-                  </TooltipProvider>
-                </NextThemesProvider>
-              </TenantThemeProvider>
+              <GovernanceProvider
+                defaultEnabled={true}
+                defaultPolicyLevel="default"
+              >
+                <TenantThemeProvider>
+                  <NextThemesProvider
+                    disableTransitionOnChange
+                    enableSystem
+                    attribute="class"
+                    defaultTheme="system"
+                  >
+                    <DynamicBrandingSync />
+                    <TooltipProvider delayDuration={0}>
+                      {children}
+                    </TooltipProvider>
+                  </NextThemesProvider>
+                </TenantThemeProvider>
+              </GovernanceProvider>
             </TenantApiInitializer>
           </TenantProvider>
         </AuthProvider>

@@ -165,14 +165,14 @@ function PageHeader({
         'px-3 sm:px-4 md:px-5 lg:px-6',
         // Responsive vertical padding
         'py-2.5 sm:py-3 md:py-4',
-        // Background with subtle blur for sticky
-        'bg-background/80 backdrop-blur-sm',
+        // Background with contrast for dark mode - uses header-container pattern
+        'bg-background backdrop-blur-sm',
         // Z-index for sticky
         'z-20',
         // Sticky behavior
         sticky && 'sticky top-0',
-        // Border
-        bordered && 'border-b border-border/50',
+        // Border - always visible in both themes
+        bordered && 'border-b border-border',
         className
       )}
     >
@@ -355,11 +355,12 @@ interface PageTitleProps {
 function PageTitle({ children, subtitle, className }: PageTitleProps) {
   return (
     <div className={cn('min-w-0 flex-1', className)}>
-      <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight truncate">
+      {/* Uses page-title class for guaranteed visibility in dark mode with dynamic theming */}
+      <h1 className="page-title truncate">
         {children}
       </h1>
       {subtitle && (
-        <p className="text-xs sm:text-sm text-muted-foreground truncate mt-0.5">
+        <p className="page-subtitle truncate mt-0.5">
           {subtitle}
         </p>
       )}

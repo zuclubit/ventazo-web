@@ -1,20 +1,21 @@
 'use server';
 
 /**
- * Authentication Server Actions - Unified Auth System
+ * Session Server Actions - SSO Only
  *
- * All authentication operations run ONLY on the server.
- * This provides:
- * - Secure credential handling
- * - Direct backend API communication
- * - Session cookie management
- * - No client-side token exposure
+ * All authentication is handled via Zuclubit SSO.
+ * These actions manage session operations for SSO-authenticated users.
+ *
+ * Features:
+ * - Session validation with real access token expiration check
+ * - Smart token refresh (only when needed)
+ * - Secure logout with SSO token revocation
  *
  * @see https://nextjs.org/docs/app/guides/authentication
+ * @see middleware.ts for automatic refresh during navigation
  */
 
 import { redirect } from 'next/navigation';
-import { z } from 'zod';
 import {
   createSession,
   deleteSession,
@@ -24,34 +25,17 @@ import {
   type SessionPayload,
   type ClientSession,
 } from './index';
+import { revokeToken, refreshAccessToken } from '@/lib/auth/sso-config';
 
 // ============================================
 // Configuration
 // ============================================
 
-// For Server Actions (edge runtime), use API_URL secret
-// For client-side, NEXT_PUBLIC_API_URL is embedded at build time
-const API_URL = process.env['API_URL'] || process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
-
-// ============================================
-// Validation Schemas
-// ============================================
-
-const LoginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
-});
-
-const RegisterSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[a-z]/, 'Password must contain a lowercase letter')
-    .regex(/[A-Z]/, 'Password must contain an uppercase letter')
-    .regex(/[0-9]/, 'Password must contain a number'),
-  fullName: z.string().min(2, 'Name must be at least 2 characters').optional(),
-});
+/**
+ * Buffer time before token expiry to trigger refresh (5 minutes)
+ * This should match the middleware configuration
+ */
+const TOKEN_REFRESH_BUFFER_SECONDS = 5 * 60;
 
 // ============================================
 // Response Types
@@ -60,225 +44,72 @@ const RegisterSchema = z.object({
 export interface AuthResult {
   success: boolean;
   error?: string;
-  errorCode?: string;
   redirectTo?: string;
 }
 
-export interface RegisterResult {
-  success: boolean;
+export interface SessionStatus {
+  isValid: boolean;
+  needsRefresh: boolean;
+  expiresIn: number | null;
   error?: string;
-  confirmationRequired?: boolean;
 }
 
 // ============================================
-// Backend API Response Types
-// ============================================
-
-interface BackendLoginResponse {
-  user: {
-    id: string;
-    email: string;
-    fullName: string | null;
-    avatarUrl: string | null;
-    phone: string | null;
-    isActive: boolean;
-    metadata: Record<string, unknown>;
-  };
-  session: {
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: number;
-    expiresAt: number;
-  };
-  tenants: Array<{
-    id: string;
-    name: string;
-    slug: string;
-    role: string;
-  }>;
-}
-
-interface BackendRegisterResponse {
-  user: {
-    id: string;
-    email: string;
-    fullName: string | null;
-  };
-  session: {
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: number;
-    expiresAt: number;
-  } | null;
-  confirmationRequired: boolean;
-}
-
-interface BackendRefreshResponse {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-  expiresAt: number;
-}
-
-// ============================================
-// Login Action
+// Token Utilities
 // ============================================
 
 /**
- * Authenticate user with email/password
- * Creates encrypted session cookie on success
+ * Decode JWT payload without verification (for reading claims)
+ * Only use for extracting expiration, NOT for security decisions
  */
-export async function loginAction(
-  email: string,
-  password: string
-): Promise<AuthResult> {
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
-    // 1. Validate input
-    const validation = LoginSchema.safeParse({ email, password });
-    if (!validation.success) {
-      return {
-        success: false,
-        error: validation.error.errors[0]?.message || 'Invalid input',
-      };
-    }
+    const parts = token.split('.');
+    if (parts.length !== 3 || !parts[1]) return null;
 
-    // Log API URL for debugging
-    console.log('[LoginAction] Calling API:', `${API_URL}/api/v1/auth/login`);
+    // Handle base64url encoding
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padding = '='.repeat((4 - base64.length % 4) % 4);
+    const decoded = Buffer.from(base64 + padding, 'base64').toString('utf8');
 
-    // 2. Authenticate with backend API
-    const response = await fetch(`${API_URL}/api/v1/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
-      cache: 'no-store',
-    });
-
-    console.log('[LoginAction] Response status:', response.status);
-
-    const data = await response.json();
-    console.log('[LoginAction] Response data keys:', Object.keys(data));
-
-    // 3. Handle errors
-    if (!response.ok) {
-      // Handle specific error codes
-      if (data.code === 'EMAIL_NOT_CONFIRMED') {
-        return {
-          success: false,
-          error: 'EMAIL_NOT_CONFIRMED',
-          errorCode: 'EMAIL_NOT_CONFIRMED',
-        };
-      }
-
-      return {
-        success: false,
-        error: data.message || 'Invalid email or password',
-      };
-    }
-
-    // 4. Extract session data
-    const loginData = data as BackendLoginResponse;
-
-    // Determine tenant and role
-    let tenantId = '';
-    let role = 'viewer';
-
-    if (loginData.tenants && loginData.tenants.length > 0) {
-      const firstTenant = loginData.tenants[0];
-      if (firstTenant) {
-        tenantId = firstTenant.id;
-        role = firstTenant.role || 'viewer';
-      }
-    }
-
-    // 5. Create encrypted session cookie
-    await createSession({
-      userId: loginData.user.id,
-      email: loginData.user.email,
-      tenantId,
-      role,
-      accessToken: loginData.session.accessToken,
-      refreshToken: loginData.session.refreshToken,
-      expiresAt: loginData.session.expiresAt,
-    });
-
-    // 6. Determine redirect
-    let redirectTo = '/app';
-    if (!tenantId) {
-      // New user without tenant - go to onboarding
-      redirectTo = '/onboarding/create-business';
-    }
-
-    return { success: true, redirectTo };
-  } catch (error) {
-    console.error('[LoginAction] Error:', error);
-    // Return more detailed error for debugging
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return {
-      success: false,
-      error: `Connection error: ${errorMessage}`,
-    };
+    return JSON.parse(decoded);
+  } catch {
+    return null;
   }
 }
 
-// ============================================
-// Register Action
-// ============================================
+/**
+ * Get token expiration timestamp from JWT
+ * Returns null if token is invalid or doesn't have exp claim
+ */
+function getTokenExpiry(token: string): number | null {
+  const payload = decodeJwtPayload(token);
+  if (!payload || typeof payload['exp'] !== 'number') return null;
+  return payload['exp'];
+}
 
 /**
- * Register new user
- * Does NOT create session (requires email confirmation)
+ * Check if access token needs refresh
+ * Returns true if token is expired or will expire within buffer time
  */
-export async function registerAction(
-  email: string,
-  password: string,
-  fullName?: string
-): Promise<RegisterResult> {
-  try {
-    // 1. Validate input
-    const validation = RegisterSchema.safeParse({ email, password, fullName });
-    if (!validation.success) {
-      return {
-        success: false,
-        error: validation.error.errors[0]?.message || 'Invalid input',
-      };
-    }
+function tokenNeedsRefresh(accessToken: string): boolean {
+  const expiry = getTokenExpiry(accessToken);
+  if (!expiry) return true; // If we can't determine expiry, try to refresh
 
-    // 2. Register with backend API
-    const response = await fetch(`${API_URL}/api/v1/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password, fullName }),
-      cache: 'no-store',
-    });
+  const now = Math.floor(Date.now() / 1000);
+  return expiry - now < TOKEN_REFRESH_BUFFER_SECONDS;
+}
 
-    const data = await response.json();
+/**
+ * Calculate seconds until token expires
+ * Returns negative value if already expired, null if unknown
+ */
+function getSecondsUntilExpiry(accessToken: string): number | null {
+  const expiry = getTokenExpiry(accessToken);
+  if (!expiry) return null;
 
-    // 3. Handle errors
-    if (!response.ok) {
-      return {
-        success: false,
-        error: data.message || 'Registration failed',
-      };
-    }
-
-    // 4. Return success
-    const registerData = data as BackendRegisterResponse;
-
-    return {
-      success: true,
-      confirmationRequired: registerData.confirmationRequired ?? true,
-    };
-  } catch (error) {
-    console.error('[RegisterAction] Error:', error);
-    return {
-      success: false,
-      error: 'Connection error. Please try again.',
-    };
-  }
+  const now = Math.floor(Date.now() / 1000);
+  return expiry - now;
 }
 
 // ============================================
@@ -287,23 +118,22 @@ export async function registerAction(
 
 /**
  * Logout user
- * Deletes session cookie and notifies backend
+ * Revokes tokens at SSO server and deletes local session
  */
 export async function logoutAction(): Promise<void> {
   const session = await getSession();
 
-  // Notify backend (best effort)
-  if (session?.accessToken) {
+  if (session) {
+    // Revoke tokens at SSO server
     try {
-      await fetch(`${API_URL}/api/v1/auth/logout`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-    } catch {
-      // Ignore errors - logout should succeed locally
+      if (session.refreshToken) {
+        await revokeToken(session.refreshToken, 'refresh_token');
+      }
+      if (session.accessToken) {
+        await revokeToken(session.accessToken, 'access_token');
+      }
+    } catch (error) {
+      console.warn('[LogoutAction] SSO token revocation failed:', error);
     }
   }
 
@@ -312,14 +142,66 @@ export async function logoutAction(): Promise<void> {
 }
 
 // ============================================
-// Token Refresh Action
+// Token Refresh Actions
 // ============================================
 
 /**
  * Refresh authentication tokens
- * Updates session with new tokens from backend
+ * Uses SSO token endpoint to get new tokens
+ *
+ * This function checks if refresh is actually needed before making the call,
+ * preventing unnecessary token rotation and network requests.
  */
 export async function refreshSessionAction(): Promise<boolean> {
+  const session = await getSession();
+
+  if (!session?.refreshToken) {
+    console.warn('[RefreshSessionAction] No refresh token available');
+    return false;
+  }
+
+  if (!session.accessToken) {
+    console.warn('[RefreshSessionAction] No access token in session');
+    return false;
+  }
+
+  // Check if refresh is actually needed
+  if (!tokenNeedsRefresh(session.accessToken)) {
+    // Token is still valid, no refresh needed
+    const expiresIn = getSecondsUntilExpiry(session.accessToken);
+    console.log(`[RefreshSessionAction] Token still valid for ${expiresIn}s, skipping refresh`);
+    return true;
+  }
+
+  try {
+    console.log('[RefreshSessionAction] Refreshing tokens...');
+    const tokens = await refreshAccessToken(session.refreshToken);
+
+    // Get new expiration from the refreshed access token
+    const newExpiry = getTokenExpiry(tokens.accessToken);
+    const now = Math.floor(Date.now() / 1000);
+
+    await updateSession({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: newExpiry || (now + tokens.expiresIn),
+    });
+
+    console.log('[RefreshSessionAction] Tokens refreshed successfully');
+    return true;
+  } catch (error) {
+    console.error('[RefreshSessionAction] Error:', error);
+    // Delete session on refresh failure - forces re-login
+    await deleteSession();
+    return false;
+  }
+}
+
+/**
+ * Force refresh tokens regardless of expiration status
+ * Use this when you need to ensure fresh tokens (e.g., before sensitive operations)
+ */
+export async function forceRefreshSession(): Promise<boolean> {
   const session = await getSession();
 
   if (!session?.refreshToken) {
@@ -327,179 +209,89 @@ export async function refreshSessionAction(): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refreshToken: session.refreshToken }),
-      cache: 'no-store',
-    });
+    const tokens = await refreshAccessToken(session.refreshToken);
+    const newExpiry = getTokenExpiry(tokens.accessToken);
+    const now = Math.floor(Date.now() / 1000);
 
-    if (!response.ok) {
-      // Refresh failed - session is invalid
-      await deleteSession();
-      return false;
-    }
-
-    const data = (await response.json()) as BackendRefreshResponse;
-
-    // Update session with new tokens
     await updateSession({
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-      expiresAt: data.expiresAt,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: newExpiry || (now + tokens.expiresIn),
     });
 
     return true;
   } catch (error) {
-    console.error('[RefreshSessionAction] Error:', error);
+    console.error('[ForceRefreshSession] Error:', error);
     return false;
   }
 }
 
 // ============================================
-// Password Reset Actions
+// Session Status Actions
 // ============================================
 
 /**
- * Request password reset email
- * Always returns success to prevent email enumeration
+ * Get detailed session status
+ * Useful for debugging and monitoring session health
  */
-export async function requestPasswordResetAction(
-  email: string
-): Promise<{ success: boolean; message: string }> {
-  try {
-    await fetch(`${API_URL}/api/v1/auth/forgot-password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email }),
-      cache: 'no-store',
-    });
-  } catch {
-    // Ignore errors
-  }
-
-  // Always return success to not reveal email existence
-  return {
-    success: true,
-    message: 'If an account exists with this email, a reset link has been sent.',
-  };
-}
-
-/**
- * Reset password with token
- */
-export async function resetPasswordAction(
-  token: string,
-  newPassword: string
-): Promise<AuthResult> {
-  try {
-    const response = await fetch(`${API_URL}/api/v1/auth/reset-password`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ token, password: newPassword }),
-      cache: 'no-store',
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: data.message || 'Password reset failed',
-      };
-    }
-
-    return { success: true, redirectTo: '/login' };
-  } catch (error) {
-    console.error('[ResetPasswordAction] Error:', error);
-    return {
-      success: false,
-      error: 'Connection error. Please try again.',
-    };
-  }
-}
-
-/**
- * Update password for authenticated user
- */
-export async function updatePasswordAction(
-  currentPassword: string,
-  newPassword: string
-): Promise<AuthResult> {
+export async function getSessionStatus(): Promise<SessionStatus> {
   const session = await getSession();
 
-  if (!session?.accessToken) {
+  if (!session) {
     return {
-      success: false,
-      error: 'Not authenticated',
+      isValid: false,
+      needsRefresh: false,
+      expiresIn: null,
+      error: 'No session found',
     };
   }
 
-  try {
-    const response = await fetch(`${API_URL}/api/v1/auth/update-password`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ currentPassword, password: newPassword }),
-      cache: 'no-store',
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: data.message || 'Password update failed',
-      };
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error('[UpdatePasswordAction] Error:', error);
+  if (!session.accessToken) {
     return {
-      success: false,
-      error: 'Connection error. Please try again.',
+      isValid: false,
+      needsRefresh: false,
+      expiresIn: null,
+      error: 'No access token in session',
     };
   }
+
+  const expiresIn = getSecondsUntilExpiry(session.accessToken);
+  const needsRefresh = tokenNeedsRefresh(session.accessToken);
+
+  return {
+    isValid: !needsRefresh || !!session.refreshToken,
+    needsRefresh,
+    expiresIn,
+    error: undefined,
+  };
 }
 
-// ============================================
-// Email Confirmation Actions
-// ============================================
-
 /**
- * Resend email confirmation
- * Always returns success to prevent email enumeration
+ * Check and refresh session if needed
+ * Returns the current session status after any necessary refresh
  */
-export async function resendConfirmationAction(
-  email: string
-): Promise<{ success: boolean; message: string }> {
-  try {
-    await fetch(`${API_URL}/api/v1/auth/resend-confirmation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email }),
-      cache: 'no-store',
-    });
-  } catch {
-    // Ignore errors
+export async function checkAndRefreshSession(): Promise<SessionStatus> {
+  const initialStatus = await getSessionStatus();
+
+  if (!initialStatus.isValid && !initialStatus.needsRefresh) {
+    return initialStatus;
   }
 
-  // Always return success
-  return {
-    success: true,
-    message: 'If the email exists and is unconfirmed, a new confirmation link has been sent.',
-  };
+  if (initialStatus.needsRefresh) {
+    const refreshed = await refreshSessionAction();
+    if (!refreshed) {
+      return {
+        isValid: false,
+        needsRefresh: false,
+        expiresIn: null,
+        error: 'Token refresh failed',
+      };
+    }
+    // Return updated status after refresh
+    return getSessionStatus();
+  }
+
+  return initialStatus;
 }
 
 // ============================================
@@ -516,19 +308,53 @@ export async function getCurrentUser(): Promise<ClientSession | null> {
 
 /**
  * Check if user is authenticated
+ * Also verifies that the session has valid tokens
  */
 export async function checkAuth(): Promise<boolean> {
   const session = await getSession();
-  return !!session;
+
+  if (!session?.accessToken) {
+    return false;
+  }
+
+  // Check if token is completely expired (past buffer)
+  const expiry = getTokenExpiry(session.accessToken);
+  if (expiry) {
+    const now = Math.floor(Date.now() / 1000);
+    // Session is invalid if token expired AND no refresh token
+    if (expiry < now && !session.refreshToken) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
  * Get current access token for API calls
- * Used by API client for backend requests
+ * Optionally refreshes if token is expiring soon
+ *
+ * @param autoRefresh - Whether to automatically refresh if needed (default: true)
  */
-export async function getAccessToken(): Promise<string | null> {
+export async function getAccessToken(autoRefresh = true): Promise<string | null> {
   const session = await getSession();
-  return session?.accessToken ?? null;
+
+  if (!session?.accessToken) {
+    return null;
+  }
+
+  // Optionally refresh before returning
+  if (autoRefresh && tokenNeedsRefresh(session.accessToken)) {
+    const refreshed = await refreshSessionAction();
+    if (refreshed) {
+      const updatedSession = await getSession();
+      return updatedSession?.accessToken ?? null;
+    }
+    // If refresh failed, return null (session is invalid)
+    return null;
+  }
+
+  return session.accessToken;
 }
 
 /**
@@ -539,170 +365,16 @@ export async function getCurrentTenantId(): Promise<string | null> {
   return session?.tenantId ?? null;
 }
 
-// ============================================
-// Tenant Actions
-// ============================================
-
 /**
- * Switch to a different tenant
- */
-export async function switchTenantAction(tenantId: string): Promise<AuthResult> {
-  const session = await getSession();
-
-  if (!session?.accessToken) {
-    return {
-      success: false,
-      error: 'Not authenticated',
-    };
-  }
-
-  try {
-    // Fetch user profile for new tenant to get role
-    const response = await fetch(`${API_URL}/api/v1/auth/me`, {
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-        'x-tenant-id': tenantId,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: 'Unable to switch tenant',
-      };
-    }
-
-    const userData = await response.json();
-    const user = userData.data || userData;
-
-    // Update session with new tenant
-    await updateSession({
-      tenantId,
-      role: user.role || 'viewer',
-    });
-
-    return { success: true };
-  } catch (error) {
-    console.error('[SwitchTenantAction] Error:', error);
-    return {
-      success: false,
-      error: 'Connection error. Please try again.',
-    };
-  }
-}
-
-// ============================================
-// Onboarding Actions
-// ============================================
-
-/**
- * Create tenant (business) during onboarding
- * Uses authenticated session to create the tenant
- */
-export async function createTenantAction(data: {
-  businessName: string;
-  businessType: string;
-  businessSize: string;
-  phone: string;
-  country: string;
-  city: string;
-  timezone: string;
-}): Promise<AuthResult & { tenantId?: string }> {
-  const session = await getSession();
-
-  if (!session?.accessToken) {
-    return {
-      success: false,
-      error: 'No estás autenticado. Por favor inicia sesión nuevamente.',
-    };
-  }
-
-  try {
-    // Generate slug from business name
-    const slug = data.businessName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .substring(0, 50);
-
-    console.log('[CreateTenantAction] Creating tenant:', { name: data.businessName, slug });
-
-    const response = await fetch(`${API_URL}/api/v1/auth/tenants`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: data.businessName,
-        slug: `${slug}-${Date.now().toString(36)}`, // Add unique suffix
-        settings: {
-          businessType: data.businessType,
-          businessSize: data.businessSize,
-          phone: data.phone,
-          country: data.country,
-          city: data.city,
-          timezone: data.timezone,
-          currency: 'MXN',
-          locale: 'es-MX',
-        },
-      }),
-      cache: 'no-store',
-    });
-
-    console.log('[CreateTenantAction] Response status:', response.status);
-
-    const result = await response.json();
-    console.log('[CreateTenantAction] Response:', JSON.stringify(result).substring(0, 200));
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: result.message || 'Error al crear el negocio',
-      };
-    }
-
-    const tenantId = result.tenantId || result.id || result.tenant?.id;
-
-    if (!tenantId) {
-      return {
-        success: false,
-        error: 'No se pudo obtener el ID del tenant',
-      };
-    }
-
-    // Update session with new tenant
-    await updateSession({
-      tenantId,
-      role: 'owner',
-    });
-
-    return {
-      success: true,
-      tenantId,
-      redirectTo: '/onboarding/setup',
-    };
-  } catch (error) {
-    console.error('[CreateTenantAction] Error:', error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return {
-      success: false,
-      error: `Error de conexión: ${errorMessage}`,
-    };
-  }
-}
-
-/**
- * Get current session user data for client components
- * Used by onboarding to check if user is logged in
+ * Get current session user data
  */
 export async function getSessionUserAction(): Promise<{
   userId: string;
   email: string;
   tenantId: string;
+  tenantSlug?: string;
   role: string;
+  permissions?: string[];
 } | null> {
   const session = await getSession();
 
@@ -714,6 +386,28 @@ export async function getSessionUserAction(): Promise<{
     userId: session.userId,
     email: session.email,
     tenantId: session.tenantId,
+    tenantSlug: session.tenantSlug,
     role: session.role,
+    permissions: session.permissions,
   };
+}
+
+// ============================================
+// Tenant Actions
+// ============================================
+
+/**
+ * Update session with new tenant
+ * Called after user selects/creates a tenant
+ */
+export async function updateTenantInSession(
+  tenantId: string,
+  tenantSlug?: string,
+  role?: string
+): Promise<boolean> {
+  return updateSession({
+    tenantId,
+    tenantSlug,
+    role: role || 'viewer',
+  });
 }

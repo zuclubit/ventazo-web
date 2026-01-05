@@ -679,6 +679,58 @@ export class WebSocketServer implements IWebSocketServer {
   }
 
   /**
+   * Publish Kanban board event
+   * Used for real-time collaboration on Kanban boards
+   */
+  publishKanbanEvent(
+    tenantId: string,
+    eventType: 'KANBAN_ITEM_MOVED' | 'KANBAN_ITEM_CREATED' | 'KANBAN_ITEM_UPDATED' | 'KANBAN_CONFIG_UPDATED' | 'KANBAN_WIP_WARNING' | 'KANBAN_LOCK_ACQUIRED' | 'KANBAN_LOCK_RELEASED',
+    entityType: 'lead' | 'opportunity' | 'task' | 'customer',
+    payload: {
+      entityId?: string;
+      fromStageId?: string;
+      toStageId?: string;
+      moveId?: string;
+      userId: string;
+      userName?: string;
+      timestamp: Date;
+      wipStatus?: {
+        stageId: string;
+        current: number;
+        limit: number;
+        level: string;
+      };
+      lockInfo?: {
+        lockedBy: string;
+        lockedByName?: string;
+        expiresAt: Date;
+      };
+      data?: Record<string, unknown>;
+    }
+  ): void {
+    const message: WebSocketMessage = {
+      id: crypto.randomUUID(),
+      type: eventType as WebSocketMessageType,
+      tenantId,
+      userId: payload.userId,
+      payload: {
+        entityType,
+        ...payload,
+      },
+      timestamp: new Date(),
+    };
+
+    // Broadcast to Kanban subscribers for this entity type
+    this.broadcast(
+      { tenantId, subscriptionType: entityType },
+      message
+    );
+
+    // Also broadcast to general Kanban channel
+    this.broadcast({ tenantId, subscriptionType: 'kanban' }, message);
+  }
+
+  /**
    * Shutdown server
    */
   shutdown(): void {

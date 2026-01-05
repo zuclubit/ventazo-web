@@ -56,6 +56,8 @@ const createQuoteSchema = z.object({
 });
 
 const updateQuoteSchema = z.object({
+  // Status update for drag & drop Kanban operations
+  status: z.enum(['draft', 'pending_review', 'sent', 'viewed', 'accepted', 'rejected', 'expired', 'revised']).optional(),
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).optional(),
   expirationDate: z.string().datetime().optional(),
@@ -193,6 +195,23 @@ export const quoteRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // ============================================
+  // Stats - Must be before /:quoteId to avoid route collision
+  // ============================================
+
+  // Get quote statistics (using efficient SQL aggregation)
+  fastify.get('/stats', async (request, reply) => {
+    const context = getContext(request);
+
+    const result = await quoteService.getStats(context.tenantId);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.send(result.value);
+  });
+
+  // ============================================
   // Quote CRUD Operations
   // ============================================
 
@@ -240,6 +259,40 @@ export const quoteRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Update quote
   fastify.put('/:quoteId', async (request, reply) => {
+    const context = getContext(request);
+    const { quoteId } = request.params as { quoteId: string };
+    const validation = updateQuoteSchema.safeParse(request.body);
+
+    if (!validation.success) {
+      return reply.status(400).send({
+        error: 'Validation error',
+        details: validation.error.errors,
+      });
+    }
+
+    const updateData = {
+      ...validation.data,
+      expirationDate: validation.data.expirationDate
+        ? new Date(validation.data.expirationDate)
+        : undefined,
+    };
+
+    const result = await quoteService.updateQuote(
+      context.tenantId,
+      quoteId,
+      context.userId,
+      updateData
+    );
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.send(result.value);
+  });
+
+  // Partial update quote (PATCH) - Same as PUT for drag & drop status updates
+  fastify.patch('/:quoteId', async (request, reply) => {
     const context = getContext(request);
     const { quoteId } = request.params as { quoteId: string };
     const validation = updateQuoteSchema.safeParse(request.body);
@@ -419,6 +472,24 @@ export const quoteRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.status(201).send(result.value);
   });
 
+  // Duplicate quote (create a copy)
+  fastify.post('/:quoteId/duplicate', async (request, reply) => {
+    const context = getContext(request);
+    const { quoteId } = request.params as { quoteId: string };
+
+    const result = await quoteService.duplicateQuote(
+      context.tenantId,
+      quoteId,
+      context.userId
+    );
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.status(201).send(result.value);
+  });
+
   // ============================================
   // Quote Line Items
   // ============================================
@@ -429,6 +500,46 @@ export const quoteRoutes: FastifyPluginAsync = async (fastify) => {
     const { quoteId } = request.params as { quoteId: string };
 
     const result = await quoteService.getQuoteWithItems(context.tenantId, quoteId);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    return reply.send(result.value);
+  });
+
+  // ============================================
+  // PDF Generation
+  // ============================================
+
+  // Generate PDF for a quote
+  fastify.get('/:quoteId/pdf', async (request, reply) => {
+    const context = getContext(request);
+    const { quoteId } = request.params as { quoteId: string };
+    const { theme = 'dark', templateId } = request.query as { theme?: string; templateId?: string };
+
+    const result = await quoteService.generatePdf(context.tenantId, quoteId, theme, templateId);
+
+    if (result.isFailure) {
+      return reply.status(400).send({ error: result.error });
+    }
+
+    const { pdfBytes, filename } = result.value;
+
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `attachment; filename="${filename}"`)
+      .header('Content-Length', pdfBytes.length)
+      .send(Buffer.from(pdfBytes));
+  });
+
+  // Generate PDF preview (base64)
+  fastify.get('/:quoteId/pdf/preview', async (request, reply) => {
+    const context = getContext(request);
+    const { quoteId } = request.params as { quoteId: string };
+    const { theme = 'dark', templateId } = request.query as { theme?: string; templateId?: string };
+
+    const result = await quoteService.generatePdfPreview(context.tenantId, quoteId, theme, templateId);
 
     if (result.isFailure) {
       return reply.status(400).send({ error: result.error });
@@ -457,7 +568,8 @@ export const quoteRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: result.error });
     }
 
-    return reply.send(result.value);
+    // Wrap in consistent response format
+    return reply.send({ activities: result.value });
   });
 
   // ============================================

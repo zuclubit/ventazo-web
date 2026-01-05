@@ -350,7 +350,7 @@ export function LeadPreviewPanel({
   if (isMobile) {
     return (
       <Sheet open={!!lead} onOpenChange={(open) => !open && onClose()}>
-        <SheetContent side="right" className="p-0 max-w-sm">
+        <SheetContent side="right" className="p-0 w-full sm:max-w-sm">
           <SheetHeader className="sr-only">
             <SheetTitle>{lead?.fullName || 'Lead'}</SheetTitle>
           </SheetHeader>

@@ -313,6 +313,64 @@ export class CampaignService {
     return result as T;
   }
 
+  // Helper to map CampaignRow to a frontend-friendly format
+  /**
+   * Safely format date to ISO string, handling both Date objects and strings
+   */
+  private formatDate(value: Date | string | null | undefined): string | undefined {
+    if (!value) return undefined;
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'string') return value;
+    return undefined;
+  }
+
+  private mapCampaignRow(row: CampaignRow): any {
+    return {
+      id: row.id,
+      tenantId: row.tenant_id,
+      name: row.name,
+      description: row.description,
+      type: row.type,
+      status: row.status,
+      goalType: row.goal_type,
+      channels: row.channels,
+      primaryChannel: row.primary_channel,
+      startDate: this.formatDate(row.start_date),
+      endDate: this.formatDate(row.end_date),
+      timezone: row.timezone,
+      audienceId: row.audience_id,
+      audienceName: row.audience_name,
+      estimatedReach: row.estimated_reach,
+      actualReach: row.actual_reach,
+      budgetAmount: row.budget_amount,
+      budgetCurrency: row.budget_currency,
+      budgetSpent: row.budget_spent,
+      goals: row.goals,
+      utmSource: row.utm_source,
+      utmMedium: row.utm_medium,
+      utmCampaign: row.utm_campaign,
+      utmTerm: row.utm_term,
+      utmContent: row.utm_content,
+      subject: row.subject,
+      previewText: row.preview_text,
+      fromName: row.from_name,
+      fromEmail: row.from_email,
+      replyTo: row.reply_to,
+      templateId: row.template_id,
+      settings: row.settings,
+      tags: row.tags,
+      folderId: row.folder_id,
+      ownerId: row.owner_id,
+      ownerName: row.owner_name,
+      customFields: row.custom_fields,
+      createdBy: row.created_by,
+      createdAt: this.formatDate(row.created_at),
+      updatedAt: this.formatDate(row.updated_at),
+      publishedAt: this.formatDate(row.published_at),
+      completedAt: this.formatDate(row.completed_at),
+    };
+  }
+
   // ============================================================================
   // CAMPAIGN CRUD
   // ============================================================================
@@ -383,7 +441,7 @@ export class CampaignService {
           input.type,
           'draft',
           input.goalType ?? 'engagement',
-          input.channels ?? [],
+          JSON.stringify(input.channels ?? []),
           input.primaryChannel ?? null,
           input.startDate ?? null,
           input.endDate ?? null,
@@ -406,7 +464,7 @@ export class CampaignService {
           input.replyTo ?? null,
           input.templateId ?? null,
           JSON.stringify(input.settings ?? {}),
-          input.tags ?? [],
+          JSON.stringify(input.tags ?? []),
           input.folderId ?? null,
           input.ownerId,
           input.ownerName ?? null,
@@ -747,11 +805,11 @@ export class CampaignService {
           input.type,
           JSON.stringify(input.rules ?? []),
           input.ruleLogic ?? 'and',
-          input.memberIds ?? [],
+          JSON.stringify(input.memberIds ?? []),
           input.memberIds?.length ?? 0,
           input.refreshInterval ?? null,
           input.autoRefresh ?? false,
-          input.tags ?? [],
+          JSON.stringify(input.tags ?? []),
           userId,
           now,
           now,
@@ -1475,7 +1533,7 @@ export class CampaignService {
           JSON.stringify(input.mergeFields ?? []),
           input.isPublic ?? false,
           false,
-          input.tags ?? [],
+          JSON.stringify(input.tags ?? []),
           userId,
           now,
           now,
@@ -1803,6 +1861,19 @@ export class CampaignService {
       const budget = budgetResult.getValue().rows[0];
       const counts = campaignCounts.getValue().rows[0];
 
+      // Recent campaigns (last 5)
+      const recentResult = await this.pool.query<CampaignRow>(
+        `SELECT * FROM campaigns
+         WHERE tenant_id = $1
+         ORDER BY created_at DESC
+         LIMIT 5`,
+        [tenantId]
+      );
+
+      const recentCampaigns = recentResult.isSuccess
+        ? recentResult.getValue().rows.map((row) => this.mapCampaignRow(row))
+        : [];
+
       return Result.ok({
         tenantId,
         totalCampaigns: parseInt(counts?.total ?? '0', 10),
@@ -1827,6 +1898,7 @@ export class CampaignService {
         totalBudget: parseFloat(budget?.total_budget ?? '0'),
         totalSpent: parseFloat(budget?.total_spent ?? '0'),
         budgetRemaining: parseFloat(budget?.total_budget ?? '0') - parseFloat(budget?.total_spent ?? '0'),
+        recentCampaigns,
       });
     } catch (error) {
       return Result.fail(`Failed to get dashboard: ${error}`);
@@ -1907,6 +1979,439 @@ export class CampaignService {
       return Result.ok(result.getValue().rows);
     } catch (error) {
       return Result.fail(`Failed to get campaign triggers: ${error}`);
+    }
+  }
+
+  // ============================================================================
+  // FRONTEND COMPATIBILITY METHODS
+  // ============================================================================
+
+  /**
+   * Duplicate campaign
+   */
+  async duplicateCampaign(
+    tenantId: string,
+    userId: string,
+    campaignId: string,
+    newName?: string
+  ): Promise<Result<CampaignRow>> {
+    try {
+      // Get the original campaign
+      const originalResult = await this.getCampaignById(tenantId, campaignId);
+      if (originalResult.isFailure) {
+        return Result.fail(originalResult.error!);
+      }
+
+      const original = originalResult.value;
+      if (!original) {
+        return Result.fail('Campaign not found');
+      }
+
+      // Create a copy with new ID and name
+      const id = uuidv4();
+      const now = new Date();
+      const duplicatedName = newName || `${original.name} (copia)`;
+
+      const result = await this.pool.query<CampaignRow>(
+        `INSERT INTO campaigns (
+          id, tenant_id, name, description, type, status, goal_type, channels,
+          primary_channel, start_date, end_date, timezone, audience_id, audience_name,
+          budget_amount, budget_currency, budget_spent, goals, utm_source, utm_medium,
+          utm_campaign, utm_term, utm_content, subject, preview_text, from_name,
+          from_email, reply_to, template_id, settings, tags, folder_id, owner_id,
+          owner_name, custom_fields, created_by, created_at, updated_at
+        ) SELECT
+          $1, tenant_id, $2, description, type, 'draft', goal_type, channels,
+          primary_channel, NULL, NULL, timezone, audience_id, audience_name,
+          budget_amount, budget_currency, 0, goals, utm_source, utm_medium,
+          $3, utm_term, utm_content, subject, preview_text, from_name,
+          from_email, reply_to, template_id, settings, tags, folder_id, owner_id,
+          owner_name, custom_fields, $4, $5, $5
+        FROM campaigns WHERE id = $6 AND tenant_id = $7
+        RETURNING *`,
+        [
+          id,
+          duplicatedName,
+          duplicatedName.toLowerCase().replace(/\s+/g, '-'),
+          userId,
+          now,
+          campaignId,
+          tenantId,
+        ]
+      );
+
+      if (result.isFailure) {
+        return Result.fail(result.error!);
+      }
+
+      const rows = result.getValue().rows;
+      if (rows.length === 0) {
+        return Result.fail('Failed to duplicate campaign');
+      }
+
+      return Result.ok(rows[0]);
+    } catch (error) {
+      return Result.fail(`Failed to duplicate campaign: ${error}`);
+    }
+  }
+
+  /**
+   * Preview recipients based on filters
+   */
+  async previewRecipients(
+    tenantId: string,
+    filters: {
+      entityType: 'customer' | 'lead' | 'all';
+      status?: string[];
+      tier?: string[];
+      tags?: string[];
+      limit?: number;
+    }
+  ): Promise<Result<{ recipients: any[]; total: number; hasMore: boolean }>> {
+    try {
+      const limit = filters.limit || 10;
+      const recipients: any[] = [];
+
+      // Get customers if needed
+      if (filters.entityType === 'customer' || filters.entityType === 'all') {
+        const customerConditions: string[] = ['tenant_id = $1'];
+        const customerParams: any[] = [tenantId];
+        let paramIndex = 2;
+
+        if (filters.status && filters.status.length > 0) {
+          customerConditions.push(`status = ANY($${paramIndex})`);
+          customerParams.push(filters.status);
+          paramIndex++;
+        }
+
+        if (filters.tier && filters.tier.length > 0) {
+          customerConditions.push(`tier = ANY($${paramIndex})`);
+          customerParams.push(filters.tier);
+          paramIndex++;
+        }
+
+        customerParams.push(limit);
+
+        const customersResult = await this.pool.query<any>(
+          `SELECT id, company_name as name, email, 'customer' as entity_type, tier, status
+           FROM customers WHERE ${customerConditions.join(' AND ')}
+           AND email IS NOT NULL
+           LIMIT $${paramIndex}`,
+          customerParams
+        );
+
+        if (customersResult.isFailure) {
+          return Result.fail(customersResult.error!);
+        }
+
+        recipients.push(...customersResult.getValue().rows);
+      }
+
+      // Get leads if needed
+      if (filters.entityType === 'lead' || filters.entityType === 'all') {
+        const leadConditions: string[] = ['tenant_id = $1'];
+        const leadParams: any[] = [tenantId];
+        let paramIndex = 2;
+
+        if (filters.status && filters.status.length > 0) {
+          leadConditions.push(`status = ANY($${paramIndex})`);
+          leadParams.push(filters.status);
+          paramIndex++;
+        }
+
+        leadParams.push(limit);
+
+        const leadsResult = await this.pool.query<any>(
+          `SELECT id, company_name as name, email, 'lead' as entity_type, status
+           FROM leads WHERE ${leadConditions.join(' AND ')}
+           AND email IS NOT NULL
+           LIMIT $${paramIndex}`,
+          leadParams
+        );
+
+        if (leadsResult.isFailure) {
+          return Result.fail(leadsResult.error!);
+        }
+
+        recipients.push(...leadsResult.getValue().rows);
+      }
+
+      // Get total count
+      const totalResult = await this.countRecipients(tenantId, filters);
+      if (totalResult.isFailure) {
+        return Result.fail(totalResult.error!);
+      }
+
+      return Result.ok({
+        recipients: recipients.slice(0, limit),
+        total: totalResult.value ?? 0,
+        hasMore: (totalResult.value ?? 0) > limit,
+      });
+    } catch (error) {
+      return Result.fail(`Failed to preview recipients: ${error}`);
+    }
+  }
+
+  /**
+   * Count recipients based on filters
+   */
+  async countRecipients(
+    tenantId: string,
+    filters: {
+      entityType: 'customer' | 'lead' | 'all';
+      status?: string[];
+      tier?: string[];
+      tags?: string[];
+    }
+  ): Promise<Result<number>> {
+    try {
+      let totalCount = 0;
+
+      // Count customers if needed
+      if (filters.entityType === 'customer' || filters.entityType === 'all') {
+        const customerConditions: string[] = ['tenant_id = $1', 'email IS NOT NULL'];
+        const customerParams: any[] = [tenantId];
+        let paramIndex = 2;
+
+        if (filters.status && filters.status.length > 0) {
+          customerConditions.push(`status = ANY($${paramIndex})`);
+          customerParams.push(filters.status);
+          paramIndex++;
+        }
+
+        if (filters.tier && filters.tier.length > 0) {
+          customerConditions.push(`tier = ANY($${paramIndex})`);
+          customerParams.push(filters.tier);
+        }
+
+        const customersResult = await this.pool.query<{ count: string }>(
+          `SELECT COUNT(*) as count FROM customers WHERE ${customerConditions.join(' AND ')}`,
+          customerParams
+        );
+
+        if (customersResult.isFailure) {
+          return Result.fail(customersResult.error!);
+        }
+
+        totalCount += parseInt(customersResult.getValue().rows[0]?.count ?? '0', 10);
+      }
+
+      // Count leads if needed
+      if (filters.entityType === 'lead' || filters.entityType === 'all') {
+        const leadConditions: string[] = ['tenant_id = $1', 'email IS NOT NULL'];
+        const leadParams: any[] = [tenantId];
+        let paramIndex = 2;
+
+        if (filters.status && filters.status.length > 0) {
+          leadConditions.push(`status = ANY($${paramIndex})`);
+          leadParams.push(filters.status);
+        }
+
+        const leadsResult = await this.pool.query<{ count: string }>(
+          `SELECT COUNT(*) as count FROM leads WHERE ${leadConditions.join(' AND ')}`,
+          leadParams
+        );
+
+        if (leadsResult.isFailure) {
+          return Result.fail(leadsResult.error!);
+        }
+
+        totalCount += parseInt(leadsResult.getValue().rows[0]?.count ?? '0', 10);
+      }
+
+      return Result.ok(totalCount);
+    } catch (error) {
+      return Result.fail(`Failed to count recipients: ${error}`);
+    }
+  }
+
+  /**
+   * Get campaign recipients (from campaign_sends)
+   */
+  async getCampaignRecipients(
+    tenantId: string,
+    campaignId: string,
+    pagination: { page: number; limit: number }
+  ): Promise<Result<{ recipients: CampaignSendRow[]; total: number; hasMore: boolean }>> {
+    try {
+      const offset = (pagination.page - 1) * pagination.limit;
+
+      // Get count
+      const countResult = await this.pool.query<{ count: string }>(
+        `SELECT COUNT(*) as count FROM campaign_sends WHERE tenant_id = $1 AND campaign_id = $2`,
+        [tenantId, campaignId]
+      );
+
+      if (countResult.isFailure) {
+        return Result.fail(countResult.error!);
+      }
+
+      const total = parseInt(countResult.getValue().rows[0]?.count ?? '0', 10);
+
+      // Get recipients
+      const recipientsResult = await this.pool.query<CampaignSendRow>(
+        `SELECT * FROM campaign_sends WHERE tenant_id = $1 AND campaign_id = $2
+         ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
+        [tenantId, campaignId, pagination.limit, offset]
+      );
+
+      if (recipientsResult.isFailure) {
+        return Result.fail(recipientsResult.error!);
+      }
+
+      return Result.ok({
+        recipients: recipientsResult.getValue().rows,
+        total,
+        hasMore: offset + pagination.limit < total,
+      });
+    } catch (error) {
+      return Result.fail(`Failed to get campaign recipients: ${error}`);
+    }
+  }
+
+  /**
+   * Send campaign (schedule or send immediately)
+   */
+  async sendCampaign(
+    tenantId: string,
+    userId: string,
+    campaignId: string,
+    options: { sendNow?: boolean; scheduledAt?: string }
+  ): Promise<Result<{ success: boolean; campaignId: string; recipientCount: number; scheduledAt?: string }>> {
+    try {
+      // Validate campaign exists and is ready to send
+      const campaignResult = await this.getCampaignById(tenantId, campaignId);
+      if (campaignResult.isFailure) {
+        return Result.fail(campaignResult.error!);
+      }
+
+      const campaign = campaignResult.value;
+      if (!campaign) {
+        return Result.fail('Campaign not found');
+      }
+
+      if (campaign.status !== 'draft' && campaign.status !== 'scheduled') {
+        return Result.fail(`Cannot send campaign with status: ${campaign.status}`);
+      }
+
+      const now = new Date();
+      let newStatus: CampaignStatus = 'scheduled';
+      let scheduledAt: Date | null = null;
+
+      if (options.sendNow) {
+        newStatus = 'active';
+        scheduledAt = now;
+      } else if (options.scheduledAt) {
+        scheduledAt = new Date(options.scheduledAt);
+        if (scheduledAt < now) {
+          return Result.fail('Scheduled time must be in the future');
+        }
+      } else {
+        return Result.fail('Either sendNow or scheduledAt is required');
+      }
+
+      // Update campaign status
+      const updateResult = await this.pool.query<CampaignRow>(
+        `UPDATE campaigns SET status = $1, start_date = $2, updated_at = $3, published_at = $4
+         WHERE id = $5 AND tenant_id = $6 RETURNING *`,
+        [newStatus, scheduledAt, now, options.sendNow ? now : null, campaignId, tenantId]
+      );
+
+      if (updateResult.isFailure) {
+        return Result.fail(updateResult.error!);
+      }
+
+      // Count recipients based on audience
+      let recipientCount = 0;
+      if (campaign.audience_id) {
+        const audienceResult = await this.getAudienceById(tenantId, campaign.audience_id);
+        if (audienceResult.value) {
+          recipientCount = audienceResult.value.member_count;
+        }
+      }
+
+      return Result.ok({
+        success: true,
+        campaignId,
+        recipientCount,
+        scheduledAt: scheduledAt?.toISOString(),
+      });
+    } catch (error) {
+      return Result.fail(`Failed to send campaign: ${error}`);
+    }
+  }
+
+  /**
+   * Schedule campaign
+   */
+  async scheduleCampaign(
+    tenantId: string,
+    userId: string,
+    campaignId: string,
+    scheduledAt: string
+  ): Promise<Result<CampaignRow>> {
+    try {
+      const scheduledDate = new Date(scheduledAt);
+      const now = new Date();
+
+      if (scheduledDate < now) {
+        return Result.fail('Scheduled time must be in the future');
+      }
+
+      const result = await this.pool.query<CampaignRow>(
+        `UPDATE campaigns SET status = 'scheduled', start_date = $1, updated_at = $2
+         WHERE id = $3 AND tenant_id = $4 RETURNING *`,
+        [scheduledDate, now, campaignId, tenantId]
+      );
+
+      if (result.isFailure) {
+        return Result.fail(result.error!);
+      }
+
+      const rows = result.getValue().rows;
+      if (rows.length === 0) {
+        return Result.fail('Campaign not found');
+      }
+
+      return Result.ok(rows[0]);
+    } catch (error) {
+      return Result.fail(`Failed to schedule campaign: ${error}`);
+    }
+  }
+
+  /**
+   * Send test campaign
+   */
+  async sendTestCampaign(
+    tenantId: string,
+    userId: string,
+    campaignId: string,
+    testRecipients: string[]
+  ): Promise<Result<{ success: boolean; sentTo: string[]; errors: string[] }>> {
+    try {
+      // Validate campaign exists
+      const campaignResult = await this.getCampaignById(tenantId, campaignId);
+      if (campaignResult.isFailure) {
+        return Result.fail(campaignResult.error!);
+      }
+
+      const campaign = campaignResult.value;
+      if (!campaign) {
+        return Result.fail('Campaign not found');
+      }
+
+      // In a real implementation, this would send actual emails
+      // For now, we just validate and return success
+      const validEmails = testRecipients.filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+      const invalidEmails = testRecipients.filter((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+
+      return Result.ok({
+        success: validEmails.length > 0,
+        sentTo: validEmails,
+        errors: invalidEmails.map((email) => `Invalid email: ${email}`),
+      });
+    } catch (error) {
+      return Result.fail(`Failed to send test campaign: ${error}`);
     }
   }
 }

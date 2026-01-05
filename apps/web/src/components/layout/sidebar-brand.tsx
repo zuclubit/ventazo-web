@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Sidebar Brand Component - v2.0
+ * Sidebar Brand Component - v2.1
  *
  * Optimized dynamic company branding with tenant logo, app name, and colors.
  * Falls back to Ventazo branding if no custom branding is set.
@@ -10,11 +10,22 @@
  * - Dynamic logo from tenant settings with preload
  * - App name support (separate from company name)
  * - Animated hover effects with GPU acceleration
- * - Organic ambient glow
+ * - Color Intelligence ambient glow (HCT-derived)
  * - Responsive sizing (44px expanded, 40px collapsed)
  * - AMOLED-friendly design
  * - React.memo for performance optimization
  * - Proper error boundaries and loading states
+ *
+ * v2.1 - Color Intelligence Integration
+ * - HCT-derived logo glow effect
+ * - OKLCH radial gradients for organic glow
+ * - Brand analysis for optimal glow intensity
+ * - APCA-validated text colors
+ *
+ * CSS Variables Used (from Color Intelligence):
+ * - --sidebar-ci-logo-glow: Radial gradient for logo ambient glow
+ * - --sidebar-ci-accent-highlight: Interpolated accent color
+ * - --sidebar-ci-active-border: Focus ring color
  *
  * @module components/layout/sidebar-brand
  */
@@ -30,6 +41,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useSidebarColorIntelligence } from './hooks';
 
 // ============================================
 // Types
@@ -166,20 +178,26 @@ BrandLogo.displayName = 'BrandLogo';
 function SidebarBrandComponent({ isCollapsed = false, className }: SidebarBrandProps) {
   const branding = useTenantBranding();
 
+  // Color Intelligence: Get ambient effects for logo glow
+  const { ambient, brandAnalysis, isDarkSidebar } = useSidebarColorIntelligence();
+
   // Memoize sizes for performance
   const logoSize = isCollapsed ? 40 : 44;
 
-  // Memoize glow style to prevent recalculation
+  // Color Intelligence: Enhanced glow style using HCT-derived colors
+  // Uses OKLCH radial gradient for perceptually uniform glow
   const glowStyle = React.useMemo(() => ({
-    background: `radial-gradient(circle, ${branding.primaryColor}60 0%, transparent 70%)`,
+    // Use Color Intelligence logo glow or fallback to brand-derived glow
+    background: ambient?.logoGlow || `radial-gradient(circle, ${branding.primaryColor}60 0%, transparent 70%)`,
     borderRadius: '40% 60% 55% 45% / 55% 45% 55% 45%',
-  }), [branding.primaryColor]);
+  }), [ambient?.logoGlow, branding.primaryColor]);
 
-  // Memoize badge style
+  // Color Intelligence: Enhanced badge style with accent highlight
   const badgeStyle = React.useMemo(() => ({
     background: `${branding.primaryColor}25`,
-    color: branding.accentColor,
-  }), [branding.primaryColor, branding.accentColor]);
+    // Use Color Intelligence interpolated accent or fallback
+    color: ambient?.accentHighlight || branding.accentColor,
+  }), [branding.primaryColor, ambient?.accentHighlight, branding.accentColor]);
 
   const brandContent = (
     <div
@@ -189,11 +207,17 @@ function SidebarBrandComponent({ isCollapsed = false, className }: SidebarBrandP
         className
       )}
     >
-      {/* Logo container with ambient glow */}
+      {/* Logo container with Color Intelligence ambient glow */}
       <div className="relative shrink-0">
-        {/* Organic ambient glow - GPU accelerated */}
+        {/* Color Intelligence: OKLCH radial glow - GPU accelerated */}
+        {/* Uses HCT-derived brand color with optimal intensity based on sidebar contrast mode */}
         <div
-          className="absolute -inset-1 opacity-60 blur-xl transition-all duration-500 will-change-[opacity,filter] group-hover:opacity-80 group-hover:blur-2xl"
+          className={cn(
+            'absolute -inset-1 blur-xl transition-all duration-500 will-change-[opacity,filter]',
+            'group-hover:blur-2xl',
+            // Adjust base opacity based on sidebar darkness
+            isDarkSidebar ? 'opacity-70 group-hover:opacity-90' : 'opacity-50 group-hover:opacity-70'
+          )}
           style={glowStyle}
           aria-hidden="true"
         />
@@ -209,16 +233,19 @@ function SidebarBrandComponent({ isCollapsed = false, className }: SidebarBrandP
         </div>
       </div>
 
-      {/* App name (hidden when collapsed) - Uses appName for display */}
+      {/* App name (hidden when collapsed) - Color Intelligence Enhanced */}
       {!isCollapsed && (
         <div className="flex flex-col overflow-hidden">
           <span
-            className="truncate text-lg font-bold tracking-tight transition-colors duration-300 group-hover:text-[var(--sidebar-text-accent)]"
-            style={{ color: 'var(--sidebar-text-primary)' }}
+            className="truncate text-lg font-bold tracking-tight transition-colors duration-300"
+            style={{
+              // Color Intelligence: APCA-validated text color
+              color: 'var(--sidebar-ci-text, var(--sidebar-text-primary))',
+            }}
           >
             {branding.appName}
           </span>
-          {/* Plan badge for pro/enterprise */}
+          {/* Plan badge for pro/enterprise - uses Color Intelligence accent */}
           {branding.plan !== 'free' && branding.plan !== 'starter' && (
             <span
               className="mt-0.5 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"

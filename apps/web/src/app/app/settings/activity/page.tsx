@@ -10,10 +10,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  Loader2,
   RefreshCw,
   User,
 } from 'lucide-react';
+import { ActivityPageSkeleton } from '../components';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -147,11 +147,7 @@ export default function ActivityPage() {
 
   // Loading state
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <ActivityPageSkeleton />;
   }
 
   return (

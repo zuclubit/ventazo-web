@@ -126,6 +126,40 @@ export default function RootLayout({
             __html: `if(typeof __name==="undefined"){window.__name=function(fn){return fn}}`,
           }}
         />
+        {/* FOUC Prevention: Apply cached theme colors BEFORE React hydration */}
+        {/* This reads from localStorage and applies CSS variables instantly */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function(){
+  try{
+    var stored=localStorage.getItem('zuclubit-tenant-storage');
+    if(!stored)return;
+    var data=JSON.parse(stored);
+    var state=data.state;
+    if(!state)return;
+    var colors=state.cachedBranding||state.settings;
+    if(!colors||!colors.primaryColor)return;
+    var root=document.documentElement;
+    var p=colors.primaryColor||'#0EB58C';
+    var s=colors.sidebarColor||'#003C3B';
+    var a=colors.accentColor||'#5EEAD4';
+    var sf=colors.surfaceColor||'#052828';
+    root.style.setProperty('--tenant-primary',p);
+    root.style.setProperty('--tenant-sidebar',s);
+    root.style.setProperty('--tenant-accent',a);
+    root.style.setProperty('--tenant-surface',sf);
+    root.style.setProperty('--brand-primary',p);
+    root.style.setProperty('--brand-sidebar',s);
+    root.style.setProperty('--brand-accent',a);
+    root.style.setProperty('--tenant-primary-glow',p+'40');
+    root.style.setProperty('--tenant-accent-glow',a+'40');
+    root.dataset.themePreloaded='true';
+  }catch(e){}
+})();
+`.trim(),
+          }}
+        />
       </head>
       <body
         className={cn(

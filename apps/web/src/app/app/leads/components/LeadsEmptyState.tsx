@@ -1,13 +1,21 @@
 'use client';
 
 /**
- * LeadsEmptyState Component - Redesigned
+ * LeadsEmptyState Component - Premium Responsive Design v2.0
  *
- * Educational empty state with hierarchy:
+ * Educational empty state with clear visual hierarchy:
  * - WhatsApp as PRIMARY action (large centered card)
  * - Add manually and Import as SECONDARY actions (smaller, below)
  *
+ * Mobile-first responsive design:
+ * - Full-width cards on mobile with proper padding
+ * - Stacked layout on mobile, row on tablet+
+ * - 44px minimum touch targets (WCAG 2.1 AA)
+ * - Smooth transitions and animations
+ *
  * Based on UX research: WhatsApp is #1 channel in LATAM/Mexico
+ *
+ * @module components/LeadsEmptyState
  */
 
 import * as React from 'react';
@@ -19,6 +27,8 @@ import {
   ArrowRight,
   Zap,
   CheckCircle2,
+  Search,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -45,78 +55,111 @@ export interface LeadsEmptyStateProps {
 }
 
 // ============================================
-// Primary CTA Card (WhatsApp - Large)
+// Primary CTA Card (WhatsApp - Large, Responsive)
 // ============================================
 
 interface PrimaryCTACardProps {
   onClick?: () => void;
 }
 
-function PrimaryCTACard({ onClick }: PrimaryCTACardProps) {
+const PrimaryCTACard = React.memo(function PrimaryCTACard({ onClick }: PrimaryCTACardProps) {
   return (
     <div
       className={cn(
-        'relative w-full max-w-md rounded-2xl border-2 p-8',
-        'border-[var(--whatsapp)]/30',
-        'bg-gradient-to-br from-[var(--whatsapp-bg)] via-[var(--whatsapp)]/5 to-transparent',
-        'transition-all duration-300 hover:border-[var(--whatsapp)]/50 hover:shadow-lg hover:shadow-[var(--whatsapp)]/10',
-        'cursor-pointer group'
+        // Base layout - full width on mobile, constrained on larger screens
+        'relative w-full rounded-2xl border-2',
+        // Responsive padding: smaller on mobile, larger on tablet+
+        'p-5 sm:p-6 md:p-8',
+        // Max width only on larger screens
+        'sm:max-w-md',
+        // WhatsApp theming
+        'border-[var(--whatsapp,#25D366)]/30',
+        'bg-gradient-to-br from-[var(--whatsapp-bg,rgba(37,211,102,0.08))] via-[var(--whatsapp,#25D366)]/5 to-transparent',
+        // Transitions and interactions
+        'transition-all duration-300',
+        'hover:border-[var(--whatsapp,#25D366)]/50',
+        'hover:shadow-lg hover:shadow-[var(--whatsapp,#25D366)]/10',
+        'active:scale-[0.99]',
+        'cursor-pointer group',
+        // Focus visible for keyboard navigation
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--whatsapp,#25D366)] focus-visible:ring-offset-2'
       )}
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
     >
-      {/* Decorative gradient orb */}
-      <div className="absolute top-4 right-4 h-20 w-20 rounded-full bg-[var(--whatsapp)]/10 blur-2xl" />
+      {/* Decorative gradient orb - hidden on small screens */}
+      <div className="absolute top-4 right-4 h-20 w-20 rounded-full bg-[var(--whatsapp,#25D366)]/10 blur-2xl hidden sm:block" />
 
-      {/* Badge */}
-      <div className="inline-flex items-center gap-1.5 mb-4 px-3 py-1 rounded-full border border-[var(--whatsapp)]/30 bg-[var(--whatsapp-bg)]">
-        <Zap className="h-3.5 w-3.5 whatsapp-text" />
-        <span className="text-xs font-medium whatsapp-text">Recomendado</span>
+      {/* Badge - Responsive sizing */}
+      <div className="inline-flex items-center gap-1.5 mb-3 sm:mb-4 px-2.5 sm:px-3 py-1 rounded-full border border-[var(--whatsapp,#25D366)]/30 bg-[var(--whatsapp-bg,rgba(37,211,102,0.08))]">
+        <Zap className="h-3 sm:h-3.5 w-3 sm:w-3.5 text-[var(--whatsapp,#25D366)]" />
+        <span className="text-[10px] sm:text-xs font-medium text-[var(--whatsapp,#25D366)]">Recomendado</span>
       </div>
 
-      {/* Icon */}
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl whatsapp-button mb-5 shadow-lg shadow-[var(--whatsapp)]/30 group-hover:scale-105 transition-transform">
-        <MessageCircle className="h-8 w-8 text-white" />
+      {/* Icon - Responsive sizing */}
+      <div className={cn(
+        'flex items-center justify-center rounded-xl sm:rounded-2xl mb-4 sm:mb-5',
+        'h-12 w-12 sm:h-14 md:h-16 sm:w-14 md:w-16',
+        'bg-[var(--whatsapp,#25D366)] shadow-lg shadow-[var(--whatsapp,#25D366)]/30',
+        'group-hover:scale-105 transition-transform duration-300'
+      )}>
+        <MessageCircle className="h-6 w-6 sm:h-7 md:h-8 sm:w-7 md:w-8 text-white" />
       </div>
 
-      {/* Content */}
-      <h3 className="text-xl font-semibold mb-2">Conectar WhatsApp</h3>
-      <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+      {/* Content - Responsive typography */}
+      <h3 className="text-lg sm:text-xl font-semibold mb-1.5 sm:mb-2 text-foreground">
+        Conectar WhatsApp
+      </h3>
+      <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-5 leading-relaxed">
         Recibe leads automáticamente desde WhatsApp Business.
         La forma más rápida de capturar prospectos en México.
       </p>
 
-      {/* Features */}
-      <div className="flex flex-col gap-2 mb-6">
+      {/* Features - Responsive spacing and sizing */}
+      <div className="flex flex-col gap-1.5 sm:gap-2 mb-5 sm:mb-6">
         {[
           'Captura automática de contactos',
           'Respuestas instantáneas con IA',
           'Integración sin código',
         ].map((feature) => (
-          <div key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 whatsapp-text shrink-0" />
+          <div key={feature} className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+            <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[var(--whatsapp,#25D366)] shrink-0" />
             <span>{feature}</span>
           </div>
         ))}
       </div>
 
-      {/* Button */}
+      {/* Button - 44px min touch target */}
       <Button
         size="lg"
         onClick={(e) => {
           e.stopPropagation();
           onClick?.();
         }}
-        className="w-full whatsapp-button shadow-lg shadow-[var(--whatsapp)]/30"
+        className={cn(
+          'w-full min-h-[44px] sm:min-h-[48px]',
+          'bg-[var(--whatsapp,#25D366)] hover:bg-[var(--whatsapp-hover,#20BD5A)]',
+          'shadow-lg shadow-[var(--whatsapp,#25D366)]/30',
+          'text-sm sm:text-base font-medium',
+          'active:scale-[0.98] transition-all duration-200'
+        )}
       >
         Conectar ahora
         <ArrowRight className="ml-2 h-4 w-4" />
       </Button>
     </div>
   );
-}
+});
 
 // ============================================
-// Secondary CTA Card (Smaller)
+// Secondary CTA Card (Smaller, Responsive)
 // ============================================
 
 interface SecondaryCTACardProps {
@@ -127,7 +170,7 @@ interface SecondaryCTACardProps {
   onClick?: () => void;
 }
 
-function SecondaryCTACard({
+const SecondaryCTACard = React.memo(function SecondaryCTACard({
   icon,
   title,
   description,
@@ -137,25 +180,48 @@ function SecondaryCTACard({
   return (
     <div
       className={cn(
-        'flex-1 min-w-[180px] rounded-xl border border-border/50 p-5',
+        // Flex behavior - equal width on row layout
+        'flex-1 min-w-0',
+        // Responsive padding
+        'p-4 sm:p-5',
+        // Styling
+        'rounded-xl border border-border/50',
         'bg-card/50 backdrop-blur-sm',
-        'transition-all duration-300 hover:border-primary/20 hover:bg-card/80',
-        'cursor-pointer group'
+        // Transitions and interactions
+        'transition-all duration-300',
+        'hover:border-primary/20 hover:bg-card/80',
+        'active:scale-[0.99]',
+        'cursor-pointer group',
+        // Focus visible
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
       )}
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
     >
-      {/* Icon */}
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted mb-3 group-hover:bg-primary/10 transition-colors">
+      {/* Icon - Responsive sizing with 44px touch target on mobile */}
+      <div className={cn(
+        'flex items-center justify-center rounded-lg sm:rounded-xl',
+        'h-10 w-10 sm:h-11 sm:w-11',
+        'bg-muted mb-2.5 sm:mb-3',
+        'group-hover:bg-primary/10 transition-colors duration-200'
+      )}>
         {icon}
       </div>
 
-      {/* Content */}
-      <h3 className="font-semibold text-sm mb-1">{title}</h3>
-      <p className="text-xs text-muted-foreground mb-4 leading-relaxed line-clamp-2">
+      {/* Content - Responsive typography */}
+      <h3 className="font-semibold text-sm sm:text-[15px] mb-1 text-foreground">{title}</h3>
+      <p className="text-[11px] sm:text-xs text-muted-foreground mb-3 sm:mb-4 leading-relaxed line-clamp-2">
         {description}
       </p>
 
-      {/* Button */}
+      {/* Button - 44px min touch target */}
       <Button
         size="sm"
         variant="outline"
@@ -163,85 +229,130 @@ function SecondaryCTACard({
           e.stopPropagation();
           onClick?.();
         }}
-        className="w-full group-hover:border-primary/30"
+        className={cn(
+          'w-full min-h-[40px] sm:min-h-[44px]',
+          'text-xs sm:text-sm',
+          'group-hover:border-primary/30',
+          'active:scale-[0.98] transition-all duration-200'
+        )}
       >
         {buttonLabel}
-        <ArrowRight className="ml-2 h-3.5 w-3.5" />
+        <ArrowRight className="ml-1.5 sm:ml-2 h-3 w-3 sm:h-3.5 sm:w-3.5" />
       </Button>
     </div>
   );
-}
+});
 
 // ============================================
-// No Results Variant
+// No Results Variant (Responsive)
 // ============================================
 
-function NoResultsEmpty({
+const NoResultsEmpty = React.memo(function NoResultsEmpty({
   searchTerm,
   onClearFilters,
+  onAddLead,
   className,
-}: Pick<LeadsEmptyStateProps, 'searchTerm' | 'onClearFilters' | 'className'>) {
+}: Pick<LeadsEmptyStateProps, 'searchTerm' | 'onClearFilters' | 'onAddLead' | 'className'>) {
   return (
-    <div className={cn('flex flex-col items-center justify-center py-12 px-4', className)}>
-      {/* Icon */}
-      <div className="relative mb-5">
+    <div className={cn(
+      'flex flex-col items-center justify-center',
+      'w-full max-w-sm mx-auto',
+      'py-8 sm:py-12 px-4 sm:px-6',
+      className
+    )}>
+      {/* Icon - Responsive sizing */}
+      <div className="relative mb-4 sm:mb-5">
         <div className="absolute inset-0 blur-2xl rounded-full bg-muted opacity-50" />
-        <div className="relative flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/20 bg-muted/50">
-          <UserPlus className="h-7 w-7 text-muted-foreground" strokeWidth={1.5} />
+        <div className={cn(
+          'relative flex items-center justify-center rounded-full',
+          'h-14 w-14 sm:h-16 sm:w-16',
+          'border-2 border-dashed border-muted-foreground/20 bg-muted/50'
+        )}>
+          <Search className="h-6 w-6 sm:h-7 sm:w-7 text-muted-foreground" strokeWidth={1.5} />
         </div>
       </div>
 
-      {/* Content */}
-      <h3 className="text-lg font-semibold mb-2">Sin resultados</h3>
-      <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
+      {/* Content - Responsive typography */}
+      <h3 className="text-base sm:text-lg font-semibold mb-1.5 sm:mb-2 text-foreground">
+        Sin resultados
+      </h3>
+      <p className="text-xs sm:text-sm text-muted-foreground text-center mb-5 sm:mb-6 leading-relaxed">
         No encontramos leads que coincidan con{' '}
         {searchTerm ? (
-          <span className="font-medium">"{searchTerm}"</span>
+          <span className="font-medium text-foreground">"{searchTerm}"</span>
         ) : (
           'los filtros aplicados'
         )}
-        . Intenta con otros términos de búsqueda.
       </p>
 
-      {/* Action */}
-      {onClearFilters && (
-        <Button variant="outline" onClick={onClearFilters}>
-          Limpiar filtros
-        </Button>
-      )}
+      {/* Actions - Stacked on mobile, row on larger */}
+      <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 w-full">
+        {onClearFilters && (
+          <Button
+            variant="outline"
+            onClick={onClearFilters}
+            className="min-h-[44px] flex-1"
+          >
+            <X className="mr-2 h-4 w-4" />
+            Limpiar filtros
+          </Button>
+        )}
+        {onAddLead && (
+          <Button
+            onClick={onAddLead}
+            className="min-h-[44px] flex-1"
+          >
+            <UserPlus className="mr-2 h-4 w-4" />
+            Agregar Lead
+          </Button>
+        )}
+      </div>
     </div>
   );
-}
+});
 
 // ============================================
-// Compact Variant
+// Compact Variant (Responsive)
 // ============================================
 
-function CompactEmpty({
+const CompactEmpty = React.memo(function CompactEmpty({
   onAddLead,
   className,
 }: Pick<LeadsEmptyStateProps, 'onAddLead' | 'className'>) {
   return (
-    <div className={cn('flex flex-col items-center justify-center py-8 px-4', className)}>
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-3">
+    <div className={cn(
+      'flex flex-col items-center justify-center',
+      'py-6 sm:py-8 px-4',
+      className
+    )}>
+      <div className={cn(
+        'flex items-center justify-center rounded-full bg-primary/10',
+        'h-11 w-11 sm:h-12 sm:w-12 mb-2.5 sm:mb-3'
+      )}>
         <UserPlus className="h-5 w-5 text-primary" />
       </div>
-      <p className="text-sm text-muted-foreground mb-3">No hay leads</p>
+      <p className="text-xs sm:text-sm text-muted-foreground mb-2.5 sm:mb-3">
+        No hay leads en esta etapa
+      </p>
       {onAddLead && (
-        <Button size="sm" onClick={onAddLead}>
+        <Button
+          size="sm"
+          onClick={onAddLead}
+          className="min-h-[40px] sm:min-h-[44px] px-4"
+        >
           <UserPlus className="mr-2 h-4 w-4" />
           Agregar Lead
         </Button>
       )}
     </div>
   );
-}
+});
 
 // ============================================
-// Main Component
+// Main Component (Responsive)
 // ============================================
 
-export function LeadsEmptyState({
+export const LeadsEmptyState = React.memo(function LeadsEmptyState({
   onAddLead,
   onConnectWhatsApp,
   onImport,
@@ -256,6 +367,7 @@ export function LeadsEmptyState({
       <NoResultsEmpty
         searchTerm={searchTerm}
         onClearFilters={onClearFilters}
+        onAddLead={onAddLead}
         className={className}
       />
     );
@@ -266,42 +378,53 @@ export function LeadsEmptyState({
     return <CompactEmpty onAddLead={onAddLead} className={className} />;
   }
 
-  // Default full variant - Redesigned with hierarchy
+  // Default full variant - Premium Responsive Design
   return (
-    <div className={cn('flex flex-col items-center justify-center py-12 px-4', className)}>
-      {/* Header */}
-      <div className="text-center max-w-lg mb-8">
-        {/* Motivational Badge */}
-        <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5">
-          <Rocket className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium text-primary">¡Es hora de conseguir clientes!</span>
+    <div className={cn(
+      'flex flex-col items-center justify-center',
+      // Responsive padding - smaller on mobile
+      'py-6 sm:py-8 md:py-12 px-4 sm:px-6',
+      // Full width container
+      'w-full',
+      className
+    )}>
+      {/* Header - Responsive typography and spacing */}
+      <div className="text-center w-full max-w-lg mb-5 sm:mb-6 md:mb-8">
+        {/* Motivational Badge - Hidden on very small screens, visible from sm */}
+        <div className="hidden xs:inline-flex sm:inline-flex items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full border border-primary/20 bg-primary/5">
+          <Rocket className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
+          <span className="text-xs sm:text-sm font-medium text-primary">¡Es hora de conseguir clientes!</span>
         </div>
 
-        {/* Title */}
-        <h2 className="text-2xl font-bold mb-3">
+        {/* Title - Responsive font sizes */}
+        <h2 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3 text-foreground">
           Tu pipeline está listo
         </h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed px-2 sm:px-0">
           Agrega tu primer lead y empieza a cerrar ventas hoy mismo.
-          Te recomendamos conectar WhatsApp para recibir prospectos automáticamente.
+          <span className="hidden sm:inline"> Te recomendamos conectar WhatsApp para recibir prospectos automáticamente.</span>
         </p>
       </div>
 
-      {/* PRIMARY Action - WhatsApp (Large Card) */}
-      <PrimaryCTACard onClick={onConnectWhatsApp} />
+      {/* PRIMARY Action - WhatsApp (Large Card) - Full width on mobile */}
+      <div className="w-full flex justify-center">
+        <PrimaryCTACard onClick={onConnectWhatsApp} />
+      </div>
 
-      {/* Divider with "o" */}
-      <div className="flex items-center gap-4 my-6 w-full max-w-md">
+      {/* Divider with "o también" - Responsive spacing */}
+      <div className="flex items-center gap-3 sm:gap-4 my-4 sm:my-5 md:my-6 w-full sm:max-w-md px-2 sm:px-0">
         <div className="flex-1 h-px bg-border" />
-        <span className="text-xs text-muted-foreground uppercase tracking-wider">o también</span>
+        <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+          o también
+        </span>
         <div className="flex-1 h-px bg-border" />
       </div>
 
-      {/* SECONDARY Actions (Smaller, in row) */}
-      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+      {/* SECONDARY Actions - Stack on mobile, row on tablet+ */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:max-w-md">
         {/* Add Manually */}
         <SecondaryCTACard
-          icon={<UserPlus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />}
+          icon={<UserPlus className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground group-hover:text-primary transition-colors" />}
           title="Agregar Manualmente"
           description="Captura un prospecto con sus datos de contacto"
           buttonLabel="Agregar Lead"
@@ -310,7 +433,7 @@ export function LeadsEmptyState({
 
         {/* Import Excel */}
         <SecondaryCTACard
-          icon={<Upload className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />}
+          icon={<Upload className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground group-hover:text-primary transition-colors" />}
           title="Importar desde Excel"
           description="Sube tu base de datos en formato CSV o Excel"
           buttonLabel="Importar"
@@ -319,4 +442,4 @@ export function LeadsEmptyState({
       </div>
     </div>
   );
-}
+});

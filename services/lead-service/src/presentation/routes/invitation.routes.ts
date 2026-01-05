@@ -12,9 +12,12 @@ import {
   InvitationStatus,
   UserRole,
   Permission,
+  type CreateInvitationRequest,
+  type BulkInvitationRequest,
 } from '../../infrastructure/auth';
 import {
   authenticate,
+  authenticateWithoutTenant,
   optionalAuthenticate,
   requirePermission,
   getAuthUser,
@@ -36,9 +39,25 @@ const acceptInvitationSchema = z.object({
   token: z.string().min(1, 'Token is required'),
 });
 
+const acceptInvitationWithSignupSchema = z.object({
+  token: z.string().min(1, 'El token es requerido'),
+  password: z.string()
+    .min(8, 'La contraseña debe tener al menos 8 caracteres')
+    .max(128, 'La contraseña no puede tener más de 128 caracteres'),
+  fullName: z.string()
+    .min(2, 'El nombre debe tener al menos 2 caracteres')
+    .max(100, 'El nombre no puede tener más de 100 caracteres'),
+  phone: z.string()
+    .regex(/^[\d\s\-+()]+$/, 'Número de teléfono inválido')
+    .optional(),
+});
+
 const uuidParamSchema = z.object({
   id: z.string().uuid(),
 });
+
+// Empty body schema for endpoints that don't require body but may receive Content-Type header
+const emptyBodySchema = z.object({}).optional();
 
 /**
  * Invitation routes plugin
@@ -74,7 +93,7 @@ export const invitationRoutes: FastifyPluginAsync = async (fastify) => {
     },
   }, async (request, reply) => {
     const user = getAuthUser(request);
-    const body = createInvitationSchema.parse(request.body);
+    const body = createInvitationSchema.parse(request.body) as CreateInvitationRequest;
 
     // Validate role hierarchy
     const roleHierarchy: UserRole[] = [
@@ -136,7 +155,7 @@ export const invitationRoutes: FastifyPluginAsync = async (fastify) => {
     },
   }, async (request, reply) => {
     const user = getAuthUser(request);
-    const body = bulkInvitationSchema.parse(request.body);
+    const body = bulkInvitationSchema.parse(request.body) as BulkInvitationRequest;
 
     // Validate role hierarchy for all invitations
     const roleHierarchy: UserRole[] = [
@@ -286,9 +305,10 @@ export const invitationRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * Accept invitation
    * POST /api/v1/invitations/accept
+   * Note: Uses authenticateWithoutTenant because user might not have access to any tenant yet
    */
   fastify.post('/accept', {
-    preHandler: [authenticate],
+    preHandler: [authenticateWithoutTenant],
     schema: {
       tags: ['Invitations'],
       summary: 'Accept invitation',
@@ -319,7 +339,13 @@ export const invitationRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
-    const result = await invitationService.acceptInvitation(token, user.id);
+    // Pass user email and fullName to create user record if needed
+    const result = await invitationService.acceptInvitation(
+      token,
+      user.id,
+      user.email,
+      user.metadata?.fullName
+    );
 
     if (result.isFailure) {
       return reply.status(400).send({
@@ -332,6 +358,113 @@ export const invitationRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       message: 'Invitation accepted successfully',
       membership: result.value,
+    };
+  });
+
+  /**
+   * Accept invitation with signup (for new users)
+   * POST /api/v1/invitations/accept-signup
+   *
+   * This endpoint allows new users to create an account and accept
+   * an invitation in a single step. No authentication required.
+   *
+   * The email is automatically verified since the user received the invitation.
+   */
+  fastify.post('/accept-signup', {
+    schema: {
+      tags: ['Invitations'],
+      summary: 'Accept invitation with signup',
+      description: 'Create account and accept invitation in one step (for new users)',
+      body: toJsonSchema(acceptInvitationWithSignupSchema),
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+            user: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                email: { type: 'string' },
+                fullName: { type: 'string' },
+                avatarUrl: { type: 'string', nullable: true },
+                tenantId: { type: 'string' },
+                role: { type: 'string' },
+              },
+            },
+            membership: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                userId: { type: 'string' },
+                tenantId: { type: 'string' },
+                role: { type: 'string' },
+              },
+            },
+            session: {
+              type: 'object',
+              properties: {
+                accessToken: { type: 'string' },
+                refreshToken: { type: 'string' },
+                expiresIn: { type: 'number' },
+                expiresAt: { type: 'number' },
+              },
+            },
+          },
+        },
+        400: {
+          type: 'object',
+          properties: {
+            statusCode: { type: 'number' },
+            error: { type: 'string' },
+            message: { type: 'string' },
+          },
+        },
+        410: {
+          type: 'object',
+          properties: {
+            statusCode: { type: 'number' },
+            error: { type: 'string' },
+            message: { type: 'string' },
+          },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const body = acceptInvitationWithSignupSchema.parse(request.body);
+    const invitationService = container.resolve(InvitationService);
+
+    const result = await invitationService.acceptInvitationWithSignup({
+      token: body.token,
+      password: body.password,
+      fullName: body.fullName,
+      phone: body.phone,
+    });
+
+    if (result.isFailure) {
+      // Determine appropriate status code based on error
+      const errorMsg = result.error || 'Error al procesar la invitación';
+
+      if (errorMsg.includes('expirada') || errorMsg.includes('cancelada') || errorMsg.includes('aceptada')) {
+        return reply.status(410).send({
+          statusCode: 410,
+          error: 'Gone',
+          message: errorMsg,
+        });
+      }
+
+      return reply.status(400).send({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: errorMsg,
+      });
+    }
+
+    return {
+      message: '¡Cuenta creada exitosamente! Bienvenido al equipo.',
+      user: result.value!.user,
+      membership: result.value!.membership,
+      session: result.value!.session,
     };
   });
 
@@ -349,6 +482,7 @@ export const invitationRoutes: FastifyPluginAsync = async (fastify) => {
       summary: 'Resend invitation',
       description: 'Resend an invitation with a new token and expiration',
       params: toJsonSchema(uuidParamSchema),
+      body: toJsonSchema(emptyBodySchema),
     },
   }, async (request, reply) => {
     const user = getAuthUser(request);

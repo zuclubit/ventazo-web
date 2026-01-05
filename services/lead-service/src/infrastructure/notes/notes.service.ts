@@ -1,6 +1,7 @@
 /**
  * Notes Service
  * Manages notes and comments for CRM entities with threading support
+ * Includes notification system for @mentions (users and groups)
  */
 
 import { injectable, inject } from 'tsyringe';
@@ -19,6 +20,8 @@ import {
   NoteReactions,
   SUPPORTED_REACTIONS,
 } from './types';
+import { NotificationOrchestrator, NotificationRecipient, NotificationPayload } from '../messaging';
+import { UserTagsService } from '../user-tags';
 
 // Simple markdown to HTML conversion (for basic cases)
 function markdownToHtml(content: string): string {
@@ -56,7 +59,16 @@ function markdownToHtml(content: string): string {
   return html;
 }
 
-// Extract mentions from content
+// Types for parsed mentions
+interface ParsedMention {
+  type: 'user' | 'group';
+  id: string;
+  name: string;
+  startIndex: number;
+  endIndex: number;
+}
+
+// Extract mentions from content (both users and groups)
 function extractMentions(content: string): NoteMention[] {
   const mentions: NoteMention[] = [];
   const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
@@ -74,10 +86,46 @@ function extractMentions(content: string): NoteMention[] {
   return mentions;
 }
 
+// Extract and categorize mentions (user vs group)
+function parseMentions(content: string): ParsedMention[] {
+  const mentions: ParsedMention[] = [];
+  // Matches both @[Name](userId) and @[GroupName](tag:tagId)
+  const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+  let match;
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    const idOrTag = match[2];
+    const name = match[1];
+
+    // Check if it's a group mention (starts with "tag:")
+    if (idOrTag.startsWith('tag:')) {
+      mentions.push({
+        type: 'group',
+        id: idOrTag.replace('tag:', ''),
+        name,
+        startIndex: match.index,
+        endIndex: match.index + match[0].length,
+      });
+    } else {
+      mentions.push({
+        type: 'user',
+        id: idOrTag,
+        name,
+        startIndex: match.index,
+        endIndex: match.index + match[0].length,
+      });
+    }
+  }
+
+  return mentions;
+}
+
 @injectable()
 export class NotesService {
   constructor(
-    @inject('DatabasePool') private readonly pool: DatabasePool
+    @inject('DatabasePool') private readonly pool: DatabasePool,
+    private readonly notificationOrchestrator?: NotificationOrchestrator,
+    private readonly userTagsService?: UserTagsService
   ) {}
 
   /**
@@ -157,7 +205,21 @@ export class NotesService {
         return Result.fail('Failed to create note');
       }
 
-      return Result.ok(this.mapRowToNote(result.value.rows[0]));
+      const createdNote = this.mapRowToNote(result.value.rows[0]);
+
+      // Get author name for notifications
+      const authorResult = await this.pool.query(
+        `SELECT full_name FROM users WHERE id = $1`,
+        [userId]
+      );
+      const authorName = authorResult.value?.rows[0]?.full_name || 'Usuario';
+
+      // Send mention notifications asynchronously (don't block the response)
+      this.sendMentionNotifications(tenantId, createdNote, userId, authorName).catch((err) => {
+        console.error('Error sending mention notifications:', err);
+      });
+
+      return Result.ok(createdNote);
     } catch (error) {
       return Result.fail(`Failed to create note: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -768,5 +830,202 @@ export class NotesService {
       updatedAt: new Date(row.updated_at as string),
       deletedAt: row.deleted_at ? new Date(row.deleted_at as string) : undefined,
     };
+  }
+
+  /**
+   * Send notifications for @mentions in a note
+   * Handles both individual user mentions and group mentions
+   */
+  private async sendMentionNotifications(
+    tenantId: string,
+    note: Note,
+    authorId: string,
+    authorName: string
+  ): Promise<void> {
+    // Early exit if notification orchestrator is not available
+    if (!this.notificationOrchestrator) {
+      return;
+    }
+
+    try {
+      // Parse mentions to distinguish users vs groups
+      const mentions = parseMentions(note.content);
+      if (mentions.length === 0) {
+        return;
+      }
+
+      // Get entity name for notification context
+      const entityName = await this.getEntityName(tenantId, note.entityType, note.entityId);
+
+      // Create comment preview (first 100 chars)
+      const commentPreview = note.content
+        .replace(/@\[([^\]]+)\]\([^)]+\)/g, '@$1') // Replace mention markup with plain @name
+        .substring(0, 100)
+        .trim() + (note.content.length > 100 ? '...' : '');
+
+      // Get base URL for action links
+      const baseUrl = process.env.APP_URL || 'https://crm.zuclubit.com';
+      const actionUrl = `${baseUrl}/app/${note.entityType}s/${note.entityId}`;
+
+      // Separate user mentions from group mentions
+      const userMentions = mentions.filter(m => m.type === 'user');
+      const groupMentions = mentions.filter(m => m.type === 'group');
+
+      // Process individual user mentions
+      for (const mention of userMentions) {
+        // Skip if mentioning self
+        if (mention.id === authorId) {
+          continue;
+        }
+
+        // Get user details for notification
+        const userResult = await this.pool.query(
+          `SELECT id, full_name, email, phone FROM users WHERE id = $1`,
+          [mention.id]
+        );
+
+        if (userResult.isSuccess && userResult.value?.rows[0]) {
+          const user = userResult.value.rows[0];
+
+          const recipient: NotificationRecipient = {
+            userId: user.id,
+            role: 'mentioned_user' as 'team', // Cast to allowed role type
+            name: user.full_name || mention.name,
+            email: user.email,
+            phone: user.phone,
+          };
+
+          // Send notification
+          await this.notificationOrchestrator.notify(
+            tenantId,
+            'comment.mention',
+            recipient,
+            {
+              recipientName: recipient.name,
+              mentionedBy: authorName,
+              commentPreview,
+              entityType: this.getEntityTypeDisplay(note.entityType),
+              entityName,
+              commentDate: new Date().toLocaleString('es-MX', {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+              }),
+              actionUrl,
+              appName: 'Ventazo CRM',
+            },
+            note.entityType as NotificationPayload['entityType'],
+            note.entityId
+          );
+        }
+      }
+
+      // Process group mentions
+      if (groupMentions.length > 0 && this.userTagsService) {
+        for (const mention of groupMentions) {
+          // Get all members of the tag/group
+          const membersResult = await this.userTagsService.getTagMembers(tenantId, mention.id);
+
+          if (membersResult.isSuccess && membersResult.value) {
+            const members = membersResult.value; // Direct array of TagMember
+
+            // Notify each group member
+            for (const member of members) {
+              // Skip if mentioning self
+              if (member.userId === authorId) {
+                continue;
+              }
+
+              const recipient: NotificationRecipient = {
+                userId: member.userId,
+                role: 'team',
+                name: member.fullName,
+                email: member.email,
+              };
+
+              // Send group mention notification
+              await this.notificationOrchestrator.notify(
+                tenantId,
+                'comment.group_mention',
+                recipient,
+                {
+                  recipientName: recipient.name,
+                  mentionedBy: authorName,
+                  groupName: mention.name,
+                  commentPreview,
+                  entityType: this.getEntityTypeDisplay(note.entityType),
+                  entityName,
+                  commentDate: new Date().toLocaleString('es-MX', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short'
+                  }),
+                  actionUrl,
+                  appName: 'Ventazo CRM',
+                },
+                note.entityType as NotificationPayload['entityType'],
+                note.entityId
+              );
+            }
+          }
+        }
+      }
+    } catch (error) {
+      // Log error but don't fail the note creation
+      console.error('Failed to send mention notifications:', error);
+    }
+  }
+
+  /**
+   * Get entity name for notification context
+   */
+  private async getEntityName(tenantId: string, entityType: NoteEntityType, entityId: string): Promise<string> {
+    try {
+      let query = '';
+      let nameField = 'name';
+
+      switch (entityType) {
+        case 'lead':
+          query = `SELECT company_name as name FROM leads WHERE id = $1 AND tenant_id = $2`;
+          break;
+        case 'customer':
+          query = `SELECT company_name as name FROM customers WHERE id = $1 AND tenant_id = $2`;
+          break;
+        case 'opportunity':
+          query = `SELECT name FROM opportunities WHERE id = $1 AND tenant_id = $2`;
+          break;
+        case 'task':
+          query = `SELECT title as name FROM tasks WHERE id = $1 AND tenant_id = $2`;
+          break;
+        case 'contact':
+          query = `SELECT CONCAT(first_name, ' ', last_name) as name FROM lead_contacts WHERE id = $1 AND tenant_id = $2`;
+          break;
+        default:
+          return entityType;
+      }
+
+      const result = await this.pool.query(query, [entityId, tenantId]);
+
+      if (result.isSuccess && result.value?.rows[0]) {
+        return result.value.rows[0].name || entityType;
+      }
+
+      return entityType;
+    } catch {
+      return entityType;
+    }
+  }
+
+  /**
+   * Get display name for entity type
+   */
+  private getEntityTypeDisplay(entityType: NoteEntityType): string {
+    const displays: Record<NoteEntityType, string> = {
+      lead: 'Lead',
+      customer: 'Cliente',
+      opportunity: 'Oportunidad',
+      task: 'Tarea',
+      contact: 'Contacto',
+      quote: 'Cotización',
+    };
+    return displays[entityType] || entityType;
   }
 }

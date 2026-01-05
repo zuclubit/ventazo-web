@@ -11,7 +11,9 @@
  * - Digest emails
  */
 
+import { container } from 'tsyringe';
 import { ScheduledAlertsService, ScheduledAlertResult } from './scheduled-alerts.service';
+import { InvitationService } from '../auth';
 
 interface CronJobConfig {
   name: string;
@@ -131,6 +133,22 @@ export class CronSchedulerService {
       enabled: true,
     });
 
+    // Invitation expiration cleanup - run daily at midnight
+    this.jobs.set('invitation-expiration', {
+      name: 'Invitation Expiration Cleanup',
+      schedule: 'Daily at 00:00 AM',
+      handler: async () => this.expireOldInvitations(),
+      enabled: true,
+    });
+
+    // Invitation reminder - run daily at 10am (2 days before expiration)
+    this.jobs.set('invitation-reminder', {
+      name: 'Invitation Expiration Reminder',
+      schedule: 'Daily at 10:00 AM',
+      handler: async () => this.sendInvitationExpirationReminders(),
+      enabled: true,
+    });
+
     console.log(`[CronScheduler] Initialized ${this.jobs.size} scheduled jobs`);
   }
 
@@ -169,6 +187,12 @@ export class CronSchedulerService {
 
     // Payment reminders - daily at 9am
     this.scheduleDailyJob('payment-reminders', 9);
+
+    // Invitation expiration cleanup - daily at midnight
+    this.scheduleDailyJob('invitation-expiration', 0);
+
+    // Invitation reminder - daily at 10am
+    this.scheduleDailyJob('invitation-reminder', 10);
 
     console.log('[CronScheduler] All jobs scheduled successfully');
   }
@@ -428,6 +452,89 @@ export class CronSchedulerService {
         } : undefined,
       };
     });
+  }
+
+  // ============================================
+  // Invitation Expiration Jobs
+  // ============================================
+
+  /**
+   * Expire old invitations that have passed their expiration date
+   * Changes status from 'pending' to 'expired'
+   */
+  private async expireOldInvitations(): Promise<ScheduledAlertResult> {
+    console.log('[CronScheduler] Running invitation expiration cleanup...');
+
+    try {
+      const invitationService = container.resolve(InvitationService);
+      const result = await invitationService.expireOldInvitations();
+
+      if (result.isSuccess) {
+        const expiredCount = result.value || 0;
+        console.log(`[CronScheduler] Expired ${expiredCount} invitations`);
+        return {
+          alertType: 'invitation_expiration',
+          processed: expiredCount,
+          notificationsSent: expiredCount,
+          errors: [],
+        };
+      } else {
+        console.error('[CronScheduler] Failed to expire invitations:', result.error);
+        return {
+          alertType: 'invitation_expiration',
+          processed: 0,
+          notificationsSent: 0,
+          errors: [{ entityId: 'system', error: result.error || 'Unknown error' }],
+        };
+      }
+    } catch (error) {
+      console.error('[CronScheduler] Error expiring invitations:', error);
+      return {
+        alertType: 'invitation_expiration',
+        processed: 0,
+        notificationsSent: 0,
+        errors: [{ entityId: 'system', error: String(error) }],
+      };
+    }
+  }
+
+  /**
+   * Send reminder emails for invitations that will expire in 2 days
+   */
+  private async sendInvitationExpirationReminders(): Promise<ScheduledAlertResult> {
+    console.log('[CronScheduler] Checking for invitations expiring soon...');
+
+    try {
+      const invitationService = container.resolve(InvitationService);
+      const result = await invitationService.sendExpirationReminders();
+
+      if (result.isSuccess) {
+        const sentCount = result.value || 0;
+        console.log(`[CronScheduler] Sent ${sentCount} invitation expiration reminders`);
+        return {
+          alertType: 'invitation_expiration_reminder',
+          processed: sentCount,
+          notificationsSent: sentCount,
+          errors: [],
+        };
+      } else {
+        console.error('[CronScheduler] Failed to send reminders:', result.error);
+        return {
+          alertType: 'invitation_expiration_reminder',
+          processed: 0,
+          notificationsSent: 0,
+          errors: [{ entityId: 'system', error: result.error || 'Unknown error' }],
+        };
+      }
+    } catch (error) {
+      console.error('[CronScheduler] Error sending reminders:', error);
+      return {
+        alertType: 'invitation_expiration_reminder',
+        processed: 0,
+        notificationsSent: 0,
+        errors: [{ entityId: 'system', error: String(error) }],
+      };
+    }
   }
 }
 
