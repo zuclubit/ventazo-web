@@ -4,6 +4,8 @@
   "private": true,
   "description": "Smart CRM for LATAM markets with CFDI compliance",
   "workspaces": [
+    "apps/*",
+    "packages/*",
     "services/*",
     "shared/*"
   ],
@@ -16,7 +18,11 @@
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
     "clean": "turbo run clean && rm -rf node_modules",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "deploy": "./scripts/deploy-all.sh",
+    "deploy:backend": "./scripts/deploy-backend.sh",
+    "deploy:frontend": "./scripts/deploy-frontend.sh",
+    "deploy:parallel": "./scripts/deploy-all.sh --parallel"
   },
   "devDependencies": {
     "@prisma/client": "^7.1.0",
