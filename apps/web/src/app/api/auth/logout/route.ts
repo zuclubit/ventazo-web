@@ -21,10 +21,51 @@ const SSO_CONFIG = {
 };
 
 /**
+ * Development fallback key - MUST be consistent across all files
+ * This fallback is shared between: middleware.ts, callback route, session/index.ts, logout route
+ * IMPORTANT: In production, always set SESSION_SECRET environment variable
+ */
+const DEV_FALLBACK_KEY = 'zuclubit-dev-session-key-do-not-use-in-production';
+
+/**
+ * Get Cloudflare context env bindings (if available)
+ */
+function getCloudflareEnv(): Record<string, string | undefined> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getCloudflareContext } = require('@opennextjs/cloudflare');
+    const ctx = getCloudflareContext();
+    return ctx?.env || {};
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Get secret key for session decryption
+ * CRITICAL: Must use the same sources as middleware.ts and session/index.ts
  */
 function getSecretKey(): Uint8Array {
-  const secret = process.env['SESSION_SECRET'] || 'zuclubit-crm-session-fallback-key-2025';
+  const cfEnv = getCloudflareEnv();
+
+  const secret = process.env['SESSION_SECRET'] ||
+    process.env['NEXTAUTH_SECRET'] ||
+    cfEnv['SESSION_SECRET'] ||
+    cfEnv['NEXTAUTH_SECRET'] ||
+    (globalThis as Record<string, unknown>)['SESSION_SECRET'] as string | undefined;
+
+  if (!secret) {
+    const isProduction =
+      process.env['NODE_ENV'] === 'production' ||
+      process.env['VERCEL_ENV'] === 'production' ||
+      process.env['CF_PAGES'] === '1';
+
+    if (isProduction) {
+      console.error('[Logout] CRITICAL: SESSION_SECRET not configured in production!');
+    }
+    return new TextEncoder().encode(DEV_FALLBACK_KEY);
+  }
+
   return new TextEncoder().encode(secret);
 }
 
