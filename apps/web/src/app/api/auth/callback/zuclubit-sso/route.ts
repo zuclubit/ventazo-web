@@ -257,19 +257,89 @@ export async function GET(request: NextRequest) {
 
     console.log('[SSO Callback] Redirecting to:', redirectTo);
 
-    // Create redirect response with session cookie using cookies API
-    // This is more reliable than setting Set-Cookie header directly in Cloudflare Workers
-    const response = NextResponse.redirect(new URL(redirectTo, request.url));
-    response.cookies.set(cookieOptions.name, cookieOptions.value, {
-      httpOnly: cookieOptions.httpOnly,
-      secure: cookieOptions.secure,
-      sameSite: cookieOptions.sameSite,
-      path: cookieOptions.path,
-      maxAge: cookieOptions.maxAge,
-    });
+    // CRITICAL FIX: Cloudflare Workers/Pages has issues with cookies on redirect responses.
+    // NextResponse.redirect() + cookies.set() loses the cookie during the 307 redirect.
+    // Solution: Return an HTML page that sets the cookie via Set-Cookie header and redirects.
+    // This is the most reliable method for edge runtimes.
 
-    console.log('[SSO Callback] Session cookie set via cookies API');
-    return response;
+    const absoluteRedirectUrl = new URL(redirectTo, request.url).toString();
+
+    // Build Set-Cookie header manually for maximum compatibility
+    const cookieParts = [
+      `${cookieOptions.name}=${cookieOptions.value}`,
+      `Path=${cookieOptions.path}`,
+      `Max-Age=${cookieOptions.maxAge}`,
+      'HttpOnly',
+      `SameSite=${cookieOptions.sameSite.charAt(0).toUpperCase() + cookieOptions.sameSite.slice(1)}`,
+    ];
+
+    if (cookieOptions.secure) {
+      cookieParts.push('Secure');
+    }
+
+    const setCookieValue = cookieParts.join('; ');
+
+    console.log('[SSO Callback] Setting cookie via HTML redirect page');
+    console.log('[SSO Callback] Cookie length:', cookieOptions.value.length);
+
+    // Return HTML page that redirects after browser processes Set-Cookie
+    // This ensures the cookie is properly stored before navigation
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="0;url=${absoluteRedirectUrl}">
+  <title>Autenticando...</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #003c3b 0%, #052828 100%);
+      color: white;
+    }
+    .loader {
+      text-align: center;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: #5eead4;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="loader">
+    <div class="spinner"></div>
+    <p>Iniciando sesion...</p>
+  </div>
+  <script>
+    // Fallback redirect if meta refresh doesn't work
+    setTimeout(function() {
+      window.location.href = "${absoluteRedirectUrl}";
+    }, 100);
+  </script>
+</body>
+</html>`;
+
+    return new Response(html, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Set-Cookie': setCookieValue,
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    });
 
   } catch (err) {
     console.error('[SSO Callback] Token exchange failed:', err);
