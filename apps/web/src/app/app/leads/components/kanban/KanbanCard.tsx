@@ -77,44 +77,55 @@ export interface KanbanCardProps {
 // ============================================
 
 /**
- * Status styles using CSS variables for FULL dynamic theming v4.0
- * All colors are controlled via CSS variables set by useKanbanTheme
- * This ensures consistent theming across the entire Kanban board
+ * Status styles using CSS variables for FULL dynamic theming v5.0
+ * All colors derive from tenant branding for visual cohesion
+ *
+ * Status progression uses tenant colors with semantic modifiers:
+ * - new/contacted: Tenant primary (tinted light)
+ * - qualified/proposal: Tenant primary (medium intensity)
+ * - negotiation: Tenant accent (progress indicator)
+ * - won: Tenant accent (success)
+ * - lost: Semantic red (universal failure indicator)
  */
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   new: {
+    // New leads: Light primary tint
     bg: 'bg-[var(--status-info-bg)]',
     text: 'text-[var(--status-info-text)]',
     border: 'border-[var(--status-info-border)]'
   },
   contacted: {
-    bg: 'bg-[var(--status-warning-bg)]',
-    text: 'text-[var(--status-warning-text)]',
-    border: 'border-[var(--status-warning-border)]'
+    // Contacted: Slightly warmer primary
+    bg: 'bg-[rgba(var(--tenant-primary-rgb),0.12)]',
+    text: 'text-[var(--tenant-primary)]',
+    border: 'border-[rgba(var(--tenant-primary-rgb),0.25)]'
   },
   qualified: {
-    bg: 'bg-violet-500/15 dark:bg-violet-500/20',
-    text: 'text-violet-600 dark:text-violet-400',
-    border: 'border-violet-200 dark:border-violet-500/30'
+    // Qualified: Medium primary intensity
+    bg: 'bg-[rgba(var(--tenant-primary-rgb),0.18)]',
+    text: 'text-[var(--tenant-primary-hover)]',
+    border: 'border-[rgba(var(--tenant-primary-rgb),0.35)]'
   },
   proposal: {
-    // Use tenant primary color for proposal stage
-    bg: 'bg-[rgba(var(--tenant-primary-rgb),0.15)]',
+    // Proposal: Strong primary (active opportunity)
+    bg: 'bg-[rgba(var(--tenant-primary-rgb),0.2)]',
     text: 'text-[var(--tenant-primary)]',
     border: 'border-[var(--tenant-primary-glow)]'
   },
   negotiation: {
-    bg: 'bg-pink-500/15 dark:bg-pink-500/20',
-    text: 'text-pink-600 dark:text-pink-400',
-    border: 'border-pink-200 dark:border-pink-500/30'
+    // Negotiation: Accent color (progress toward close)
+    bg: 'bg-[rgba(var(--tenant-accent-rgb),0.15)]',
+    text: 'text-[var(--tenant-accent)]',
+    border: 'border-[rgba(var(--tenant-accent-rgb),0.3)]'
   },
   won: {
-    // Use tenant accent for won deals (success state)
+    // Won: Success using accent (celebration)
     bg: 'bg-[var(--status-success-bg)]',
     text: 'text-[var(--status-success-text)]',
     border: 'border-[var(--status-success-border)]'
   },
   lost: {
+    // Lost: Semantic red (universal failure indicator)
     bg: 'bg-[var(--status-error-bg)]',
     text: 'text-[var(--status-error-text)]',
     border: 'border-[var(--status-error-border)]'
@@ -243,13 +254,22 @@ function ActionButton({
   disabled,
   className,
   label,
+  variant = 'default',
 }: {
   icon: typeof MessageCircle;
   onClick: (e: React.MouseEvent) => void;
   disabled?: boolean;
   className?: string;
   label: string;
+  variant?: 'default' | 'whatsapp' | 'call';
 }) {
+  // Variant-specific base styles for better visibility
+  const variantStyles = {
+    default: 'text-muted-foreground/70 hover:text-foreground hover:bg-muted',
+    whatsapp: 'text-emerald-600/70 dark:text-emerald-400/70 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30',
+    call: 'text-[var(--tenant-primary)]/70 hover:text-[var(--tenant-primary)] hover:bg-[var(--action-call-bg)]',
+  };
+
   return (
     <button
       type="button"
@@ -260,9 +280,9 @@ function ActionButton({
         'flex items-center justify-center',
         CARD_TOKENS.touchTarget.buttonSm,
         CARD_TOKENS.radius.cardSm,
-        'text-muted-foreground',
         CARD_TOKENS.transition.micro,
         CARD_TOKENS.focus.ring,
+        variantStyles[variant],
         !disabled && 'hover:scale-105 active:scale-95',
         disabled && 'opacity-30 cursor-not-allowed',
         className
@@ -367,14 +387,18 @@ export function KanbanCard({
           CARD_TOKENS.radius.card,
           'border',
           CARD_TOKENS.transition.fast,
-          // Background & Border - Theme-aware using shadcn tokens
-          'bg-card border-border/50',
-          // Shadow - Enhanced for dark mode
-          'shadow-sm dark:shadow-lg dark:shadow-black/20',
+          // Background & Border - Theme-aware with hot lead differentiation
+          isHotLead
+            ? 'bg-gradient-to-br from-orange-50/80 to-card dark:from-orange-950/20 dark:to-card border-orange-200/60 dark:border-orange-800/40'
+            : 'bg-card border-border/50',
+          // Shadow - Enhanced for dark mode, brand glow for hot leads
+          isHotLead
+            ? 'shadow-md shadow-orange-500/10 dark:shadow-orange-500/5'
+            : 'shadow-sm dark:shadow-lg dark:shadow-black/20',
           // Hover - Interactive card states from CARD_TOKENS
           CARD_TOKENS.card.interactive,
-          // Hot lead accent
-          isHotLead && 'border-l-2 border-l-[var(--score-hot)]',
+          // Hot lead left accent bar
+          isHotLead && 'border-l-2 border-l-orange-500',
           // Optimistic state (P1 Fix: visual feedback for pending create)
           isOptimistic && 'opacity-70 animate-pulse border-dashed border-primary/50',
           // Dragging
@@ -475,14 +499,14 @@ export function KanbanCard({
               onClick={handleWhatsApp}
               disabled={!hasPhone}
               label="WhatsApp"
-              className="hover:bg-[var(--action-whatsapp-bg-hover)] hover:text-[var(--action-whatsapp-text)] hover:border-[var(--action-whatsapp-border)]"
+              variant="whatsapp"
             />
             <ActionButton
               icon={Phone}
               onClick={handleCall}
               disabled={!hasPhone}
               label="Llamar"
-              className="hover:bg-[var(--action-call-bg-hover)] hover:text-[var(--action-call-text)] hover:border-[var(--action-call-border)]"
+              variant="call"
             />
 
             {/* More Options */}

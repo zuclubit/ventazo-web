@@ -668,6 +668,135 @@ export class AuthService {
   }
 
   /**
+   * Create tenant from SSO - creates a new tenant using SSO-provided ID
+   * Used when SSO assigns a tenant that doesn't exist in our backend yet.
+   * This maintains the same tenant ID between SSO and backend.
+   */
+  async createTenantFromSSO(
+    tenantId: string,
+    name: string,
+    slug: string
+  ): Promise<Result<Tenant>> {
+    try {
+      const now = new Date();
+
+      // Check if tenant already exists (maybe created by another user)
+      const existingResult = await this.getTenantById(tenantId);
+      if (existingResult.isSuccess && existingResult.value) {
+        console.log(`[AuthService] SSO tenant already exists: ${tenantId}`);
+        return Result.ok(existingResult.value);
+      }
+
+      // Ensure unique slug (append random suffix if needed)
+      let finalSlug = slug;
+      const slugCheck = await this.checkSlugAvailability(slug);
+      if (slugCheck.isSuccess && !slugCheck.value) {
+        // Slug taken, append random suffix
+        finalSlug = `${slug}-${Date.now().toString(36)}`;
+      }
+
+      // Create tenant with SSO-provided ID (instead of generating new UUID)
+      const tenantResult = await this.pool.query<Tenant>(
+        `INSERT INTO tenants (id, name, slug, plan, settings, metadata, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (id) DO UPDATE SET
+           name = EXCLUDED.name,
+           updated_at = EXCLUDED.updated_at
+         RETURNING
+           id,
+           name,
+           slug,
+           plan,
+           is_active as "isActive",
+           settings,
+           metadata,
+           created_at as "createdAt",
+           updated_at as "updatedAt"`,
+        [
+          tenantId,
+          name,
+          finalSlug,
+          'free',
+          {},
+          { source: 'sso' },
+          now,
+          now,
+        ]
+      );
+
+      if (tenantResult.isFailure || !tenantResult.value) {
+        return Result.fail(tenantResult.error || 'Failed to create SSO tenant');
+      }
+
+      const tenant = tenantResult.value.rows[0];
+      console.log(`[AuthService] SSO tenant created: ${tenant.id} (${tenant.name})`);
+
+      return Result.ok(tenant);
+    } catch (error) {
+      console.error('[AuthService] SSO tenant creation failed:', error);
+      return Result.fail(`SSO tenant creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Create membership from SSO - used when SSO system assigns a user to a tenant
+   * Unlike addMember, this creates an already-accepted membership since it's
+   * trusted data from the SSO system.
+   */
+  async createMembershipFromSSO(
+    tenantId: string,
+    userId: string,
+    role: UserRole
+  ): Promise<Result<TenantMembership>> {
+    try {
+      const now = new Date();
+      const membershipId = uuidv4();
+
+      // Check if membership already exists
+      const existingResult = await this.getTenantMembership(userId, tenantId);
+      if (existingResult.isSuccess && existingResult.value) {
+        // Membership exists, just return it
+        return Result.ok(existingResult.value);
+      }
+
+      // Create membership with acceptedAt set (SSO users are pre-accepted)
+      const result = await this.pool.query<TenantMembership>(
+        `INSERT INTO tenant_memberships
+         (id, user_id, tenant_id, role, invited_by, invited_at, accepted_at, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (user_id, tenant_id) DO UPDATE SET
+           role = EXCLUDED.role,
+           is_active = TRUE,
+           accepted_at = COALESCE(tenant_memberships.accepted_at, EXCLUDED.accepted_at),
+           updated_at = EXCLUDED.updated_at
+         RETURNING
+           id,
+           user_id as "userId",
+           tenant_id as "tenantId",
+           role,
+           invited_by as "invitedBy",
+           invited_at as "invitedAt",
+           accepted_at as "acceptedAt",
+           is_active as "isActive",
+           created_at as "createdAt",
+           updated_at as "updatedAt"`,
+        [membershipId, userId, tenantId, role, userId, now, now, true, now, now]
+      );
+
+      if (result.isFailure || !result.value) {
+        return Result.fail(result.error || 'Failed to create SSO membership');
+      }
+
+      // Invalidate cache
+      this.invalidateTenantCache(userId);
+
+      return Result.ok(result.value.rows[0]);
+    } catch (error) {
+      return Result.fail(`Failed to create SSO membership: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Invite a user to a tenant (creates user if needed)
    */
   async inviteUser(
@@ -1273,6 +1402,14 @@ export class AuthService {
       );
 
       if (insertResult.isFailure || !insertResult.value) {
+        // Insert failed - might be duplicate email, try to find existing user
+        console.log('[AuthService] Insert failed, checking for existing user by email...');
+        const existingUser = await this.getUserByEmail(data.email);
+        if (existingUser.isSuccess && existingUser.value) {
+          console.log('[AuthService] Found existing user by email:', existingUser.value.id);
+          // Return the existing user (the SSO user ID doesn't match, but email does)
+          return Result.ok(existingUser.value);
+        }
         console.error('[AuthService] Failed to create user:', insertResult.error);
         return Result.fail(insertResult.error || 'Failed to create user');
       }

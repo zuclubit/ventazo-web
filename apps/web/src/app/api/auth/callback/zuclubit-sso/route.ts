@@ -3,9 +3,13 @@
  *
  * Handles the OAuth2 authorization code flow callback:
  * 1. Receives authorization code from SSO
- * 2. Exchanges code for tokens
- * 3. Creates local session
- * 4. Redirects to app or requested page
+ * 2. Exchanges code for SSO tokens
+ * 3. Exchanges SSO tokens for native backend tokens via /oauth/exchange
+ * 4. Creates local session with backend tokens
+ * 5. Redirects to app or requested page
+ *
+ * IMPORTANT: The session is created with BACKEND tokens, not SSO tokens.
+ * This ensures API calls to zuclubit-lead-service.fly.dev are authenticated.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,6 +23,39 @@ import {
 // Session configuration (must match session/index.ts)
 const SESSION_COOKIE_NAME = 'zcrm_session';
 const SESSION_DURATION_DAYS = 7;
+
+// Backend API configuration for token exchange
+const rawApiUrl = process.env['API_URL'] || process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
+const API_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
+const INTERNAL_API_KEY = process.env['INTERNAL_API_KEY'] || '';
+
+/**
+ * Response from backend /oauth/exchange endpoint
+ */
+interface BackendExchangeResponse {
+  user: {
+    id: string;
+    email: string;
+    fullName: string | null;
+  };
+  tenants: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    role: string;
+  }>;
+  onboarding?: {
+    status: string;
+    currentStep: string;
+    completedSteps: string[];
+  };
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    expiresAt: number;
+  };
+}
 
 /**
  * Development fallback key - MUST be consistent across all files
@@ -225,11 +262,90 @@ export async function GET(request: NextRequest) {
 
     console.log('[SSO Callback] Token exchange successful for user:', payload.email);
 
-    // Create session token
+    // Variables for session creation
+    let finalAccessToken = tokens.accessToken;
+    let finalRefreshToken = tokens.refreshToken;
+    let finalExpiresAt = payload.exp;
+    let tenantId = payload.tenant_id || '';
+    let role = payload.role || 'viewer';
+    let onboardingStatus = 'not_started';
+    let requiresOnboarding = !payload.tenant_id;
+
+    // Try to exchange SSO tokens for native backend tokens
+    // This is CRITICAL for API calls to work properly
+    if (INTERNAL_API_KEY) {
+      try {
+        console.log('[SSO Callback] Exchanging SSO tokens for backend native tokens...');
+
+        const exchangeResponse = await fetch(`${API_URL}/api/v1/auth/oauth/exchange`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-API-Key': INTERNAL_API_KEY,
+          },
+          body: JSON.stringify({
+            userId: payload.sub,
+            email: payload.email,
+            fullName: payload.name || payload.given_name,
+            avatarUrl: payload.picture,
+            provider: 'zuclubit-sso',
+            // Pass SSO tenant info for automatic membership sync
+            ssoTenantId: payload.tenant_id || undefined,
+            ssoRole: payload.role || 'owner',
+          }),
+          cache: 'no-store',
+        });
+
+        if (exchangeResponse.ok) {
+          const exchangeData: BackendExchangeResponse = await exchangeResponse.json();
+          console.log('[SSO Callback] Backend token exchange successful');
+
+          // Use native backend tokens instead of SSO tokens
+          if (exchangeData.tokens) {
+            finalAccessToken = exchangeData.tokens.accessToken;
+            finalRefreshToken = exchangeData.tokens.refreshToken;
+            finalExpiresAt = exchangeData.tokens.expiresAt;
+            console.log('[SSO Callback] Using backend native tokens for session');
+          }
+
+          // Get tenant info from backend response
+          if (exchangeData.tenants && exchangeData.tenants.length > 0) {
+            const firstTenant = exchangeData.tenants[0];
+            if (firstTenant) {
+              tenantId = firstTenant.id;
+              role = firstTenant.role || 'viewer';
+            }
+          }
+
+          // Get onboarding status from backend
+          if (exchangeData.onboarding) {
+            onboardingStatus = exchangeData.onboarding.status;
+            requiresOnboarding = onboardingStatus !== 'completed';
+          }
+        } else {
+          const errorText = await exchangeResponse.text();
+          console.warn('[SSO Callback] Backend token exchange failed:', exchangeResponse.status, errorText);
+          console.warn('[SSO Callback] Falling back to SSO tokens - API calls may fail with 401');
+        }
+      } catch (exchangeError) {
+        console.warn('[SSO Callback] Backend exchange error:', exchangeError);
+        console.warn('[SSO Callback] Falling back to SSO tokens - API calls may fail with 401');
+      }
+    } else {
+      console.warn('[SSO Callback] INTERNAL_API_KEY not configured - using SSO tokens');
+      console.warn('[SSO Callback] API calls to backend may fail with 401');
+    }
+
+    // Create session token with the best available tokens
     const { cookieOptions } = await createSessionToken(
-      tokens.accessToken,
-      tokens.refreshToken,
-      payload
+      finalAccessToken,
+      finalRefreshToken,
+      {
+        ...payload,
+        tenant_id: tenantId,
+        role: role,
+        exp: finalExpiresAt,
+      }
     );
 
     // Determine redirect destination
@@ -250,9 +366,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Check if user needs onboarding (no tenant)
-    if (!payload.tenant_id) {
+    // Check if user needs onboarding based on tenant and onboarding status
+    if (!tenantId) {
       redirectTo = '/onboarding/create-business';
+    } else if (requiresOnboarding && onboardingStatus !== 'completed') {
+      // Map onboarding status to route
+      const stepToRoute: Record<string, string> = {
+        not_started: '/onboarding/create-business',
+        profile_created: '/onboarding/create-business',
+        business_created: '/onboarding/setup',
+        setup_completed: '/onboarding/invite-team',
+        team_invited: '/onboarding/complete',
+      };
+      redirectTo = stepToRoute[onboardingStatus] || '/app/dashboard';
     }
 
     console.log('[SSO Callback] Redirecting to:', redirectTo);

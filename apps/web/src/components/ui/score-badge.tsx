@@ -68,11 +68,12 @@ const getScoreConfig = (score: number): ScoreConfig => {
       label: 'Caliente',
       labelEn: 'Hot',
       icon: Flame,
-      // SEMANTIC: hot = orange/red (high priority, urgent attention)
-      gradient: 'bg-gradient-to-br from-orange-600 via-orange-500 to-amber-400',
-      glowClass: 'shadow-[0_0_20px_rgba(249,115,22,0.4)]',
+      // Hot score: Uses CSS variable --score-hot-gradient (tenant-blended)
+      // Falls back to semantic orange if variables not set
+      gradient: 'score-badge-premium hot',
+      glowClass: 'shadow-[var(--score-hot-shadow,0_0_20px_rgba(249,115,22,0.4))]',
       textColor: 'text-white',
-      iconClass: 'text-yellow-200 animate-flame-flicker',
+      iconClass: 'text-white/90 animate-flame-flicker',
     };
   }
 
@@ -82,10 +83,11 @@ const getScoreConfig = (score: number): ScoreConfig => {
       label: 'Tibio',
       labelEn: 'Warm',
       icon: TrendingUp,
-      gradient: 'bg-gradient-to-br from-amber-600 via-amber-500 to-yellow-400',
-      glowClass: 'shadow-[0_0_20px_rgba(245,158,11,0.4)]',
+      // Warm score: Uses CSS variable --score-warm-gradient (tenant-blended)
+      gradient: 'score-badge-premium warm',
+      glowClass: 'shadow-[var(--score-warm-shadow,0_0_20px_rgba(245,158,11,0.4))]',
       textColor: 'text-white',
-      iconClass: 'text-yellow-200',
+      iconClass: 'text-white/80',
     };
   }
 
@@ -94,10 +96,11 @@ const getScoreConfig = (score: number): ScoreConfig => {
     label: 'Frío',
     labelEn: 'Cold',
     icon: Snowflake,
-    gradient: 'bg-gradient-to-br from-slate-500 via-slate-400 to-gray-300',
-    glowClass: 'shadow-[0_0_20px_rgba(100,116,139,0.3)]',
-    textColor: 'text-slate-800 dark:text-white',
-    iconClass: 'text-slate-600 dark:text-slate-300',
+    // Cold score: Uses CSS variable --score-cold-gradient (tenant-blended)
+    gradient: 'score-badge-premium cold',
+    glowClass: 'shadow-[var(--score-cold-shadow,0_0_20px_rgba(100,116,139,0.3))]',
+    textColor: 'text-white dark:text-white',
+    iconClass: 'text-white/80 dark:text-white/80',
   };
 };
 
@@ -165,8 +168,8 @@ export const ScoreBadge = React.memo<ScoreBadgeProps>(function ScoreBadge({
         role="img"
         aria-label={`Score: ${score} - ${config.label}`}
         className={cn(
-          'relative flex flex-col items-center justify-center rounded-xl font-bold',
-          config.gradient,
+          'relative flex flex-col items-center justify-center font-bold',
+          config.gradient, // Contains CSS class 'score-badge-premium hot/warm/cold'
           config.textColor,
           sizes.container,
           sizes.fontSize,

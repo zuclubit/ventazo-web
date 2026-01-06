@@ -362,42 +362,78 @@ export function useKanbanTheme(): KanbanTheme {
   }), [primaryColor]);
 
   // ============================================
-  // Generate Score Themes
-  // Using rawBase values for computations, CSS vars for backgrounds
+  // Generate Score Themes - Brand-Aware v6.0
+  // SEMANTIC FIRST: Temperature colors convey urgency (orange=hot, amber=warm, gray=cold)
+  // BRAND VIA GLOW: Add brand identity through shadows/glows, not gradient colors
   // ============================================
   const score = React.useMemo(() => {
-    // Hot leads blend with tenant primary for cohesion
-    const hotBlended = isCustomTheme
-      ? blendColors(SCORE_COLORS.hot.rawBase, primaryColor, 0.2)
+    // Hot leads: Keep semantic orange (95%) with very subtle brand tint (5%)
+    // Brand identity comes from the GLOW COLOR, not the badge color
+    const hotBase = isCustomTheme
+      ? blendColors(SCORE_COLORS.hot.rawBase, primaryColor, 0.08)
       : SCORE_COLORS.hot.rawBase;
+    const hotLight = isCustomTheme
+      ? blendColors(SCORE_COLORS.hot.rawLight, primaryColor, 0.05)
+      : SCORE_COLORS.hot.rawLight;
+    const hotDark = isCustomTheme
+      ? blendColors(SCORE_COLORS.hot.rawDark, primaryColor, 0.05)
+      : SCORE_COLORS.hot.rawDark;
+
+    // Warm leads: Keep semantic amber (90%) with subtle brand accent tint (10%)
+    const warmBase = isCustomTheme
+      ? blendColors(SCORE_COLORS.warm.rawBase, accentColor, 0.12)
+      : SCORE_COLORS.warm.rawBase;
+    const warmLight = isCustomTheme
+      ? blendColors(SCORE_COLORS.warm.rawLight, accentColor, 0.08)
+      : SCORE_COLORS.warm.rawLight;
+    const warmDark = isCustomTheme
+      ? blendColors(SCORE_COLORS.warm.rawDark, accentColor, 0.08)
+      : SCORE_COLORS.warm.rawDark;
+
+    // Cold leads: Keep neutral gray, minimal modification
+    const coldBase = SCORE_COLORS.cold.rawBase;
+    const coldLight = SCORE_COLORS.cold.rawLight;
+    const coldDark = SCORE_COLORS.cold.rawDark;
+
+    // Brand-colored glow for hot leads - this is where brand identity shows
+    const hotGlowColor = isCustomTheme
+      ? blendColors(SCORE_COLORS.hot.rawBase, primaryColor, 0.5)
+      : SCORE_COLORS.hot.rawBase;
+
+    // Brand-colored glow for warm leads
+    const warmGlowColor = isCustomTheme
+      ? blendColors(SCORE_COLORS.warm.rawBase, accentColor, 0.4)
+      : SCORE_COLORS.warm.rawBase;
 
     return {
       hot: {
-        gradient: `linear-gradient(135deg, ${SCORE_COLORS.hot.dark} 0%, ${hotBlended} 50%, ${SCORE_COLORS.hot.light} 100%)`,
+        gradient: `linear-gradient(135deg, ${hotDark} 0%, ${hotBase} 50%, ${hotLight} 100%)`,
         text: '#FFFFFF',
-        shadow: `0 4px 16px ${hexToRgba(SCORE_COLORS.hot.rawBase, 0.35)}`,
+        // BRAND GLOW: Primary-tinted shadow gives brand identity
+        shadow: `0 4px 16px ${hexToRgba(hotGlowColor, 0.45)}, 0 0 24px ${hexToRgba(primaryColor, 0.2)}`,
         icon: '#FFFFFF',
-        bg: 'color-mix(in srgb, var(--score-hot-base, #F97316) 12%, transparent)',
-        border: 'color-mix(in srgb, var(--score-hot-base, #F97316) 25%, transparent)',
+        bg: hexToRgba(hotBase, 0.12),
+        border: hexToRgba(hotBase, 0.25),
       },
       warm: {
-        gradient: `linear-gradient(135deg, ${SCORE_COLORS.warm.dark} 0%, ${SCORE_COLORS.warm.base} 50%, ${SCORE_COLORS.warm.light} 100%)`,
-        text: '#78350F',
-        shadow: `0 4px 16px ${hexToRgba(SCORE_COLORS.warm.rawBase, 0.35)}`,
-        icon: '#78350F',
-        bg: 'color-mix(in srgb, var(--score-warm-base, #F59E0B) 12%, transparent)',
-        border: 'color-mix(in srgb, var(--score-warm-base, #F59E0B) 25%, transparent)',
+        gradient: `linear-gradient(135deg, ${warmDark} 0%, ${warmBase} 50%, ${warmLight} 100%)`,
+        text: '#FFFFFF',
+        // BRAND GLOW: Accent-tinted shadow
+        shadow: `0 4px 16px ${hexToRgba(warmGlowColor, 0.4)}, 0 0 20px ${hexToRgba(accentColor, 0.15)}`,
+        icon: '#FFFFFF',
+        bg: hexToRgba(warmBase, 0.12),
+        border: hexToRgba(warmBase, 0.25),
       },
       cold: {
-        gradient: `linear-gradient(135deg, ${SCORE_COLORS.cold.dark} 0%, ${SCORE_COLORS.cold.base} 50%, ${SCORE_COLORS.cold.light} 100%)`,
+        gradient: `linear-gradient(135deg, ${coldDark} 0%, ${coldBase} 50%, ${coldLight} 100%)`,
         text: '#FFFFFF',
-        shadow: `0 4px 16px ${hexToRgba(SCORE_COLORS.cold.rawBase, 0.25)}`,
+        shadow: `0 4px 12px ${hexToRgba(coldBase, 0.25)}`,
         icon: '#FFFFFF',
-        bg: 'color-mix(in srgb, var(--score-cold-base, #6B7280) 12%, transparent)',
-        border: 'color-mix(in srgb, var(--score-cold-base, #6B7280) 25%, transparent)',
+        bg: hexToRgba(coldBase, 0.12),
+        border: hexToRgba(coldBase, 0.25),
       },
     };
-  }, [primaryColor, isCustomTheme]);
+  }, [primaryColor, accentColor, isCustomTheme]);
 
   // ============================================
   // Generate Drop Zone Theme

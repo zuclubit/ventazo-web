@@ -6,6 +6,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { container } from 'tsyringe';
 import { z } from 'zod';
+import { Result } from '@zuclubit/domain';
 import { toJsonSchema } from '../../utils/zod-schema';
 import {
   AuthService,
@@ -1941,6 +1942,9 @@ export const userSyncRoutes: FastifyPluginAsync = async (fastify) => {
     fullName: z.string().optional(),
     avatarUrl: z.string().url().optional().nullable(),
     provider: z.string().optional(),
+    // SSO-specific fields - if SSO provides tenant info, we should sync it
+    ssoTenantId: z.string().uuid('Invalid SSO tenant ID').optional(),
+    ssoRole: z.enum(['owner', 'admin', 'sales_rep', 'sales_manager', 'viewer']).optional(),
   });
 
   fastify.post('/oauth/exchange', {
@@ -2012,14 +2016,44 @@ export const userSyncRoutes: FastifyPluginAsync = async (fastify) => {
         metadata: body.provider ? { oauthProvider: body.provider } : undefined,
       });
 
-      if (syncResult.isFailure) {
-        request.log.warn({ error: syncResult.error }, 'User sync failed, user may already exist');
-        // Continue anyway - user may already exist
+      // CRITICAL: Get the ACTUAL user ID from the database
+      // The SSO user ID (body.userId) might differ from the database user ID
+      // if the user was created through a different auth method (email/password)
+      let actualUserId = body.userId;
+      let actualUserFullName = body.fullName;
+
+      if (syncResult.isSuccess && syncResult.value) {
+        // Use the ID from the synced/found user
+        actualUserId = syncResult.value.id;
+        actualUserFullName = syncResult.value.fullName || body.fullName;
+        request.log.info(
+          { ssoUserId: body.userId, dbUserId: actualUserId },
+          'User sync successful, using DB user ID'
+        );
+      } else {
+        // Sync failed, try to find user by email
+        request.log.warn({ error: syncResult.error }, 'User sync failed, trying email lookup');
+        const existingUser = await authService.getUserByEmail(body.email);
+        if (existingUser.isSuccess && existingUser.value) {
+          actualUserId = existingUser.value.id;
+          actualUserFullName = existingUser.value.fullName || body.fullName;
+          request.log.info(
+            { ssoUserId: body.userId, dbUserId: actualUserId },
+            'Found existing user by email'
+          );
+        } else {
+          request.log.error('Could not find or create user');
+          return reply.status(500).send({
+            statusCode: 500,
+            error: 'Internal Server Error',
+            message: 'Could not find or create user',
+          });
+        }
       }
 
-      // 2. Get user's tenant memberships
-      const tenantsResult = await authService.getUserTenants(body.userId);
-      const tenants = tenantsResult.isSuccess && tenantsResult.value?.memberships
+      // 2. Get user's tenant memberships (using actual DB user ID)
+      const tenantsResult = await authService.getUserTenants(actualUserId);
+      let tenants = tenantsResult.isSuccess && tenantsResult.value?.memberships
         ? tenantsResult.value.memberships.map(m => ({
             id: m.tenantId,
             name: m.tenantName || 'Unknown',
@@ -2028,10 +2062,87 @@ export const userSyncRoutes: FastifyPluginAsync = async (fastify) => {
           }))
         : [];
 
-      // 3. Get onboarding status
+      // 2.5. SSO Tenant Sync: If SSO provides a tenant but user has no memberships,
+      // create the membership automatically. This handles SSO users who have tenant
+      // assignments in the SSO system but not yet in our backend.
+      if (tenants.length === 0 && body.ssoTenantId) {
+        request.log.info(
+          { userId: actualUserId, ssoTenantId: body.ssoTenantId },
+          'SSO user has no memberships, syncing SSO tenant'
+        );
+
+        // Check if tenant exists
+        let tenantResult = await authService.getTenantById(body.ssoTenantId);
+
+        // If tenant doesn't exist, create it from SSO data
+        if (tenantResult.isFailure || !tenantResult.value) {
+          request.log.info(
+            { ssoTenantId: body.ssoTenantId },
+            'SSO tenant not found, creating it from SSO data'
+          );
+
+          // Create tenant with SSO-provided ID
+          const createResult = await authService.createTenantFromSSO(
+            body.ssoTenantId,
+            actualUserFullName ? `${actualUserFullName}'s Business` : `${body.email.split('@')[0]}'s Business`,
+            body.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '-')
+          );
+
+          if (createResult.isSuccess && createResult.value) {
+            request.log.info(
+              { tenantId: body.ssoTenantId },
+              'SSO tenant created successfully'
+            );
+            tenantResult = Result.ok(createResult.value);
+          } else {
+            request.log.warn(
+              { error: createResult.error },
+              'Failed to create SSO tenant'
+            );
+          }
+        }
+
+        if (tenantResult.isSuccess && tenantResult.value) {
+          const tenant = tenantResult.value;
+          const role = body.ssoRole || 'owner';
+
+          // Create membership with actual DB user ID (NOT SSO user ID)
+          const membershipResult = await authService.createMembershipFromSSO(
+            body.ssoTenantId,
+            actualUserId,
+            role as UserRole
+          );
+
+          if (membershipResult.isSuccess && membershipResult.value) {
+            request.log.info(
+              { userId: actualUserId, tenantId: body.ssoTenantId, role },
+              'SSO membership created successfully'
+            );
+
+            tenants = [{
+              id: tenant.id,
+              name: tenant.name,
+              slug: tenant.slug,
+              role,
+            }];
+          } else {
+            request.log.warn(
+              { error: membershipResult.error },
+              'Failed to create SSO membership'
+            );
+          }
+        } else {
+          request.log.warn(
+            { ssoTenantId: body.ssoTenantId },
+            'Could not create or find SSO tenant'
+          );
+        }
+      }
+
+      // 3. Get onboarding status (use actual DB user ID)
       let onboarding = null;
       try {
-        const onboardingResult = await onboardingService.getOnboardingStatus(body.userId);
+        const onboardingResult = await onboardingService.getOnboardingStatus(actualUserId);
         if (onboardingResult.isSuccess && onboardingResult.value) {
           onboarding = {
             status: onboardingResult.value.status,
@@ -2043,14 +2154,14 @@ export const userSyncRoutes: FastifyPluginAsync = async (fastify) => {
         request.log.warn({ error: onboardingError }, 'Could not fetch onboarding status');
       }
 
-      // 4. Generate native JWT tokens
+      // 4. Generate native JWT tokens (use actual DB user ID)
       // Use first tenant if available, otherwise leave tenantId empty
       const firstTenant = tenants[0];
       const tenantId = firstTenant?.id || '';
       const role = firstTenant?.role || 'owner';
 
       const tokenResult = await jwtService.generateTokenPair(
-        body.userId,
+        actualUserId,
         body.email,
         tenantId,
         role
@@ -2067,14 +2178,14 @@ export const userSyncRoutes: FastifyPluginAsync = async (fastify) => {
 
       const tokens = tokenResult.value!;
 
-      request.log.info({ userId: body.userId, email: body.email }, 'OAuth exchange successful');
+      request.log.info({ userId: actualUserId, email: body.email }, 'OAuth exchange successful');
 
       // 5. Return complete user state with native tokens
       return {
         user: {
-          id: body.userId,
+          id: actualUserId,
           email: body.email,
-          fullName: syncResult.isSuccess ? syncResult.value?.fullName : body.fullName,
+          fullName: actualUserFullName,
         },
         tenants,
         onboarding,
