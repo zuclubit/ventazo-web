@@ -1,28 +1,29 @@
 'use client';
 
 /**
- * AI Assistant Page
+ * AI Assistant Page - Premium Streaming Experience
  *
- * Chat interface for the AI Agent that helps users manage
- * leads, customers, tasks, opportunities, and quotes via natural language.
+ * Chat interface with real-time streaming responses, professional markdown
+ * rendering, and enhanced progress indicators.
  *
  * Integrates with zuclubit-bot-helper multi-provider LLM service.
  *
  * @module app/app/assistant/page
- * @version 2.0.0
+ * @version 3.0.0 - Streaming + Markdown + Enhanced UX
  */
 
 import * as React from 'react';
 import {
   AlertCircle,
   Bot,
-  History,
+  Database,
   Loader2,
-  MessageSquarePlus,
+  MessageSquare,
   RefreshCw,
+  Search,
   Send,
-  Settings,
   Sparkles,
+  Square,
   User,
   Zap,
 } from 'lucide-react';
@@ -32,9 +33,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
-import { useAIAssistant, useAIHealth, type AIChatMessage } from '@/lib/ai-assistant';
+import { useAIHealth, type AIChatMessage } from '@/lib/ai-assistant';
+import { useStreamingAssistant } from '@/lib/ai-assistant/streaming';
 import { cn } from '@/lib/utils';
+
+import { MarkdownRenderer } from './components/MarkdownRenderer';
 
 // ============================================
 // Types
@@ -45,8 +48,10 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-  isLoading?: boolean;
+  isStreaming?: boolean;
 }
+
+type StreamingStatus = 'idle' | 'thinking' | 'searching' | 'analyzing' | 'writing';
 
 // ============================================
 // Confirmation Card Component
@@ -104,14 +109,45 @@ function ConfirmationCard({
 }
 
 // ============================================
+// Streaming Status Indicator
+// ============================================
+
+interface StatusIndicatorProps {
+  status: StreamingStatus;
+  isStreaming: boolean;
+}
+
+function StatusIndicator({ status, isStreaming }: StatusIndicatorProps) {
+  const statusConfig = {
+    idle: { icon: Sparkles, text: '', color: '' },
+    thinking: { icon: Sparkles, text: 'Pensando...', color: 'text-purple-400' },
+    searching: { icon: Search, text: 'Buscando datos...', color: 'text-blue-400' },
+    analyzing: { icon: Database, text: 'Analizando información...', color: 'text-emerald-400' },
+    writing: { icon: MessageSquare, text: 'Escribiendo respuesta...', color: 'text-[var(--tenant-primary)]' },
+  };
+
+  const config = statusConfig[status];
+  const Icon = config.icon;
+
+  if (status === 'idle' || !isStreaming) return null;
+
+  return (
+    <div className="flex items-center gap-2 px-4 py-2 bg-card/50 backdrop-blur-sm border border-border/50 rounded-full animate-in fade-in">
+      <Icon className={cn('h-3.5 w-3.5 animate-pulse', config.color)} />
+      <span className={cn('text-xs font-medium', config.color)}>{config.text}</span>
+    </div>
+  );
+}
+
+// ============================================
 // Suggested Actions
 // ============================================
 
 const SUGGESTED_ACTIONS = [
-  { label: 'Ver mis leads', prompt: 'Muéstrame mis leads activos' },
-  { label: 'Crear tarea', prompt: 'Crea una tarea de seguimiento para mañana' },
-  { label: 'Resumen del día', prompt: '¿Cuál es el resumen de mi día?' },
-  { label: 'Leads calientes', prompt: 'Muéstrame los leads con score mayor a 70' },
+  { label: 'Mis leads activos', prompt: 'Muéstrame mis leads activos', icon: '📋' },
+  { label: 'Crear tarea', prompt: 'Crea una tarea de seguimiento para mañana', icon: '✅' },
+  { label: 'Resumen del día', prompt: '¿Cuál es el resumen de mi día?', icon: '📊' },
+  { label: 'Leads calientes', prompt: 'Muéstrame los leads con score mayor a 70', icon: '🔥' },
 ];
 
 // ============================================
@@ -120,10 +156,13 @@ const SUGGESTED_ACTIONS = [
 
 interface MessageBubbleProps {
   message: Message;
+  isLatest?: boolean;
 }
 
-function MessageBubble({ message }: MessageBubbleProps) {
+function MessageBubble({ message, isLatest }: MessageBubbleProps) {
   const isUser = message.role === 'user';
+  const showCursor = isLatest && message.isStreaming && message.content.length > 0;
+  const isEmptyStreaming = isLatest && message.isStreaming && message.content.length === 0;
 
   return (
     <div
@@ -135,7 +174,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
       {/* Avatar */}
       <div
         className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-md',
           isUser
             ? 'bg-[var(--tenant-primary)]'
             : 'bg-gradient-to-br from-[var(--tenant-primary)] to-[var(--tenant-accent)]'
@@ -151,31 +190,40 @@ function MessageBubble({ message }: MessageBubbleProps) {
       {/* Message Content */}
       <div
         className={cn(
-          'flex max-w-[80%] flex-col gap-1 rounded-2xl px-4 py-3',
+          'flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-3',
           isUser
             ? 'bg-[var(--tenant-primary)] text-white'
-            : 'bg-card border border-border'
+            : 'bg-card border border-border shadow-sm'
         )}
       >
-        {message.isLoading ? (
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm text-muted-foreground">Pensando...</span>
+        {isEmptyStreaming ? (
+          <div className="flex items-center gap-2 py-1">
+            <div className="flex gap-1">
+              <span className="w-2 h-2 bg-[var(--tenant-primary)] rounded-full animate-bounce [animation-delay:0ms]" />
+              <span className="w-2 h-2 bg-[var(--tenant-primary)] rounded-full animate-bounce [animation-delay:150ms]" />
+              <span className="w-2 h-2 bg-[var(--tenant-primary)] rounded-full animate-bounce [animation-delay:300ms]" />
+            </div>
           </div>
-        ) : (
+        ) : isUser ? (
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        ) : (
+          <MarkdownRenderer content={message.content} isStreaming={showCursor} />
         )}
-        <span
-          className={cn(
-            'text-[10px]',
-            isUser ? 'text-white/70' : 'text-muted-foreground'
-          )}
-        >
-          {message.timestamp.toLocaleTimeString('es-MX', {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </span>
+
+        {/* Timestamp */}
+        {!isEmptyStreaming && (
+          <span
+            className={cn(
+              'text-[10px] mt-1',
+              isUser ? 'text-white/70' : 'text-muted-foreground'
+            )}
+          >
+            {message.timestamp.toLocaleTimeString('es-MX', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -189,30 +237,43 @@ function EmptyState({ onSuggest }: { onSuggest: (prompt: string) => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">
       <div className="relative mb-6">
-        <div className="absolute inset-0 bg-gradient-to-r from-[var(--tenant-primary)] to-[var(--tenant-accent)] blur-2xl opacity-20 rounded-full" />
-        <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--tenant-primary)] to-[var(--tenant-accent)]">
-          <Bot className="h-10 w-10 text-white" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[var(--tenant-primary)] to-[var(--tenant-accent)] blur-3xl opacity-20 rounded-full scale-150" />
+        <div className="relative flex h-24 w-24 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--tenant-primary)] to-[var(--tenant-accent)] shadow-xl">
+          <Bot className="h-12 w-12 text-white" />
         </div>
       </div>
 
       <h2 className="text-2xl font-bold mb-2">Asistente IA</h2>
       <p className="text-muted-foreground mb-8 max-w-md">
-        Soy tu asistente de CRM. Puedo ayudarte a gestionar leads, crear tareas,
-        consultar oportunidades y mucho más. ¿En qué puedo ayudarte?
+        Tu asistente personal de CRM con respuestas en <span className="text-[var(--tenant-primary)] font-medium">tiempo real</span>.
+        Gestiona leads, tareas, oportunidades y más con lenguaje natural.
       </p>
 
       {/* Suggested Actions */}
-      <div className="grid grid-cols-2 gap-2 max-w-md w-full">
+      <div className="grid grid-cols-2 gap-3 max-w-lg w-full">
         {SUGGESTED_ACTIONS.map((action) => (
           <Button
             key={action.label}
             variant="outline"
-            className="h-auto py-3 px-4 text-left justify-start hover:bg-[var(--tenant-primary)]/10 hover:border-[var(--tenant-primary)]/30 transition-colors"
+            className="h-auto py-4 px-4 text-left justify-start hover:bg-[var(--tenant-primary)]/10 hover:border-[var(--tenant-primary)]/40 transition-all group"
             onClick={() => onSuggest(action.prompt)}
           >
-            <span className="text-sm">{action.label}</span>
+            <span className="text-xl mr-2 group-hover:scale-110 transition-transform">{action.icon}</span>
+            <span className="text-sm font-medium">{action.label}</span>
           </Button>
         ))}
+      </div>
+
+      {/* Features */}
+      <div className="flex items-center gap-4 mt-8 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <Zap className="h-3.5 w-3.5 text-amber-400" />
+          <span>Respuestas instantáneas</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Database className="h-3.5 w-3.5 text-emerald-400" />
+          <span>Datos en tiempo real</span>
+        </div>
       </div>
     </div>
   );
@@ -224,6 +285,7 @@ function EmptyState({ onSuggest }: { onSuggest: (prompt: string) => void }) {
 
 export default function AssistantPage() {
   const [input, setInput] = React.useState('');
+  const [streamingStatus, setStreamingStatus] = React.useState<StreamingStatus>('idle');
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
@@ -233,13 +295,14 @@ export default function AssistantPage() {
   const {
     messages: aiMessages,
     isLoading,
+    isStreaming,
     error,
     pendingConfirmation,
     sendMessage,
     confirmAction,
     startNewConversation,
-    clearConversation,
-  } = useAIAssistant();
+    cancelStream,
+  } = useStreamingAssistant();
 
   // Convert AI messages to local format
   const messages: Message[] = React.useMemo(() => {
@@ -248,8 +311,28 @@ export default function AssistantPage() {
       role: msg.role as 'user' | 'assistant',
       content: msg.content,
       timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+      isStreaming: isStreaming && idx === aiMessages.length - 1 && msg.role === 'assistant',
     }));
-  }, [aiMessages]);
+  }, [aiMessages, isStreaming]);
+
+  // Update streaming status based on content
+  React.useEffect(() => {
+    if (!isLoading && !isStreaming) {
+      setStreamingStatus('idle');
+      return;
+    }
+
+    const lastMessage = messages[messages.length - 1];
+    const content = lastMessage?.content || '';
+
+    if (content.length === 0) {
+      setStreamingStatus('thinking');
+    } else if (content.length < 50) {
+      setStreamingStatus('analyzing');
+    } else {
+      setStreamingStatus('writing');
+    }
+  }, [isLoading, isStreaming, messages]);
 
   // Auto-scroll to bottom on new messages
   React.useEffect(() => {
@@ -266,11 +349,13 @@ export default function AssistantPage() {
     if (!text || isLoading) return;
 
     setInput('');
+    setStreamingStatus('thinking');
 
     try {
       await sendMessage(text);
     } catch (err) {
       console.error('Failed to send message:', err);
+      setStreamingStatus('idle');
     }
   }, [input, isLoading, sendMessage]);
 
@@ -283,6 +368,7 @@ export default function AssistantPage() {
 
   const handleNewChat = () => {
     startNewConversation();
+    setStreamingStatus('idle');
     inputRef.current?.focus();
   };
 
@@ -294,6 +380,11 @@ export default function AssistantPage() {
     void confirmAction('cancel');
   }, [confirmAction]);
 
+  const handleStopStreaming = () => {
+    cancelStream();
+    setStreamingStatus('idle');
+  };
+
   // Service health status
   const isHealthy = health?.status === 'healthy' || health?.status === 'degraded';
   const isDegraded = health?.status === 'degraded';
@@ -301,33 +392,37 @@ export default function AssistantPage() {
   return (
     <div className="flex h-[calc(100vh-var(--header-height,64px)-var(--bottom-bar-height,0px))] flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
+      <div className="flex items-center justify-between border-b px-4 py-3 bg-background/80 backdrop-blur-sm">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--tenant-primary)] to-[var(--tenant-accent)]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--tenant-primary)] to-[var(--tenant-accent)] shadow-md">
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <div className="flex items-center gap-2">
             <div>
               <h1 className="text-lg font-semibold">Asistente IA</h1>
               <p className="text-xs text-muted-foreground">
-                Powered by zuclubit-bot-helper
+                Respuestas en tiempo real
               </p>
             </div>
             {/* Service Status */}
             {healthLoading ? (
               <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground text-[10px]">
-                Conectando...
+                <Loader2 className="h-2.5 w-2.5 mr-1 animate-spin" />
+                Conectando
               </Badge>
             ) : isDegraded ? (
               <Badge variant="outline" className="border-amber-500/50 text-amber-400 text-[10px]">
+                <div className="h-1.5 w-1.5 rounded-full bg-amber-400 mr-1.5 animate-pulse" />
                 Degradado
               </Badge>
             ) : isHealthy ? (
               <Badge variant="outline" className="border-emerald-500/50 text-emerald-400 text-[10px]">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5" />
                 En línea
               </Badge>
             ) : (
               <Badge variant="outline" className="border-destructive/50 text-destructive text-[10px]">
+                <div className="h-1.5 w-1.5 rounded-full bg-destructive mr-1.5" />
                 Sin conexión
               </Badge>
             )}
@@ -353,23 +448,14 @@ export default function AssistantPage() {
         {messages.length === 0 ? (
           <EmptyState onSuggest={(prompt) => handleSend(prompt)} />
         ) : (
-          <div className="space-y-4 pb-4">
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+          <div className="space-y-4 pb-4 max-w-4xl mx-auto">
+            {messages.map((message, idx) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isLatest={idx === messages.length - 1}
+              />
             ))}
-
-            {/* Loading indicator */}
-            {isLoading && (
-              <div className="flex gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--tenant-primary)] to-[var(--tenant-accent)]">
-                  <Sparkles className="h-4 w-4 text-white" />
-                </div>
-                <div className="flex max-w-[80%] items-center gap-2 rounded-2xl bg-card border border-border px-4 py-3">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm text-muted-foreground">Pensando...</span>
-                </div>
-              </div>
-            )}
 
             {/* Pending Confirmation */}
             {pendingConfirmation && (
@@ -403,9 +489,16 @@ export default function AssistantPage() {
         )}
       </ScrollArea>
 
+      {/* Streaming Status */}
+      {(isLoading || isStreaming) && (
+        <div className="flex justify-center py-2">
+          <StatusIndicator status={streamingStatus} isStreaming={isLoading || isStreaming} />
+        </div>
+      )}
+
       {/* Input Area */}
-      <div className="border-t p-4">
-        <div className="flex gap-2">
+      <div className="border-t p-4 bg-background/80 backdrop-blur-sm">
+        <div className="flex gap-2 max-w-4xl mx-auto">
           <Input
             ref={inputRef}
             value={input}
@@ -415,23 +508,32 @@ export default function AssistantPage() {
             disabled={isLoading}
             className="flex-1"
           />
-          <Button
-            onClick={() => handleSend()}
-            disabled={!input.trim() || isLoading}
-            className="bg-[var(--tenant-primary)] hover:bg-[var(--tenant-primary)]/90"
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
+          {isStreaming ? (
+            <Button
+              onClick={handleStopStreaming}
+              variant="outline"
+              className="border-destructive/50 text-destructive hover:bg-destructive/10"
+            >
+              <Square className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              onClick={() => handleSend()}
+              disabled={!input.trim() || isLoading}
+              className="bg-[var(--tenant-primary)] hover:bg-[var(--tenant-primary)]/90"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          )}
         </div>
         <p className="mt-2 text-center text-xs text-muted-foreground">
-          El asistente puede cometer errores. Verifica la información importante.
+          Presiona Enter para enviar • El asistente puede cometer errores
         </p>
       </div>
     </div>
   );
 }
-

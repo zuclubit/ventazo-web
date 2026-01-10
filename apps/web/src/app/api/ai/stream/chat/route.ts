@@ -1,57 +1,133 @@
 /**
  * AI Streaming Chat Route (Proxy)
  *
- * Proxies SSE streaming requests to the backend Lead Service.
- * Handles authentication and tenant context injection.
+ * Proxies SSE streaming requests to the zuclubit-bot-helper service.
+ * Uses HMAC-SHA256 for service-to-service authentication.
  *
  * @module app/api/ai/stream/chat/route
  */
 
 import { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
+import { createHmac } from 'crypto';
 import { jwtVerify } from 'jose';
 
 // ============================================
 // Constants
 // ============================================
 
-const BACKEND_URL = process.env['LEAD_SERVICE_URL'] || 'http://localhost:3001';
-const SESSION_SECRET = process.env['SESSION_SECRET'] || 'dev-session-secret-min-32-chars!!';
+const BOT_HELPER_URL =
+  process.env['BOT_HELPER_URL'] ||
+  process.env['NEXT_PUBLIC_BOT_HELPER_URL'] ||
+  'https://zuclubit-bot-helper.fly.dev';
+
+const CRM_SECRET = process.env['CRM_INTEGRATION_SECRET'] || '';
+
+// Session cookie name
+const SESSION_COOKIE_NAME = 'zcrm_session';
+
+/**
+ * Development fallback key - consistent across all auth files
+ */
+const DEV_FALLBACK_KEY = 'zuclubit-dev-session-key-do-not-use-in-production';
 
 // ============================================
-// Session Verification
+// Helpers
+// ============================================
+
+/**
+ * Get Cloudflare context env bindings (if available)
+ */
+function getCloudflareEnv(): Record<string, string | undefined> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getCloudflareContext } = require('@opennextjs/cloudflare');
+    const ctx = getCloudflareContext();
+    return ctx?.env || {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Get secret key for session JWT
+ */
+function getSecretKey(): Uint8Array {
+  const cfEnv = getCloudflareEnv();
+
+  const secret =
+    process.env['SESSION_SECRET'] ||
+    process.env['NEXTAUTH_SECRET'] ||
+    cfEnv['SESSION_SECRET'] ||
+    cfEnv['NEXTAUTH_SECRET'] ||
+    ((globalThis as Record<string, unknown>)['SESSION_SECRET'] as string | undefined);
+
+  if (!secret) {
+    const isProduction =
+      process.env['NODE_ENV'] === 'production' ||
+      process.env['VERCEL_ENV'] === 'production' ||
+      process.env['CF_PAGES'] === '1';
+
+    if (isProduction) {
+      console.error(
+        '[AI Stream Proxy] CRITICAL: SESSION_SECRET not configured in production!'
+      );
+    }
+
+    return new TextEncoder().encode(DEV_FALLBACK_KEY);
+  }
+
+  return new TextEncoder().encode(secret);
+}
+
+// ============================================
+// Session Types
 // ============================================
 
 interface SessionPayload {
-  sub: string;
+  userId: string;
   email: string;
   tenantId: string;
-  tenantSlug: string;
   role: string;
-  permissions: string[];
-  iat: number;
-  exp: number;
+  accessToken: string;
 }
 
-async function verifySession(): Promise<SessionPayload | null> {
+/**
+ * Decrypt and verify session from cookie
+ */
+async function getSession(): Promise<SessionPayload | null> {
   try {
-    const cookieStore = cookies();
-    const sessionCookie = cookieStore.get('zcrm_session');
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
-    if (!sessionCookie?.value) {
+    if (!sessionCookie) {
       return null;
     }
 
-    const secret = new TextEncoder().encode(SESSION_SECRET);
-    const { payload } = await jwtVerify(sessionCookie.value, secret, {
+    const { payload } = await jwtVerify(sessionCookie, getSecretKey(), {
       algorithms: ['HS256'],
     });
 
-    return payload as unknown as SessionPayload;
+    return {
+      userId: payload['userId'] as string,
+      email: payload['email'] as string,
+      tenantId: (payload['tenantId'] as string) || '',
+      role: (payload['role'] as string) || 'viewer',
+      accessToken: payload['accessToken'] as string,
+    };
   } catch (error) {
-    console.error('[AIStreamProxy] Session verification failed:', error);
+    console.warn('[AI Stream Proxy] Session decryption failed:', error);
     return null;
   }
+}
+
+/**
+ * Generate HMAC-SHA256 signature for service-to-service auth
+ */
+function generateHmacSignature(body: object | null, timestamp: string): string {
+  const bodyString = body ? JSON.stringify(body) : '';
+  const signatureData = `${timestamp}.${bodyString}`;
+  return createHmac('sha256', CRM_SECRET).update(signatureData).digest('hex');
 }
 
 // ============================================
@@ -60,7 +136,7 @@ async function verifySession(): Promise<SessionPayload | null> {
 
 export async function POST(request: NextRequest) {
   // Verify session
-  const session = await verifySession();
+  const session = await getSession();
 
   if (!session) {
     return new Response(
@@ -72,24 +148,58 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Check if CRM secret is configured
+  if (!CRM_SECRET && process.env['NODE_ENV'] === 'production') {
+    console.error('[AI Stream Proxy] CRM_INTEGRATION_SECRET not configured');
+    return new Response(
+      JSON.stringify({
+        error: 'Configuration Error',
+        message: 'AI streaming service not configured',
+      }),
+      {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
   try {
     // Get request body
     const body = await request.json();
 
-    // Forward request to backend with auth headers
-    const backendResponse = await fetch(`${BACKEND_URL}/api/v1/ai/stream/chat`, {
+    // Enrich body with user context
+    const enrichedBody = {
+      ...body,
+      tenantId: session.tenantId,
+      user: {
+        userId: session.userId,
+        email: session.email,
+        displayName: session.email.split('@')[0],
+        role: session.role,
+        permissions: [],
+      },
+      toolExecutionToken: session.accessToken,
+    };
+
+    // Generate HMAC auth
+    const timestamp = Date.now().toString();
+    const signature = CRM_SECRET
+      ? generateHmacSignature(enrichedBody, timestamp)
+      : 'dev-signature';
+
+    // Forward request to bot-helper with auth headers
+    const backendResponse = await fetch(`${BOT_HELPER_URL}/v1/crm/stream/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
+        'x-crm-timestamp': timestamp,
+        'x-crm-signature': signature,
+        'x-service': 'zuclubit-crm',
         'x-tenant-id': session.tenantId,
-        'x-tenant-slug': session.tenantSlug,
-        'x-user-id': session.sub,
-        'x-user-email': session.email,
-        'x-user-role': session.role,
-        'x-user-permissions': session.permissions.join(','),
+        'x-user-id': session.userId,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(enrichedBody),
     });
 
     if (!backendResponse.ok) {
@@ -132,7 +242,7 @@ export async function POST(request: NextRequest) {
       headers,
     });
   } catch (error) {
-    console.error('[AIStreamProxy] Request failed:', error);
+    console.error('[AI Stream Proxy] Request failed:', error);
 
     return new Response(
       JSON.stringify({
@@ -161,3 +271,6 @@ export async function OPTIONS() {
     },
   });
 }
+
+// Runtime configuration
+export const runtime = 'nodejs';
