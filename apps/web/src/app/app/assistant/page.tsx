@@ -17,8 +17,10 @@ import {
   AlertCircle,
   Bot,
   Database,
+  History,
   Loader2,
   MessageSquare,
+  MessageSquarePlus,
   RefreshCw,
   Search,
   Send,
@@ -38,6 +40,7 @@ import { useStreamingAssistant } from '@/lib/ai-assistant/streaming';
 import { cn } from '@/lib/utils';
 
 import { MarkdownRenderer } from './components/MarkdownRenderer';
+import { ConversationHistorySidebar } from './components/ConversationHistorySidebar';
 
 // ============================================
 // Types
@@ -286,6 +289,7 @@ function EmptyState({ onSuggest }: { onSuggest: (prompt: string) => void }) {
 export default function AssistantPage() {
   const [input, setInput] = React.useState('');
   const [streamingStatus, setStreamingStatus] = React.useState<StreamingStatus>('idle');
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
@@ -294,14 +298,17 @@ export default function AssistantPage() {
   const { data: health, isLoading: healthLoading } = useAIHealth();
   const {
     messages: aiMessages,
+    conversationId,
     isLoading,
     isStreaming,
+    isLoadingConversation,
     error,
     pendingConfirmation,
     sendMessage,
     confirmAction,
     startNewConversation,
     cancelStream,
+    loadConversation,
   } = useStreamingAssistant();
 
   // Convert AI messages to local format
@@ -389,59 +396,87 @@ export default function AssistantPage() {
   const isHealthy = health?.status === 'healthy' || health?.status === 'degraded';
   const isDegraded = health?.status === 'degraded';
 
+  // Handle conversation selection from sidebar
+  const handleSelectConversation = React.useCallback(
+    async (id: string) => {
+      await loadConversation(id);
+    },
+    [loadConversation]
+  );
+
   return (
-    <div className="flex h-[calc(100vh-var(--header-height,64px)-var(--bottom-bar-height,0px))] flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b px-4 py-3 bg-background/80 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--tenant-primary)] to-[var(--tenant-accent)] shadow-md">
-            <Sparkles className="h-5 w-5 text-white" />
+    <div className="flex h-[calc(100vh-var(--header-height,64px)-var(--bottom-bar-height,0px))]">
+      {/* Conversation History Sidebar */}
+      <ConversationHistorySidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        activeConversationId={conversationId}
+        onSelectConversation={handleSelectConversation}
+        onNewConversation={handleNewChat}
+      />
+
+      {/* Main Chat Area */}
+      <div className="flex flex-1 flex-col relative">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b px-4 py-3 bg-background/80 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            {/* Toggle sidebar button */}
+            {!sidebarOpen && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 mr-1"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <History className="h-4 w-4" />
+              </Button>
+            )}
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--tenant-primary)] to-[var(--tenant-accent)] shadow-md">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex items-center gap-2">
+              <div>
+                <h1 className="text-lg font-semibold">Asistente IA</h1>
+                <p className="text-xs text-muted-foreground">
+                  Respuestas en tiempo real
+                </p>
+              </div>
+              {/* Service Status */}
+              {healthLoading ? (
+                <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground text-[10px]">
+                  <Loader2 className="h-2.5 w-2.5 mr-1 animate-spin" />
+                  Conectando
+                </Badge>
+              ) : isDegraded ? (
+                <Badge variant="outline" className="border-amber-500/50 text-amber-400 text-[10px]">
+                  <div className="h-1.5 w-1.5 rounded-full bg-amber-400 mr-1.5 animate-pulse" />
+                  Degradado
+                </Badge>
+              ) : isHealthy ? (
+                <Badge variant="outline" className="border-emerald-500/50 text-emerald-400 text-[10px]">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5" />
+                  En línea
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-destructive/50 text-destructive text-[10px]">
+                  <div className="h-1.5 w-1.5 rounded-full bg-destructive mr-1.5" />
+                  Sin conexión
+                </Badge>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
-            <div>
-              <h1 className="text-lg font-semibold">Asistente IA</h1>
-              <p className="text-xs text-muted-foreground">
-                Respuestas en tiempo real
-              </p>
-            </div>
-            {/* Service Status */}
-            {healthLoading ? (
-              <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground text-[10px]">
-                <Loader2 className="h-2.5 w-2.5 mr-1 animate-spin" />
-                Conectando
-              </Badge>
-            ) : isDegraded ? (
-              <Badge variant="outline" className="border-amber-500/50 text-amber-400 text-[10px]">
-                <div className="h-1.5 w-1.5 rounded-full bg-amber-400 mr-1.5 animate-pulse" />
-                Degradado
-              </Badge>
-            ) : isHealthy ? (
-              <Badge variant="outline" className="border-emerald-500/50 text-emerald-400 text-[10px]">
-                <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5" />
-                En línea
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="border-destructive/50 text-destructive text-[10px]">
-                <div className="h-1.5 w-1.5 rounded-full bg-destructive mr-1.5" />
-                Sin conexión
-              </Badge>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {messages.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
               onClick={handleNewChat}
               className="gap-2"
             >
-              <RefreshCw className="h-4 w-4" />
-              <span className="hidden sm:inline">Nueva conversación</span>
+              <MessageSquarePlus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nueva</span>
             </Button>
-          )}
+          </div>
         </div>
-      </div>
 
       {/* Messages Area */}
       <ScrollArea ref={scrollRef} className="flex-1 p-4">
@@ -533,6 +568,17 @@ export default function AssistantPage() {
         <p className="mt-2 text-center text-xs text-muted-foreground">
           Presiona Enter para enviar • El asistente puede cometer errores
         </p>
+      </div>
+
+      {/* Loading Conversation Overlay */}
+      {isLoadingConversation && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--tenant-primary)]" />
+            <p className="text-sm text-muted-foreground">Cargando conversación...</p>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

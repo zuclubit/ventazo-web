@@ -40,11 +40,20 @@ export {
   useAILeadScore,
   useAIEmailGenerate,
   useAIConversations,
+  useAIConversation,
+  useCreateConversation,
+  useArchiveConversation,
+  useDeleteConversation,
   useAISettings,
   useAIAssistant,
 } from './hooks';
 
-export type { ConversationSummary, UseAIAssistantReturn } from './hooks';
+export type {
+  ConversationSummary,
+  ConversationMessage,
+  ConversationWithMessages,
+  UseAIAssistantReturn,
+} from './hooks';
 
 // Streaming Module
 export * from './streaming';

@@ -14,6 +14,7 @@
 import * as React from 'react';
 
 import type { AIChatMessage } from '../types';
+import type { ConversationMessage } from '../hooks';
 import { useStreamingChat } from './use-streaming-chat';
 
 // ============================================
@@ -29,6 +30,8 @@ export interface UseStreamingAssistantReturn {
   isLoading: boolean;
   /** Whether streaming token-by-token */
   isStreaming: boolean;
+  /** Whether loading existing conversation */
+  isLoadingConversation: boolean;
   /** Current error */
   error: Error | null;
   /** Pending confirmation request */
@@ -50,6 +53,10 @@ export interface UseStreamingAssistantReturn {
   startNewConversation: () => void;
   /** Cancel current stream */
   cancelStream: () => void;
+  /** Load an existing conversation */
+  loadConversation: (id: string) => Promise<void>;
+  /** Set conversation ID without loading */
+  setActiveConversation: (id: string | null) => void;
 }
 
 // ============================================
@@ -65,6 +72,7 @@ export function useStreamingAssistant(
     initialConversationId || null
   );
   const [error, setError] = React.useState<Error | null>(null);
+  const [isLoadingConversation, setIsLoadingConversation] = React.useState(false);
 
   // Use streaming hook
   const streaming = useStreamingChat(conversationId || undefined, {
@@ -177,11 +185,54 @@ export function useStreamingAssistant(
     streaming.cancel();
   }, [streaming]);
 
+  // Load existing conversation
+  const loadConversation = React.useCallback(async (id: string) => {
+    setIsLoadingConversation(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/ai/conversations/${id}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al cargar la conversación');
+      }
+
+      const data = await response.json();
+
+      // Convert messages to AIChatMessage format
+      const loadedMessages: AIChatMessage[] = data.messages.map(
+        (msg: ConversationMessage) => ({
+          role: msg.role.toLowerCase() as 'user' | 'assistant' | 'system',
+          content: msg.content,
+          timestamp: msg.createdAt,
+        })
+      );
+
+      setMessages(loadedMessages);
+      setConversationId(id);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Error desconocido'));
+    } finally {
+      setIsLoadingConversation(false);
+    }
+  }, []);
+
+  // Set active conversation without loading
+  const setActiveConversation = React.useCallback((id: string | null) => {
+    setConversationId(id);
+    if (!id) {
+      setMessages([]);
+    }
+  }, []);
+
   return {
     messages,
     conversationId,
     isLoading: streaming.isStreaming,
     isStreaming: streaming.state.status === 'streaming',
+    isLoadingConversation,
     error,
     pendingConfirmation,
     sendMessage,
@@ -189,5 +240,7 @@ export function useStreamingAssistant(
     clearConversation,
     startNewConversation,
     cancelStream,
+    loadConversation,
+    setActiveConversation,
   };
 }

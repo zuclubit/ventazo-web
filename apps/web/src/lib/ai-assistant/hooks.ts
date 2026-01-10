@@ -307,29 +307,131 @@ export function useAIEmailGenerate() {
 
 export interface ConversationSummary {
   id: string;
-  title: string;
-  lastMessage: string;
+  title: string | null;
+  status: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
+  lastMessage: string | null;
+  messageCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ConversationMessage {
+  id: string;
+  role: 'USER' | 'ASSISTANT' | 'SYSTEM' | 'TOOL';
+  content: string;
+  toolCalls?: unknown;
+  toolResults?: unknown;
+  createdAt: string;
+}
+
+export interface ConversationWithMessages {
+  id: string;
+  title: string | null;
+  status: 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
   messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+  messages: ConversationMessage[];
 }
 
 /**
- * Hook to get conversation history
+ * Hook to get conversation list
  */
-export function useAIConversations() {
+export function useAIConversations(options?: { status?: string; limit?: number }) {
   const { isValid, tenantId } = useTenantValidation();
 
   return useQuery({
-    queryKey: aiAssistantKeys.conversations(),
+    queryKey: [...aiAssistantKeys.conversations(), options],
     queryFn: async () => {
+      const params = new URLSearchParams();
+      if (options?.status) params.set('status', options.status);
+      if (options?.limit) params.set('limit', options.limit.toString());
+
       const response = await aiFetch<{
-        data: ConversationSummary[];
-        meta: { total: number };
-      }>('/conversations');
+        conversations: ConversationSummary[];
+        total: number;
+      }>(`/conversations?${params.toString()}`);
       return response;
     },
     enabled: isValid && !!tenantId,
+    staleTime: 30000, // 30 seconds
+  });
+}
+
+/**
+ * Hook to get a specific conversation with messages
+ */
+export function useAIConversation(conversationId: string | null) {
+  const { isValid, tenantId } = useTenantValidation();
+
+  return useQuery({
+    queryKey: aiAssistantKeys.conversation(conversationId || ''),
+    queryFn: async () => {
+      if (!conversationId) throw new Error('No conversation ID');
+      const response = await aiFetch<ConversationWithMessages>(
+        `/conversations/${conversationId}`
+      );
+      return response;
+    },
+    enabled: isValid && !!tenantId && !!conversationId,
+  });
+}
+
+/**
+ * Hook to create a new conversation
+ */
+export function useCreateConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (title?: string) => {
+      const response = await aiFetch<ConversationSummary>('/conversations', {
+        method: 'POST',
+        body: JSON.stringify({ title }),
+      });
+      return response;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: aiAssistantKeys.conversations() });
+    },
+  });
+}
+
+/**
+ * Hook to archive a conversation
+ */
+export function useArchiveConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      const response = await aiFetch<ConversationSummary>(
+        `/conversations/${conversationId}`,
+        { method: 'PATCH' }
+      );
+      return response;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: aiAssistantKeys.conversations() });
+    },
+  });
+}
+
+/**
+ * Hook to delete a conversation
+ */
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      await aiFetch<void>(`/conversations/${conversationId}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: aiAssistantKeys.conversations() });
+    },
   });
 }
 
