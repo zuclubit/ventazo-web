@@ -252,6 +252,8 @@ async function handleRequest(
         role: session.role,
         permissions: [],
       },
+      // Pass access token for bot-helper to execute tool calls against Lead Service
+      toolExecutionToken: session.accessToken,
     };
   }
 

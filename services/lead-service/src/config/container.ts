@@ -72,19 +72,14 @@ import { UserTagsService } from '../infrastructure/user-tags';
 import { NotificationOrchestrator, NotificationPreferencesService } from '../infrastructure/messaging';
 import { ILeadRepository } from '../domain/repositories';
 
-// AI Agent Services
+// AI Agent Services (local tool execution and auditing only)
+// NOTE: AI orchestration has been moved to Bot Management System
 import {
   ToolRegistryService,
   ToolExecutorService,
   ConfirmationGateService,
   AIAuditLoggerService,
 } from '../infrastructure/ai-agent/services';
-import {
-  AIAgentOrchestrator,
-  IntentClassifier,
-  ActionPlanner,
-  ResponseGenerator,
-} from '../infrastructure/ai-agent/orchestrator';
 import { getDatabaseConfig, getEventsConfig, getResendConfig } from './environment';
 
 // Command/Query Bus and Handlers
@@ -962,61 +957,10 @@ export const setupContainer = async (): Promise<void> => {
     useFactory: (c) => c.resolve(AIAuditLoggerService),
   });
 
-  // Register Intent Classifier
-  container.register(IntentClassifier, {
-    useFactory: (c) => {
-      const aiService = c.resolve(AIService);
-      return new IntentClassifier(aiService);
-    },
-  });
+  // NOTE: AI Orchestration (IntentClassifier, ActionPlanner, ResponseGenerator, AIAgentOrchestrator)
+  // has been moved to the Bot Management System. The CRM now delegates all AI logic via BotGateway.
 
-  // Register Action Planner
-  container.register(ActionPlanner, {
-    useFactory: (c) => {
-      const aiService = c.resolve(AIService);
-      const toolRegistry = c.resolve(ToolRegistryService);
-      return new ActionPlanner(aiService, toolRegistry);
-    },
-  });
-
-  // Register Response Generator
-  container.register(ResponseGenerator, {
-    useFactory: (c) => {
-      const aiService = c.resolve(AIService);
-      return new ResponseGenerator(aiService);
-    },
-  });
-
-  // Register AI Agent Orchestrator (main entry point)
-  container.register(AIAgentOrchestrator, {
-    useFactory: (c) => {
-      const pool = c.resolve(DatabasePool);
-      const aiService = c.resolve(AIService);
-      const intentClassifier = c.resolve(IntentClassifier);
-      const actionPlanner = c.resolve(ActionPlanner);
-      const responseGenerator = c.resolve(ResponseGenerator);
-      const toolRegistry = c.resolve(ToolRegistryService);
-      const toolExecutor = c.resolve(ToolExecutorService);
-      const confirmationGate = c.resolve(ConfirmationGateService);
-      const auditLogger = c.resolve(AIAuditLoggerService);
-      return new AIAgentOrchestrator(
-        pool,
-        aiService,
-        intentClassifier,
-        actionPlanner,
-        responseGenerator,
-        toolRegistry,
-        toolExecutor,
-        confirmationGate,
-        auditLogger
-      );
-    },
-  });
-  container.register('AIAgentOrchestrator', {
-    useFactory: (c) => c.resolve(AIAgentOrchestrator),
-  });
-
-  console.log('✓ AI Agent services configured');
+  console.log('✓ AI Agent services configured (local tools and auditing only)');
 
   // Register Command Bus with handlers
   const commandBus = new CommandBus();

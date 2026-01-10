@@ -265,7 +265,7 @@ export default function HomePage() {
               <div className="mb-8 flex flex-col gap-4 sm:flex-row">
                 {/* Primary CTA */}
                 <Button asChild size="lg" className="group h-14 gap-2.5 rounded-[18px] bg-gradient-to-r from-[#0D9488] to-[#14B8A6] px-8 text-[15px] font-semibold text-white shadow-[0_8px_30px_-6px_rgba(13,148,136,0.5),0_2px_8px_-2px_rgba(0,0,0,0.3)] transition-all duration-300 hover:shadow-[0_12px_40px_-6px_rgba(13,148,136,0.6),0_4px_12px_-2px_rgba(0,0,0,0.3)] hover:brightness-105">
-                  <Link href="/register">
+                  <Link href="/signup">
                     Empieza gratis ahora
                     <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                   </Link>
@@ -807,7 +807,7 @@ export default function HomePage() {
                   {/* CTA Row */}
                   <div className="flex flex-wrap items-center gap-5">
                     <Button asChild size="lg" className="h-12 rounded-xl bg-gradient-to-r from-[#0D9488] to-[#14B8A6] px-7 text-[15px] font-semibold text-white shadow-[0_6px_20px_-4px_rgba(13,148,136,0.45)] transition-all hover:shadow-[0_10px_28px_-4px_rgba(13,148,136,0.55)]">
-                      <Link href="/register">
+                      <Link href="/signup">
                         Prueba gratis 14 días
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
@@ -965,7 +965,7 @@ export default function HomePage() {
                   {/* CTA Buttons */}
                   <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
                     <Button asChild size="default" className="h-11 rounded-xl bg-gradient-to-r from-[#0D9488] to-[#14B8A6] px-6 text-sm font-semibold text-white shadow-[0_6px_20px_-4px_rgba(13,148,136,0.5)] transition-all hover:shadow-[0_8px_28px_-4px_rgba(13,148,136,0.6)]">
-                      <Link href="/register">
+                      <Link href="/signup">
                         Probar IA gratis
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
@@ -1216,7 +1216,7 @@ export default function HomePage() {
                       size="default"
                       className="h-11 rounded-xl bg-gradient-to-r from-[#0D9488] to-[#14B8A6] px-6 font-semibold text-white shadow-lg shadow-[#0D9488]/30 transition-all duration-300 hover:shadow-xl hover:shadow-[#0D9488]/40"
                     >
-                      <Link href="/register">
+                      <Link href="/signup">
                         Conectar canales
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
@@ -1482,7 +1482,7 @@ export default function HomePage() {
                 </ul>
 
                 <Button asChild variant="outline" className="h-11 w-full rounded-xl border-white/15 bg-white/5 font-medium text-white transition-all hover:border-white/25 hover:bg-white/10">
-                  <Link href="/register">{t.pricing.starter.cta}</Link>
+                  <Link href="/signup">{t.pricing.starter.cta}</Link>
                 </Button>
               </div>
 
@@ -1519,7 +1519,7 @@ export default function HomePage() {
                 </ul>
 
                 <Button asChild className="h-11 w-full rounded-xl bg-gradient-to-r from-[#0D9488] to-[#14B8A6] font-semibold text-white shadow-lg shadow-[#0D9488]/30 transition-all duration-300 hover:shadow-xl hover:shadow-[#0D9488]/40">
-                  <Link href="/register">{t.pricing.professional.cta}</Link>
+                  <Link href="/signup">{t.pricing.professional.cta}</Link>
                 </Button>
               </div>
 
@@ -1547,7 +1547,7 @@ export default function HomePage() {
                 </ul>
 
                 <Button asChild variant="outline" className="h-11 w-full rounded-xl border-[#FF6B35]/25 bg-[#FF6B35]/10 font-medium text-[#FB923C] transition-all hover:border-[#FF6B35]/40 hover:bg-[#FF6B35]/15">
-                  <Link href="/register">{t.pricing.enterprise.cta}</Link>
+                  <Link href="/signup">{t.pricing.enterprise.cta}</Link>
                 </Button>
               </div>
             </div>
@@ -1613,7 +1613,7 @@ export default function HomePage() {
                 {/* Buttons */}
                 <div className="mb-8 flex flex-col justify-center gap-3 sm:flex-row">
                   <Button asChild size="default" className="h-12 gap-2 rounded-xl bg-gradient-to-r from-[#FF6B35] to-[#F97316] px-7 font-semibold text-white shadow-lg shadow-[#FF6B35]/30 transition-all duration-300 hover:shadow-xl hover:shadow-[#FF6B35]/40">
-                    <Link href="/register">
+                    <Link href="/signup">
                       {t.cta.button}
                       <ArrowRight className="h-4 w-4" />
                     </Link>

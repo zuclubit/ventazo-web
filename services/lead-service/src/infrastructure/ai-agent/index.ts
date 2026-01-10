@@ -1,30 +1,26 @@
 /**
  * AI Agent Module
- * Central export for the AI Agent framework
  *
- * This module provides:
- * - AI Agent Orchestrator: Core pipeline for processing user requests
- * - Intent Classifier: Classifies user messages into intents
- * - Action Planner: Creates execution plans from intents
- * - Response Generator: Generates natural language responses
+ * NOTE: AI Agent orchestration has been moved to the Bot Management System.
+ * The CRM no longer contains:
+ * - AI Agent Orchestrator
+ * - Intent Classifier
+ * - Action Planner
+ * - Response Generator
+ *
+ * These services remain for local tool execution and auditing:
  * - Tool Registry: Manages available tools/functions
+ * - Tool Executor: Executes tools locally
  * - Confirmation Gate: Human-in-the-loop confirmation system
  * - Audit Logger: Comprehensive AI action auditing
+ *
+ * All AI logic is delegated to the Bot Management System via BotGateway.
  */
 
-// Types
+// Types (kept for tool definitions)
 export * from './types';
 
-// Orchestrator components
-export {
-  AIAgentOrchestrator,
-  AIAgentConfig,
-  IntentClassifier,
-  ActionPlanner,
-  ResponseGenerator,
-} from './orchestrator';
-
-// Services
+// Services (for local tool execution and auditing)
 export {
   ToolRegistryService,
   ToolExecutorService,

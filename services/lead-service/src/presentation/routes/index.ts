@@ -39,6 +39,7 @@ export { paymentRoutes } from './payment.routes';
 export { quoteRoutes } from './quote.routes';
 export { proposalTemplateRoutes } from './proposal-template.routes';
 export { aiRoutes } from './ai.routes';
+export { aiStreamRoutes } from './ai-stream.routes';
 export { realtimeRoutes } from './realtime.routes';
 export { teamRoutes, territoryRoutes, quotaRoutes } from './team.routes';
 export { emailTrackingRoutes } from './email-tracking.routes';

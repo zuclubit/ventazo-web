@@ -31,6 +31,7 @@ import { usePathname } from 'next/navigation';
 
 import {
   BarChart3,
+  Bot,
   Calendar,
   CheckSquare,
   ChevronLeft,
@@ -106,6 +107,7 @@ const NAVIGATION: NavSection[] = [
     title: 'Inicio',
     items: [
       { title: 'Dashboard', href: '/app', icon: Home, exactMatch: true },
+      { title: 'Asistente IA', href: '/app/assistant', icon: Bot, badge: 'Nuevo' },
     ],
   },
   {

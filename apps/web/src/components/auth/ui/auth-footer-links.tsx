@@ -11,7 +11,7 @@
  * <AuthFooterLinks
  *   text="Don't have an account?"
  *   linkText="Sign up here"
- *   href="/register"
+ *   href="/signup"
  * />
  * ```
  */

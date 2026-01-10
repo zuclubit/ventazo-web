@@ -45,3 +45,6 @@ export {
 } from './hooks';
 
 export type { ConversationSummary, UseAIAssistantReturn } from './hooks';
+
+// Streaming Module
+export * from './streaming';

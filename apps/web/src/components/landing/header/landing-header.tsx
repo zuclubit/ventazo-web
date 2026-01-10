@@ -55,7 +55,7 @@ export function LandingHeader({
     ctaButtons: [
       {
         label: t.nav.startFree,
-        href: '/register',
+        href: '/signup',
         variant: 'primary',
       },
     ],

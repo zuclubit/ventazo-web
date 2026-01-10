@@ -8,6 +8,8 @@ import { usePathname } from 'next/navigation';
 import {
   BarChart3,
   BookOpen,
+  Bot,
+  Brain,
   Building2,
   Calendar,
   ChevronDown,
@@ -18,6 +20,7 @@ import {
   Mail,
   MessageSquare,
   Settings,
+  Sparkles,
   Target,
   Users,
   Wallet,
@@ -53,6 +56,7 @@ const navigation: NavSection[] = [
     title: 'Principal',
     items: [
       { title: 'Dashboard', href: '/app', icon: Home },
+      { title: 'Asistente IA', href: '/app/assistant', icon: Sparkles, badge: 'Nuevo' },
       { title: 'Leads', href: '/app/leads', icon: Users, badge: '12' },
       { title: 'Oportunidades', href: '/app/opportunities', icon: Target },
       { title: 'Clientes', href: '/app/customers', icon: Building2 },
@@ -78,6 +82,7 @@ const navigation: NavSection[] = [
     title: 'Automatización',
     items: [
       { title: 'Workflows', href: '/app/workflows', icon: Workflow },
+      { title: 'AI Insights', href: '/app/ai-insights', icon: Brain },
       { title: 'Reportes', href: '/app/reports', icon: BarChart3 },
     ],
   },
