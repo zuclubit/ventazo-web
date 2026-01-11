@@ -151,16 +151,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install root dependencies
+      - name: Install dependencies
         working-directory: .
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
-      - name: Build ui-kit package
+      - name: Build dependencies with turbo
         working-directory: .
-        run: npm run build --workspace=@zuclubit/ui-kit
-
-      - name: Install web dependencies
-        run: npm ci
+        run: npx turbo run build --filter=@zuclubit/ui-kit
 
       - name: Build for Cloudflare Pages
         run: npm run build:cf
