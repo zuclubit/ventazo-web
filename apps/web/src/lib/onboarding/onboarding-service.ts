@@ -37,36 +37,9 @@ function getAuthHeaders(tenantId?: string): HeadersInit {
 }
 
 // ============================================
-// Auth Functions (Backend API)
+// NOTE: User registration now happens via Zuclubit SSO
+// All auth is handled in /api/auth/callback/zuclubit-sso
 // ============================================
-
-/**
- * Register a new user via backend API
- */
-export async function signupUser(data: SignupFormData): Promise<{ userId: string; confirmationRequired: boolean }> {
-  const response = await fetch(`${API_URL}/api/v1/auth/register`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      email: data.email,
-      password: data.password,
-      fullName: `${data.firstName} ${data.lastName}`,
-    }),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.message || 'Registration failed');
-  }
-
-  return {
-    userId: result.user.id,
-    confirmationRequired: result.confirmationRequired,
-  };
-}
 
 // ============================================
 // Onboarding Progress Functions (Backend API)

@@ -292,7 +292,7 @@ function ToolResultCard({ execution }: ToolResultCardProps) {
               <p className="text-xs text-muted-foreground truncate mt-0.5">
                 {execution.success
                   ? `Completado en ${formatExecutionTime(execution.executionTimeMs)}`
-                  : execution.error || 'Error desconocido'}
+                  : execution.error || 'Error en la ejecución - ver detalles'}
               </p>
             </div>
 

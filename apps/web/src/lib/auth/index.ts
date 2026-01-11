@@ -33,17 +33,12 @@ export {
 } from './cookie-manager';
 export type { AuthSyncEvent } from './cookie-manager';
 
-// Auth Service (Backend API)
+// Auth Service (SSO Backend API)
 export {
-  login,
-  register,
   logout,
   restoreSession,
   switchTenant,
   subscribeToAuthChanges,
-  requestPasswordReset,
-  resendConfirmationEmail,
-  updatePassword,
   fetchTenantDetails,
 } from './auth-service';
 

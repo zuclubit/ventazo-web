@@ -1,15 +1,16 @@
 /**
- * Supabase Server Client
+ * Supabase Server Storage Client
  *
- * Creates a Supabase client for use in server components, route handlers, and server actions.
- * This replaces the deprecated @supabase/auth-helpers-nextjs pattern.
+ * Creates a Supabase client for server-side file storage operations.
+ * Authentication is handled separately via Zuclubit SSO.
  *
- * @see https://supabase.com/docs/guides/auth/server-side/nextjs
+ * Used for:
+ * - Server-side file uploads
+ * - Admin storage operations
  */
 
 import 'server-only';
 import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 
 // ============================================
 // Environment Variables
@@ -20,32 +21,23 @@ const SUPABASE_ANON_KEY = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'] || '';
 const SUPABASE_SERVICE_KEY = process.env['SUPABASE_SERVICE_KEY'] || '';
 
 // ============================================
-// Server Client for Route Handlers
+// Storage Clients
 // ============================================
 
 /**
- * Create Supabase client for route handlers
- * This client has access to the user's session via cookies
+ * Create Supabase storage client for server routes
+ * Uses anon key - for basic storage operations
  */
-export async function createRouteHandlerClient(): Promise<SupabaseClient> {
+export function createStorageClient(): SupabaseClient {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     console.warn('[Supabase Server] Missing SUPABASE_URL or SUPABASE_ANON_KEY');
   }
 
-  const cookieStore = await cookies();
-
   return createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
-      flowType: 'pkce',
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
-    },
-    global: {
-      headers: {
-        // Pass cookies for auth
-        cookie: cookieStore.toString(),
-      },
     },
   });
 }
@@ -53,6 +45,7 @@ export async function createRouteHandlerClient(): Promise<SupabaseClient> {
 /**
  * Create Supabase admin client with service role
  * Use with caution - bypasses RLS
+ * For admin storage operations only
  */
 export function createServiceClient(): SupabaseClient {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
@@ -66,6 +59,11 @@ export function createServiceClient(): SupabaseClient {
     },
   });
 }
+
+/**
+ * @deprecated Use createStorageClient instead
+ */
+export const createRouteHandlerClient = createStorageClient;
 
 // Export types
 export type { SupabaseClient };

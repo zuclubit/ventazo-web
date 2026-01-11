@@ -40,13 +40,6 @@ export {
   AuthFooterLinks,
 } from './ui';
 
-// UI Components - SSO / Social Auth
-export {
-  SSOButtons,
-  GoogleSignInButton,
-  MicrosoftSignInButton,
-} from './ui';
-
 // UI Components - Skeletons
 export {
   AuthFormSkeleton,

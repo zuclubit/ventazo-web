@@ -5,9 +5,8 @@
 // Types
 export * from './types';
 
-// Service
+// Service (SSO-only - no signupUser, auth handled via /api/auth/callback/zuclubit-sso)
 export {
-  signupUser,
   getOnboardingStatus,
   updateOnboardingProgress,
   createTenant,

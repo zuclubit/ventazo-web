@@ -49,20 +49,6 @@ export { BrandLogo } from './brand-logo';
 export { AuthFooterLinks } from './auth-footer-links';
 
 // ============================================
-// SSO / Social Auth Components
-// ============================================
-
-export {
-  SSOButtons,
-  GoogleSignInButton,
-  MicrosoftSignInButton,
-  type SSOProvider,
-  type SSOButtonsProps,
-  type GoogleSignInButtonProps,
-  type MicrosoftSignInButtonProps,
-} from './sso-buttons';
-
-// ============================================
 // Skeleton Components
 // ============================================
 

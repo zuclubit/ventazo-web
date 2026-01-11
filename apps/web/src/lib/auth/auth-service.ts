@@ -1,6 +1,6 @@
 // ============================================
-// Auth Service - Backend Integration
-// All authentication goes through the backend API
+// Auth Service - SSO Backend Integration
+// All authentication goes through Zuclubit SSO
 // ============================================
 
 import {
@@ -17,9 +17,7 @@ import {
 import {
   type AuthUser,
   type AuthTokens,
-  type LoginCredentials,
   type LoginResponse,
-  type RegisterCredentials,
   type TenantMembership,
   type Tenant,
   type Permission,
@@ -37,47 +35,6 @@ const API_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
 /**
  * Backend API response types
  */
-interface BackendLoginResponse {
-  user: {
-    id: string;
-    email: string;
-    fullName: string | null;
-    avatarUrl: string | null;
-    phone: string | null;
-    isActive: boolean;
-    metadata: Record<string, unknown>;
-  };
-  session: {
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: number;
-    expiresAt: number;
-  };
-  tenants: Array<{
-    id: string;
-    name: string;
-    slug: string;
-    role: string;
-    plan?: 'free' | 'starter' | 'pro' | 'enterprise';
-    isActive?: boolean;
-  }>;
-}
-
-interface BackendRegisterResponse {
-  user: {
-    id: string;
-    email: string;
-    fullName: string | null;
-  };
-  session: {
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: number;
-    expiresAt: number;
-  } | null;
-  confirmationRequired: boolean;
-}
-
 interface BackendRefreshResponse {
   accessToken: string;
   refreshToken: string;
@@ -241,190 +198,6 @@ async function refreshTokenViaBackend(refreshToken: string): Promise<AuthTokens 
 }
 
 /**
- * Login with email and password
- */
-export async function login(
-  credentials: LoginCredentials,
-  tenantId?: string
-): Promise<LoginResponse> {
-  try {
-    const response = await fetch(`${API_URL}/api/v1/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: credentials.email,
-        password: credentials.password,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      // Handle specific error codes
-      if (data.code === 'EMAIL_NOT_CONFIRMED') {
-        throw new AuthError(
-          AuthErrorCode.EMAIL_NOT_CONFIRMED,
-          'Please verify your email address before logging in'
-        );
-      }
-      throw new AuthError(
-        AuthErrorCode.INVALID_CREDENTIALS,
-        data.message || 'Invalid email or password'
-      );
-    }
-
-    const loginData = data as BackendLoginResponse;
-
-    // Create tokens object
-    const tokens: AuthTokens = {
-      accessToken: loginData.session.accessToken,
-      refreshToken: loginData.session.refreshToken,
-      expiresIn: loginData.session.expiresIn,
-      expiresAt: loginData.session.expiresAt,
-    };
-
-    // Store tokens in memory and cookies
-    setTokens(tokens);
-    setAuthCookies({
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiresIn: tokens.expiresIn,
-    });
-
-    // Setup refresh callback
-    setRefreshCallback(async () => {
-      const currentTokens = getTokens();
-      if (!currentTokens?.refreshToken) return null;
-      return refreshTokenViaBackend(currentTokens.refreshToken);
-    });
-
-    // Map tenants to TenantMembership format
-    const tenants: TenantMembership[] = loginData.tenants.map((t) => ({
-      id: t.id,
-      tenantId: t.id,
-      tenant: {
-        id: t.id,
-        name: t.name,
-        slug: t.slug,
-        plan: t.plan || 'free', // Use plan from backend, default to 'free'
-        isActive: t.isActive ?? true,
-        createdAt: new Date().toISOString(),
-      },
-      role: t.role as UserRole,
-      isActive: true,
-    }));
-
-    // Determine which tenant to use
-    let selectedTenantId = tenantId;
-    if (!selectedTenantId && tenants.length > 0) {
-      const firstTenant = tenants[0];
-      if (firstTenant) {
-        selectedTenantId = firstTenant.tenantId;
-      }
-    }
-
-    // Find selected tenant role
-    const selectedTenant = tenants.find((t) => t.tenantId === selectedTenantId);
-    const selectedRole = selectedTenant?.role || 'viewer';
-
-    // Build auth user
-    const authUser: AuthUser = {
-      id: loginData.user.id,
-      email: loginData.user.email,
-      fullName: loginData.user.fullName ?? undefined,
-      avatarUrl: loginData.user.avatarUrl ?? undefined,
-      tenantId: selectedTenantId || '',
-      role: selectedRole as UserRole,
-      permissions: getPermissionsForRole(selectedRole as UserRole),
-      isActive: loginData.user.isActive,
-      createdAt: new Date().toISOString(),
-    };
-
-    return {
-      user: authUser,
-      tokens,
-      tenants,
-    };
-  } catch (error) {
-    clearTokens();
-    if (error instanceof AuthError) throw error;
-
-    const message = error instanceof Error ? error.message : 'Login failed';
-    throw new AuthError(AuthErrorCode.INVALID_CREDENTIALS, message, error);
-  }
-}
-
-/**
- * Register new user
- */
-export async function register(
-  credentials: RegisterCredentials
-): Promise<{ message: string; confirmationRequired: boolean }> {
-  try {
-    const response = await fetch(`${API_URL}/api/v1/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: credentials.email,
-        password: credentials.password,
-        fullName: credentials.fullName,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new AuthError(
-        AuthErrorCode.EMAIL_EXISTS,
-        data.message || 'Registration failed'
-      );
-    }
-
-    const registerData = data as BackendRegisterResponse;
-
-    return {
-      message: registerData.confirmationRequired
-        ? 'Registration successful. Please check your email to verify your account.'
-        : 'Registration successful.',
-      confirmationRequired: registerData.confirmationRequired,
-    };
-  } catch (error) {
-    if (error instanceof AuthError) throw error;
-
-    const message = error instanceof Error ? error.message : 'Registration failed';
-    throw new AuthError(AuthErrorCode.UNKNOWN_ERROR, message, error);
-  }
-}
-
-/**
- * Logout
- */
-export async function logout(): Promise<void> {
-  try {
-    const tokens = getTokens();
-    if (tokens?.accessToken) {
-      await fetch(`${API_URL}/api/v1/auth/logout`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${tokens.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }).catch(() => {
-        // Ignore errors on logout
-      });
-    }
-  } finally {
-    clearTokens();
-    clearAuthCookies();
-    setRefreshCallback(null);
-  }
-}
-
-/**
  * Parse JWT to extract payload
  */
 function parseJwtPayload(token: string): { exp?: number; sub?: string; email?: string } {
@@ -450,7 +223,32 @@ function getExpiryFromToken(token: string): number {
 }
 
 /**
+ * Logout - revoke tokens and clear session
+ */
+export async function logout(): Promise<void> {
+  try {
+    const tokens = getTokens();
+    if (tokens?.accessToken) {
+      await fetch(`${API_URL}/api/v1/auth/logout`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokens.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }).catch(() => {
+        // Ignore errors on logout
+      });
+    }
+  } finally {
+    clearTokens();
+    clearAuthCookies();
+    setRefreshCallback(null);
+  }
+}
+
+/**
  * Restore session from stored tokens (memory or cookies)
+ * Used after SSO callback to hydrate auth state
  */
 export async function restoreSession(
   tenantId?: string
@@ -597,80 +395,11 @@ export async function switchTenant(
 }
 
 /**
- * Request password reset
- */
-export async function requestPasswordReset(email: string): Promise<void> {
-  await fetch(`${API_URL}/api/v1/auth/forgot-password`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email }),
-  });
-  // Always succeed to not reveal if email exists
-}
-
-/**
- * Resend confirmation email
- */
-export async function resendConfirmationEmail(email: string): Promise<{ success: boolean; message: string }> {
-  try {
-    const response = await fetch(`${API_URL}/api/v1/auth/resend-confirmation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email }),
-    });
-
-    const data = await response.json();
-    return {
-      success: true,
-      message: data.message || 'Confirmation email sent',
-    };
-  } catch {
-    // Always return success to not reveal email status
-    return {
-      success: true,
-      message: 'If the email exists and is unconfirmed, a new confirmation link will be sent.',
-    };
-  }
-}
-
-/**
- * Update password
- */
-export async function updatePassword(newPassword: string): Promise<void> {
-  const tokens = getTokens();
-  if (!tokens?.accessToken) {
-    throw new AuthError(AuthErrorCode.SESSION_EXPIRED, 'No active session');
-  }
-
-  const response = await fetch(`${API_URL}/api/v1/auth/update-password`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${tokens.accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ password: newPassword }),
-  });
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new AuthError(
-      AuthErrorCode.UNKNOWN_ERROR,
-      data.message || 'Failed to update password'
-    );
-  }
-}
-
-/**
  * Subscribe to auth state changes
- * Since we're not using Supabase client-side anymore, this is a no-op
- * The auth state is managed via token-manager
+ * No-op - auth state is managed via token-manager
  */
 export function subscribeToAuthChanges(
-  callback: (event: string) => void
+  _callback: (event: string) => void
 ): () => void {
   // No-op - auth state is managed locally via tokens
   // Return unsubscribe function

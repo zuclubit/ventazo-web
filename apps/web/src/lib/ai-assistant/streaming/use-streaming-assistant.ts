@@ -279,16 +279,38 @@ export function useStreamingAssistant(
         params = { raw: tool.arguments };
       }
 
+      // Map tool status: use-streaming-chat uses 'done'/'error', we need 'success'/'error'
+      let status: ToolExecution['status'];
+      if (tool.status === 'done') {
+        status = 'success';
+      } else if (tool.status === 'error') {
+        status = 'error';
+      } else if (tool.status === 'pending') {
+        status = 'pending';
+      } else {
+        status = 'executing';
+      }
+
+      // Result structure: tool.result is the raw result, tool.error is the error string
+      // For nested result data, check if result has a data property
+      const resultData = tool.result && typeof tool.result === 'object' && 'data' in tool.result
+        ? (tool.result as { data: unknown }).data
+        : tool.result;
+      const errorMsg = tool.error || (tool.result && typeof tool.result === 'object' && 'error' in tool.result
+        ? (tool.result as { error: string }).error
+        : undefined);
+      const execTime = tool.result && typeof tool.result === 'object' && 'executionTimeMs' in tool.result
+        ? (tool.result as { executionTimeMs: number }).executionTimeMs
+        : undefined;
+
       actions.push({
         id,
         name: tool.name,
         parameters: params,
-        status: tool.status === 'complete'
-          ? (tool.result?.success ? 'success' : 'error')
-          : tool.status === 'pending' ? 'pending' : 'executing',
-        result: tool.result?.data,
-        error: tool.result?.error,
-        executionTimeMs: tool.result?.executionTimeMs,
+        status,
+        result: resultData,
+        error: errorMsg,
+        executionTimeMs: execTime,
       });
     });
     return actions;
