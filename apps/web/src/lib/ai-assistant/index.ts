@@ -57,3 +57,12 @@ export type {
 
 // Streaming Module
 export * from './streaming';
+
+// CRM Context Hook
+export { useCrmContext } from './hooks/use-crm-context';
+export type {
+  CrmEntityType,
+  CrmContextEntity,
+  SuggestedAction,
+  CrmContext,
+} from './hooks/use-crm-context';

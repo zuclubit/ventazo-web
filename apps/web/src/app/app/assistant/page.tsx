@@ -35,12 +35,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAIHealth, type AIChatMessage } from '@/lib/ai-assistant';
-import { useStreamingAssistant } from '@/lib/ai-assistant/streaming';
+import { useAIHealth, useCrmContext, type AIChatMessage } from '@/lib/ai-assistant';
+import { useStreamingAssistant, type CrmContextInfo } from '@/lib/ai-assistant/streaming';
 import { cn } from '@/lib/utils';
 
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 import { ConversationHistorySidebar } from './components/ConversationHistorySidebar';
+import { ToolResultsDisplay } from './components/ToolResultsDisplay';
 
 // ============================================
 // Types
@@ -54,7 +55,7 @@ interface Message {
   isStreaming?: boolean;
 }
 
-type StreamingStatus = 'idle' | 'thinking' | 'searching' | 'analyzing' | 'writing';
+type StreamingStatus = 'idle' | 'thinking' | 'searching' | 'analyzing' | 'writing' | 'executing';
 
 // ============================================
 // Confirmation Card Component
@@ -126,6 +127,7 @@ function StatusIndicator({ status, isStreaming }: StatusIndicatorProps) {
     thinking: { icon: Sparkles, text: 'Pensando...', color: 'text-purple-400' },
     searching: { icon: Search, text: 'Buscando datos...', color: 'text-blue-400' },
     analyzing: { icon: Database, text: 'Analizando información...', color: 'text-emerald-400' },
+    executing: { icon: Zap, text: 'Ejecutando acciones CRM...', color: 'text-amber-400' },
     writing: { icon: MessageSquare, text: 'Escribiendo respuesta...', color: 'text-[var(--tenant-primary)]' },
   };
 
@@ -143,15 +145,14 @@ function StatusIndicator({ status, isStreaming }: StatusIndicatorProps) {
 }
 
 // ============================================
-// Suggested Actions
+// Types for Suggested Actions
 // ============================================
 
-const SUGGESTED_ACTIONS = [
-  { label: 'Mis leads activos', prompt: 'Muéstrame mis leads activos', icon: '📋' },
-  { label: 'Crear tarea', prompt: 'Crea una tarea de seguimiento para mañana', icon: '✅' },
-  { label: 'Resumen del día', prompt: '¿Cuál es el resumen de mi día?', icon: '📊' },
-  { label: 'Leads calientes', prompt: 'Muéstrame los leads con score mayor a 70', icon: '🔥' },
-];
+interface SuggestedActionItem {
+  label: string;
+  prompt: string;
+  icon: string;
+}
 
 // ============================================
 // Message Bubble Component
@@ -236,7 +237,13 @@ function MessageBubble({ message, isLatest }: MessageBubbleProps) {
 // Empty State Component
 // ============================================
 
-function EmptyState({ onSuggest }: { onSuggest: (prompt: string) => void }) {
+interface EmptyStateProps {
+  onSuggest: (prompt: string) => void;
+  suggestedActions: SuggestedActionItem[];
+  hasContext?: boolean;
+}
+
+function EmptyState({ onSuggest, suggestedActions, hasContext }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">
       <div className="relative mb-6">
@@ -249,12 +256,18 @@ function EmptyState({ onSuggest }: { onSuggest: (prompt: string) => void }) {
       <h2 className="text-2xl font-bold mb-2">Asistente IA</h2>
       <p className="text-muted-foreground mb-8 max-w-md">
         Tu asistente personal de CRM con respuestas en <span className="text-[var(--tenant-primary)] font-medium">tiempo real</span>.
-        Gestiona leads, tareas, oportunidades y más con lenguaje natural.
+        {hasContext ? (
+          <span className="block mt-1 text-[var(--tenant-primary)]">
+            Puedo ayudarte con acciones relacionadas a la página actual.
+          </span>
+        ) : (
+          ' Gestiona leads, tareas, oportunidades y más con lenguaje natural.'
+        )}
       </p>
 
       {/* Suggested Actions */}
       <div className="grid grid-cols-2 gap-3 max-w-lg w-full">
-        {SUGGESTED_ACTIONS.map((action) => (
+        {suggestedActions.map((action) => (
           <Button
             key={action.label}
             variant="outline"
@@ -294,6 +307,9 @@ export default function AssistantPage() {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
+  // CRM Context - detects current page/entity
+  const crmContext = useCrmContext();
+
   // AI Hooks - integrate with bot-helper backend
   const { data: health, isLoading: healthLoading } = useAIHealth();
   const {
@@ -301,9 +317,11 @@ export default function AssistantPage() {
     conversationId,
     isLoading,
     isStreaming,
+    isExecutingTools,
     isLoadingConversation,
     error,
     pendingConfirmation,
+    executedActions,
     sendMessage,
     confirmAction,
     startNewConversation,
@@ -322,10 +340,16 @@ export default function AssistantPage() {
     }));
   }, [aiMessages, isStreaming]);
 
-  // Update streaming status based on content
+  // Update streaming status based on content and tool execution
   React.useEffect(() => {
-    if (!isLoading && !isStreaming) {
+    if (!isLoading && !isStreaming && !isExecutingTools) {
       setStreamingStatus('idle');
+      return;
+    }
+
+    // Check if executing tools
+    if (isExecutingTools) {
+      setStreamingStatus('executing');
       return;
     }
 
@@ -339,7 +363,7 @@ export default function AssistantPage() {
     } else {
       setStreamingStatus('writing');
     }
-  }, [isLoading, isStreaming, messages]);
+  }, [isLoading, isStreaming, isExecutingTools, messages]);
 
   // Auto-scroll to bottom on new messages
   React.useEffect(() => {
@@ -351,6 +375,27 @@ export default function AssistantPage() {
     inputRef.current?.focus();
   }, []);
 
+  // Build context info for AI
+  const buildContextInfo = React.useCallback((): CrmContextInfo | undefined => {
+    if (!crmContext.hasEntityContext) return undefined;
+
+    const entity = crmContext.entity;
+    const contextInfo: CrmContextInfo = {
+      contextPrompt: crmContext.contextPrompt,
+    };
+
+    // Map entity type to expected format
+    if (entity.type && ['lead', 'customer', 'opportunity', 'task', 'quote'].includes(entity.type)) {
+      contextInfo.entityType = entity.type as CrmContextInfo['entityType'];
+    }
+
+    if (entity.id) {
+      contextInfo.entityId = entity.id;
+    }
+
+    return contextInfo;
+  }, [crmContext]);
+
   const handleSend = React.useCallback(async (messageText?: string) => {
     const text = messageText || input.trim();
     if (!text || isLoading) return;
@@ -359,12 +404,13 @@ export default function AssistantPage() {
     setStreamingStatus('thinking');
 
     try {
-      await sendMessage(text);
+      const contextInfo = buildContextInfo();
+      await sendMessage(text, contextInfo);
     } catch (err) {
       console.error('Failed to send message:', err);
       setStreamingStatus('idle');
     }
-  }, [input, isLoading, sendMessage]);
+  }, [input, isLoading, sendMessage, buildContextInfo]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -481,7 +527,11 @@ export default function AssistantPage() {
       {/* Messages Area */}
       <ScrollArea ref={scrollRef} className="flex-1 p-4">
         {messages.length === 0 ? (
-          <EmptyState onSuggest={(prompt) => handleSend(prompt)} />
+          <EmptyState
+            onSuggest={(prompt) => handleSend(prompt)}
+            suggestedActions={crmContext.suggestedActions}
+            hasContext={crmContext.hasEntityContext}
+          />
         ) : (
           <div className="space-y-4 pb-4 max-w-4xl mx-auto">
             {messages.map((message, idx) => (
@@ -491,6 +541,22 @@ export default function AssistantPage() {
                 isLatest={idx === messages.length - 1}
               />
             ))}
+
+            {/* Tool Execution Results */}
+            {(executedActions.length > 0 || isExecutingTools) && (
+              <ToolResultsDisplay
+                executedActions={executedActions.map((action) => ({
+                  sequence: parseInt(action.id, 10) || 0,
+                  toolName: action.name,
+                  parameters: action.parameters,
+                  success: action.status === 'success',
+                  result: action.result,
+                  error: action.error,
+                  executionTimeMs: action.executionTimeMs || 0,
+                }))}
+                isExecuting={isExecutingTools}
+              />
+            )}
 
             {/* Pending Confirmation */}
             {pendingConfirmation && (

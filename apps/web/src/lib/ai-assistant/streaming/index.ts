@@ -12,4 +12,4 @@ export * from './types';
 // Hooks
 export { useStreamingChat } from './use-streaming-chat';
 export { useStreamingAssistant } from './use-streaming-assistant';
-export type { UseStreamingAssistantReturn } from './use-streaming-assistant';
+export type { UseStreamingAssistantReturn, ToolExecution, CrmContextInfo } from './use-streaming-assistant';

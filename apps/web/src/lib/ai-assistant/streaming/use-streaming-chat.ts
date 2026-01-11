@@ -60,6 +60,8 @@ export function useStreamingChat(
   const abortControllerRef = React.useRef<AbortController | null>(null);
   const conversationIdRef = React.useRef(conversationId);
   const handlersRef = React.useRef(handlers);
+  // Ref for tracking accumulated content synchronously (avoids stale closure issues)
+  const accumulatedContentRef = React.useRef('');
 
   // Keep refs updated
   React.useEffect(() => {
@@ -72,18 +74,42 @@ export function useStreamingChat(
   // ============================================
 
   const processEvent = React.useCallback((eventType: SSEEventType, data: unknown) => {
-    switch (eventType) {
-      case 'token': {
-        const tokenData = data as TokenEventData;
+    // Handle events based on data.type field (backend format) or eventType (standard SSE format)
+    const eventData = data as Record<string, unknown>;
+    const actualEventType = (eventData.type as string) || eventType;
+
+    switch (actualEventType) {
+      case 'start': {
+        // Handle stream start event from backend
         setState((prev) => ({
           ...prev,
-          content: prev.content + tokenData.t,
-          tokenCount: tokenData.i + 1,
+          status: 'streaming',
+          conversationId: (eventData.conversationId as string) || prev.conversationId,
+        }));
+        break;
+      }
+
+      case 'token': {
+        // Backend sends { type: "token", content: "...", conversationId: "..." }
+        // Legacy format: { t: "...", i: ... }
+        const tokenContent = (eventData.content as string) || (eventData as TokenEventData).t || '';
+        const tokenIndex = (eventData as TokenEventData).i ?? 0;
+
+        // Update ref synchronously to avoid stale closure issues with batched updates
+        accumulatedContentRef.current += tokenContent;
+        const newContent = accumulatedContentRef.current;
+
+        setState((prev) => ({
+          ...prev,
+          status: 'streaming',
+          content: newContent,
+          tokenCount: prev.tokenCount + 1,
+          conversationId: (eventData.conversationId as string) || prev.conversationId,
         }));
         handlersRef.current?.onToken?.(
-          tokenData.t,
-          tokenData.i,
-          state.content + tokenData.t
+          tokenContent,
+          tokenIndex,
+          newContent
         );
         break;
       }
@@ -176,14 +202,18 @@ export function useStreamingChat(
       }
 
       case 'done': {
-        const doneData = data as DoneEventData;
+        // Backend sends { type: "done", conversationId: "...", finishReason: "stop", usage: {...}, totalTimeMs: ... }
         setState((prev) => ({
           ...prev,
           status: 'done',
-          conversationId: doneData.conversationId,
-          finishReason: doneData.finishReason,
+          conversationId: (eventData.conversationId as string) || prev.conversationId,
+          finishReason: (eventData.finishReason as string) || 'stop',
+          usage: eventData.usage as UsageEventData,
         }));
-        handlersRef.current?.onDone?.(doneData);
+        handlersRef.current?.onDone?.({
+          conversationId: eventData.conversationId as string,
+          finishReason: eventData.finishReason as string,
+        });
         break;
       }
 
@@ -202,7 +232,7 @@ export function useStreamingChat(
         // Keep-alive, no action needed
         break;
     }
-  }, [state.content]);
+  }, []);
 
   // ============================================
   // Stream Reader
@@ -276,6 +306,9 @@ export function useStreamingChat(
     // Create new abort controller
     const controller = new AbortController();
     abortControllerRef.current = controller;
+
+    // Reset accumulated content ref
+    accumulatedContentRef.current = '';
 
     // Reset state
     setState({
@@ -393,6 +426,7 @@ export function useStreamingChat(
 
   const reset = React.useCallback(() => {
     cancel();
+    accumulatedContentRef.current = '';
     setState(createInitialState());
   }, [cancel]);
 

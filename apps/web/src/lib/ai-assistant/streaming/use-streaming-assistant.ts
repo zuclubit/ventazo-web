@@ -21,6 +21,24 @@ import { useStreamingChat } from './use-streaming-chat';
 // Types (Compatible with useAIAssistant)
 // ============================================
 
+/** Tool execution result */
+export interface ToolExecution {
+  id: string;
+  name: string;
+  parameters: Record<string, unknown>;
+  status: 'pending' | 'executing' | 'success' | 'error';
+  result?: unknown;
+  error?: string;
+  executionTimeMs?: number;
+}
+
+/** Context to pass to the AI for entity-aware responses */
+export interface CrmContextInfo {
+  entityType?: 'lead' | 'customer' | 'opportunity' | 'task' | 'quote';
+  entityId?: string;
+  contextPrompt?: string | null;
+}
+
 export interface UseStreamingAssistantReturn {
   /** Message history */
   messages: AIChatMessage[];
@@ -30,6 +48,8 @@ export interface UseStreamingAssistantReturn {
   isLoading: boolean;
   /** Whether streaming token-by-token */
   isStreaming: boolean;
+  /** Whether executing tools */
+  isExecutingTools: boolean;
   /** Whether loading existing conversation */
   isLoadingConversation: boolean;
   /** Current error */
@@ -40,8 +60,10 @@ export interface UseStreamingAssistantReturn {
     action: string;
     description: string;
   } | null;
+  /** Executed tool actions */
+  executedActions: ToolExecution[];
   /** Send a message (starts streaming) */
-  sendMessage: (message: string) => Promise<void>;
+  sendMessage: (message: string, context?: CrmContextInfo) => Promise<void>;
   /** Confirm/cancel pending action */
   confirmAction: (
     decision: 'confirm' | 'cancel' | 'modify',
@@ -117,7 +139,7 @@ export function useStreamingAssistant(
 
   // Send message
   const sendMessage = React.useCallback(
-    async (message: string) => {
+    async (message: string, context?: CrmContextInfo) => {
       setError(null);
 
       // Add user message immediately
@@ -136,8 +158,27 @@ export function useStreamingAssistant(
       };
       setMessages((prev) => [...prev, assistantMessage]);
 
+      // Build request with optional context
+      const request: { message: string; context?: { entityType?: string; entityId?: string; data?: Record<string, unknown> }; systemPrompt?: string } = {
+        message,
+      };
+
+      // Add CRM context if provided
+      if (context) {
+        if (context.entityType || context.entityId) {
+          request.context = {
+            entityType: context.entityType,
+            entityId: context.entityId,
+          };
+        }
+        // Add context prompt as additional system instructions
+        if (context.contextPrompt) {
+          request.systemPrompt = context.contextPrompt;
+        }
+      }
+
       // Start streaming
-      streaming.sendMessage({ message });
+      streaming.sendMessage(request);
     },
     [streaming]
   );
@@ -227,14 +268,44 @@ export function useStreamingAssistant(
     }
   }, []);
 
+  // Convert tool calls to executed actions array
+  const executedActions = React.useMemo((): ToolExecution[] => {
+    const actions: ToolExecution[] = [];
+    streaming.state.toolCalls.forEach((tool, id) => {
+      let params: Record<string, unknown> = {};
+      try {
+        params = tool.arguments ? JSON.parse(tool.arguments) : {};
+      } catch {
+        params = { raw: tool.arguments };
+      }
+
+      actions.push({
+        id,
+        name: tool.name,
+        parameters: params,
+        status: tool.status === 'complete'
+          ? (tool.result?.success ? 'success' : 'error')
+          : tool.status === 'pending' ? 'pending' : 'executing',
+        result: tool.result?.data,
+        error: tool.result?.error,
+        executionTimeMs: tool.result?.executionTimeMs,
+      });
+    });
+    return actions;
+  }, [streaming.state.toolCalls]);
+
+  const isExecutingTools = streaming.state.status === 'tool_calling';
+
   return {
     messages,
     conversationId,
     isLoading: streaming.isStreaming,
     isStreaming: streaming.state.status === 'streaming',
+    isExecutingTools,
     isLoadingConversation,
     error,
     pendingConfirmation,
+    executedActions,
     sendMessage,
     confirmAction,
     clearConversation,
