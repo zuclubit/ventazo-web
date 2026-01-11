@@ -27,7 +27,26 @@ const SESSION_DURATION_DAYS = 7;
 // Backend API configuration for token exchange
 const rawApiUrl = process.env['API_URL'] || process.env['NEXT_PUBLIC_API_URL'] || 'https://zuclubit-lead-service.fly.dev';
 const API_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
-const INTERNAL_API_KEY = process.env['INTERNAL_API_KEY'] || '';
+
+/**
+ * Get INTERNAL_API_KEY at runtime (for Cloudflare Workers compatibility)
+ */
+function getInternalApiKey(): string {
+  // Try Cloudflare context first (runtime)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getCloudflareContext } = require('@opennextjs/cloudflare');
+    const ctx = getCloudflareContext();
+    if (ctx?.env?.INTERNAL_API_KEY) {
+      return ctx.env.INTERNAL_API_KEY;
+    }
+  } catch {
+    // Not in Cloudflare environment
+  }
+
+  // Fall back to process.env (works in Node.js / build time)
+  return process.env['INTERNAL_API_KEY'] || '';
+}
 
 /**
  * Response from backend /oauth/exchange endpoint
@@ -273,7 +292,8 @@ export async function GET(request: NextRequest) {
 
     // Try to exchange SSO tokens for native backend tokens
     // This is CRITICAL for API calls to work properly
-    if (INTERNAL_API_KEY) {
+    const internalApiKey = getInternalApiKey();
+    if (internalApiKey) {
       try {
         console.log('[SSO Callback] Exchanging SSO tokens for backend native tokens...');
 
@@ -281,7 +301,7 @@ export async function GET(request: NextRequest) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Internal-API-Key': INTERNAL_API_KEY,
+            'X-Internal-API-Key': internalApiKey,
           },
           body: JSON.stringify({
             userId: payload.sub,
@@ -334,6 +354,7 @@ export async function GET(request: NextRequest) {
     } else {
       console.warn('[SSO Callback] INTERNAL_API_KEY not configured - using SSO tokens');
       console.warn('[SSO Callback] API calls to backend may fail with 401');
+      console.warn('[SSO Callback] Checked process.env and Cloudflare context');
     }
 
     // Create session token with the best available tokens
