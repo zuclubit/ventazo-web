@@ -155,6 +155,10 @@ jobs:
         working-directory: .
         run: npm ci
 
+      - name: Build ui-kit package
+        working-directory: packages/ui-kit
+        run: npm run build
+
       - name: Install web dependencies
         run: npm ci
 
