@@ -153,7 +153,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: .
-        run: npm ci --legacy-peer-deps
+        run: |
+          npm ci
+          npm install @rollup/rollup-linux-x64-gnu --save-optional
 
       - name: Build dependencies with turbo
         working-directory: .
