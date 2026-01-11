@@ -156,8 +156,8 @@ jobs:
         run: npm ci
 
       - name: Build ui-kit package
-        working-directory: packages/ui-kit
-        run: npm run build
+        working-directory: .
+        run: npm run build --workspace=@zuclubit/ui-kit
 
       - name: Install web dependencies
         run: npm ci
